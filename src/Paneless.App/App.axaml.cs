@@ -326,6 +326,48 @@ public partial class App : Application
             if (pvm.IsInventoryPage && main.Inventory is { } inv) await inv.Refresh();
             await Task.Delay(800);
         }
+        else if (view == "wall-menu" && main.DataContext is MainViewModel wvm)
+        {
+            // The Wall in demo mode: a tile's right-click menu (is every item wired?), then moving, resizing and hiding, logged.
+            main.Height = 780; main.Width = 1240;
+            wvm.Page = "Wall";
+            await Task.Delay(1500);
+            var log = new System.Text.StringBuilder();
+            var wall = main.Wall!;
+            string Order() => string.Join(", ", wall.Tiles.Select(t => $"{t.Name} {t.Width:0}{(t.HasOwnSize ? "*" : "")}{(t.ScreenOff ? " off" : "")}"));
+            log.AppendLine("tiles: " + Order());
+            if (main.GetVisualDescendants().OfType<Button>().FirstOrDefault(b => b.Classes.Contains("tile")) is { ContextMenu: { } menu } tile)
+            {
+                menu.Open(tile);
+                await Task.Delay(400);
+                async Task Dump(IEnumerable<object> items, string indent)
+                {
+                    foreach (var mi in items.OfType<MenuItem>().ToList())
+                    {
+                        log.AppendLine($"{indent}{mi.Header} visible={mi.IsVisible} enabled={mi.IsEffectivelyEnabled} command={(mi.Command != null ? "yes" : mi.Items.Count > 0 ? "submenu" : "NO")}");
+                        if (mi.Items.Count == 0) continue;
+                        mi.Open();   // submenu items are only enabled once they're shown
+                        await Task.Delay(300);
+                        await Dump(mi.Items.OfType<object>(), indent + "  ");
+                        mi.Close();
+                    }
+                }
+                log.AppendLine($"menu open={menu.IsOpen} for {(tile.DataContext as WallTile)?.Name}");
+                await Dump(menu.Items.OfType<object>(), "  ");
+                menu.Close();
+            }
+            else log.AppendLine("FAIL no tile with a context menu");
+            var first = wall.Tiles[0];
+            wall.MoveLastCommand.Execute(first); log.AppendLine("moved first to the end: " + Order());
+            wall.LargerCommand.Execute(first); log.AppendLine("made it larger: " + Order());
+            wall.TileWidth = 180; log.AppendLine("slider to 180: " + Order());
+            wall.HideCommand.Execute(wall.Tiles[0]); log.AppendLine($"hid the first: {Order()} | hidden={wall.HiddenCount} button=\"{wall.ShowHiddenText}\"");
+            await wall.ShowHiddenCommand.ExecuteAsync(null); log.AppendLine("show hidden: " + Order());
+            wall.SortByNameCommand.Execute(null); wall.SameSizeCommand.Execute(first); wall.TileWidth = 220;
+            log.AppendLine("sorted by name, same size, slider 220: " + Order());
+            await File.WriteAllTextAsync(path + ".wall.txt", log.ToString());
+            await Task.Delay(500);
+        }
         else if (view == "mcp-selftest" && main.DataContext is MainViewModel)
         {
             await McpSelfTestAsync(main, path);

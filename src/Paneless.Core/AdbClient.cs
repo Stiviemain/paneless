@@ -161,6 +161,18 @@ public sealed partial class AdbClient(string adbPath)
         return null;
     }
 
+    /// <summary>Whether the screen is on (awake, or showing a screensaver); null if that couldn't be read.
+    /// A screenshot of a screen that is off or dozing (always-on display) is just black.</summary>
+    public async Task<bool?> IsScreenOnAsync(string serial)
+    {
+        var r = await ShellAsync(serial, "dumpsys power | grep -m1 mWakefulness=", TimeSpan.FromSeconds(5));
+        return ParseScreenOn(r.Output);
+    }
+
+    /// <summary>From <c>dumpsys power</c>: "mWakefulness=Awake" (or Dreaming) is on; Asleep and Dozing are off.</summary>
+    public static bool? ParseScreenOn(string dump) =>
+        WakefulnessRx().Match(dump) is { Success: true } m ? m.Groups[1].Value is "Awake" or "Dreaming" : null;
+
     /// <summary>A PNG screenshot of the device's screen.</summary>
     public async Task<byte[]?> ScreencapAsync(string serial)
     {
@@ -334,6 +346,9 @@ public sealed partial class AdbClient(string adbPath)
     }
 
     public static bool IsIpPort(string s) => IpPortRx().IsMatch(s);
+
+    [GeneratedRegex(@"mWakefulness=(\w+)")]
+    private static partial Regex WakefulnessRx();
 
     [GeneratedRegex(@"orientation=(\d)")]
     private static partial Regex RotationRx();

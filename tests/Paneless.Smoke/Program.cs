@@ -90,6 +90,31 @@ if (args.Contains("--groups"))
     Check(AdbClient.ParseWifiIp("192.168.2.0/24 dev wlan0 proto kernel scope link src 192.168.2.55") == "192.168.2.55", "ParseWifiIp reads ip route fallback");
     Check(AdbClient.ParseWifiIp("127.0.0.1/8 scope host lo") == null, "ParseWifiIp ignores loopback");
 
+    // 8. Screen state for the Wall: a dozing or sleeping screen would give a black picture.
+    Check(AdbClient.ParseScreenOn("  mWakefulness=Awake\n") == true && AdbClient.ParseScreenOn("mWakefulness=Dreaming") == true, "screen on: Awake and Dreaming");
+    Check(AdbClient.ParseScreenOn("  mWakefulness=Dozing") == false && AdbClient.ParseScreenOn("mWakefulness=Asleep") == false, "screen off: Dozing and Asleep");
+    Check(AdbClient.ParseScreenOn("") == null, "screen state unknown when dumpsys says nothing");
+
+    // 9. Wall layout: the user's order survives devices coming and going; sizes are clamped.
+    var wall = new WallLayout();
+    Check(string.Join(",", wall.Sort(["a", "b", "c"])) == "a,b,c", "wall: no saved order keeps the given (name) order");
+    wall.Move(["a", "b", "c"], "c", 0);
+    Check(string.Join(",", wall.Sort(["a", "b", "c"])) == "c,a,b", "wall: a dragged tile keeps its new place");
+    wall.Move(["c", "b"], "b", 0);   // a is offline
+    Check(string.Join(",", wall.Sort(["a", "b", "c"])) == "b,a,c", "wall: an offline device comes back where it was");
+    Check(string.Join(",", wall.Sort(["d", "c", "a"])) == "a,c,d", "wall: a new device goes after the placed ones");
+    wall.Move(["b", "a", "c"], "b", 99);
+    Check(string.Join(",", wall.Sort(["a", "b", "c"])) == "a,c,b", "wall: moving past the end puts a tile last");
+    wall.SetWidth("a", 5000); wall.Width = 300;
+    Check(wall.WidthOf("a") == WallLayout.MaxWidth && wall.WidthOf("b") == 300 && wall.HasOwnWidth("a") && !wall.HasOwnWidth("b"), "wall: own sizes are clamped, others follow the slider");
+    wall.ClearWidth("a"); wall.Hide("b"); wall.Hide("b");
+    Check(wall.WidthOf("a") == 300 && wall.Hidden.Count == 1 && wall.IsHidden("b"), "wall: same size again, hiding twice hides once");
+    wall.ShowAll(); wall.ResetOrder();
+    Check(!wall.IsHidden("b") && string.Join(",", wall.Sort(["a", "b", "c"])) == "a,b,c", "wall: show all and sort by name");
+    var wallJson = System.Text.Json.JsonSerializer.Serialize(new AppSettings { Wall = { Width = 260, Order = ["x"], Hidden = ["y"] } });
+    var wallBack = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(wallJson)!.Wall;
+    Check(wallBack.Width == 260 && wallBack.Order.SequenceEqual(["x"]) && wallBack.IsHidden("y"), "wall: layout is saved with the settings");
+
     return okAll ? 0 : 1;
 }
 

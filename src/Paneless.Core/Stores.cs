@@ -45,6 +45,8 @@ public sealed class AppSettings
     public bool AssistantConfirm { get; set; } = true;
     /// <summary>Live wall: seconds between pictures.</summary>
     public int WallSeconds { get; set; } = 5;
+    /// <summary>Live wall: order, sizes and hidden devices.</summary>
+    public WallLayout Wall { get; set; } = new();
 }
 
 public sealed class UnlockEntry

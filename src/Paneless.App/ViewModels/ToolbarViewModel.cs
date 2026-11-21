@@ -295,7 +295,7 @@ public sealed partial class ToolbarViewModel : ObservableObject, IAsyncDisposabl
     }
 
     /// <summary>Shows the saved file in the file manager.</summary>
-    static void Reveal(string file)
+    internal static void Reveal(string file)
     {
         try
         {

@@ -113,7 +113,7 @@ The interface is built with [Avalonia](https://avaloniaui.net/), a cross-platfor
 - **Alerts:** a Windows notification when a battery runs low, storage gets full, a device gets hot, drops off the network, or an app crashes. Each alert fires once, not every minute.
 
 **Overviews**
-- **Wall:** a live picture of every device, refreshed every few seconds while the page is open. Click one to mirror it.
+- **Wall:** a live picture of every device, refreshed every few seconds while the page is open. Click one to mirror it, drag pictures into your own order, resize them all or one by one, and right-click for more: wake or unlock the screen, save a screenshot, open a second screen or apps, hide a device. Screens that are off show a Wake button instead of a black picture.
 - **Logs:** the live log (logcat) of a device, filtered by importance, text or app, with crashes in red. Save it to a file.
 - **Inventory:** model, Android version, security patch, battery, storage, RAM, address and uptime of every device. Export it as CSV for Excel or as an HTML report.
 
