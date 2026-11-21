@@ -2,6 +2,7 @@ using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Paneless.Core;
 
 namespace Paneless.App.Assistants;
 
@@ -68,11 +69,11 @@ public sealed class McpServer(AssistantTools tools) : IDisposable
             var writer = new StreamWriter(pipe, new UTF8Encoding(false), 1 << 16, leaveOpen: true) { AutoFlush = true, NewLine = "\n" };
             while (!ct.IsCancellationRequested && await reader.ReadLineAsync(ct) is { } line)
             {
-                if (line.Trim().Length == 0) continue;
+                if (McpConfig.Message(line) is not { } message) continue;
                 // Requests run concurrently (a confirmation dialog mustn't block a "ping").
                 _ = Task.Run(async () =>
                 {
-                    var reply = await HandleAsync(line, session);
+                    var reply = await HandleAsync(message, session);
                     if (reply == null) return;
                     await writeGate.WaitAsync();
                     try { await writer.WriteLineAsync(reply.ToJsonString()); }
@@ -199,7 +200,7 @@ public static class McpBridge
         {
             try
             {
-                if (JsonNode.Parse(line) is not JsonObject req || req["id"] is not { } id) continue;
+                if (McpConfig.Message(line) is not { } message || JsonNode.Parse(message) is not JsonObject req || req["id"] is not { } id) continue;
                 var err = new JsonObject
                 {
                     ["jsonrpc"] = "2.0", ["id"] = id.DeepClone(),

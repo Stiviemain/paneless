@@ -55,6 +55,14 @@ public static class McpConfig
         ? "\"" + s.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\""
         : "'" + s + "'";
 
+    /// <summary>One line an MCP client sent, ready to parse, or null for a blank line. A leading byte-order mark is
+    /// dropped: Windows PowerShell (and other .NET Framework clients) put one before the first message.</summary>
+    public static string? Message(string line)
+    {
+        var t = line.Trim().TrimStart('﻿').Trim();
+        return t.Length == 0 ? null : t;
+    }
+
     /// <summary>A readable name for an MCP client, from the clientInfo it sends when it connects.</summary>
     public static string Friendly(string? name, string? title)
     {

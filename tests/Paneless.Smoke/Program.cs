@@ -405,6 +405,9 @@ if (args.Contains("--assistants"))
     Check(McpConfig.Friendly("claude-ai", null) == "Claude" && McpConfig.Friendly("claude-code", null) == "Claude Code"
           && McpConfig.Friendly("codex-mcp-client", null) == "Codex" && McpConfig.Friendly("gemini-cli-mcp-client", null) == "Gemini"
           && McpConfig.Friendly("my-tool", "My Tool") == "My Tool" && McpConfig.Friendly(null, null).Length > 0, "assistants get readable names");
+    var withBom = McpConfig.Message("﻿{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"ping\"}\r");
+    Check(withBom != null && System.Text.Json.Nodes.JsonNode.Parse(withBom)?["method"]?.ToString() == "ping"
+          && McpConfig.Message("  ﻿ ") == null && McpConfig.Message("") == null, "MCP messages: a leading byte-order mark is ignored");
     return okAll ? 0 : 1;
 }
 
