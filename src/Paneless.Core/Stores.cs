@@ -16,6 +16,7 @@ public sealed class AppSettings
     public bool Audio { get; set; } = true;
     public bool OnTop { get; set; }
     public bool KeepAwake { get; set; } = true;
+    public bool LockOnClose { get; set; }
     public string MaxSize { get; set; } = "1920 px";
 
     public string VideoCodec { get; set; } = "h264";

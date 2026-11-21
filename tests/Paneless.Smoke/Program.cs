@@ -47,7 +47,9 @@ if (args.Contains("--groups"))
     Check(eff.BitrateMbps == 4 && !eff.Audio && eff.VideoCodec == "h264" && eff.AutoMirror && eff.PushTarget == "/sdcard/Movies/", "device > group > global");
     Check(eff.OnConnectScripts.SequenceEqual(["a", "b", "c"]), "on-connect scripts of group and device, no doubles");
     Check(EffectiveProfile.Resolve(global, null, null).BitrateMbps == 8 && !EffectiveProfile.Resolve(global, null, null).AutoMirror, "no profiles = global defaults");
-    Check(new DeviceProfile().IsEmpty && !devP.IsEmpty, "empty profiles are dropped when saved");
+    Check(new DeviceProfile().IsEmpty && !devP.IsEmpty && !new DeviceProfile { LockOnClose = true }.IsEmpty, "empty profiles are dropped when saved");
+    Check(EffectiveProfile.Resolve(global, new DeviceProfile { LockOnClose = true }, null).ToMirrorOptions().LockOnClose
+          && !EffectiveProfile.Resolve(global, new DeviceProfile { LockOnClose = true }, new DeviceProfile { LockOnClose = false }).ToMirrorOptions().LockOnClose, "LockOnClose resolves device > group > global");
 
     // USB & Wi-Fi merging in DeviceDirectory.Merge + Wi-Fi IP parsing.
     var known = new Dictionary<string, KnownDevice> { ["SN123"] = new() { Name = "My Pixel", Model = "Pixel 11", Type = "Phone" } };

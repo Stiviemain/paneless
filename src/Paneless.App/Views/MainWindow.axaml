@@ -272,6 +272,8 @@
                           ToolTip.Tip="{l:T 'Mirror while the device’s own screen stays dark. With auto-unlock it lights up only for a moment to unlock. If it turns on again, press Alt+O in the mirror window.'}" />
                 <CheckBox Content="{l:T 'Keep awake'}" IsChecked="{Binding KeepAwake}" IsEnabled="{Binding KeepAwakeEnabled}"
                           ToolTip.Tip="{l:T 'Stops the device’s screen from timing out (and locking) while it’s mirrored. Always on while the screen is kept off.'}" />
+                <CheckBox Content="{l:T 'Lock device when mirror closes'}" IsChecked="{Binding LockOnClose}"
+                          ToolTip.Tip="{l:T 'Puts the device to sleep (and locks it) when its last mirror or second-screen window closes.'}" />
                 <CheckBox Content="{l:T 'Play device audio on this computer'}" IsChecked="{Binding Audio}" />
                 <CheckBox Content="{l:T 'Mirror windows always on top'}" IsChecked="{Binding OnTop}" />
                 <Grid ColumnDefinitions="Auto,*" Margin="0,4,0,0">

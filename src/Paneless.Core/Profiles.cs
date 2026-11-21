@@ -23,6 +23,7 @@ public sealed class DeviceProfile
     public bool? Audio { get; set; }
     public bool? OnTop { get; set; }
     public bool? KeepAwake { get; set; }
+    public bool? LockOnClose { get; set; }
     /// <summary>"1920 px", "Full resolution", …</summary>
     public string? MaxSize { get; set; }
     /// <summary>h264, h265 or av1.</summary>
@@ -42,20 +43,20 @@ public sealed class DeviceProfile
     public string? Hotkey { get; set; }
 
     public bool IsEmpty =>
-        ScreenOff == null && Audio == null && OnTop == null && KeepAwake == null && MaxSize == null && VideoCodec == null
+        ScreenOff == null && Audio == null && OnTop == null && KeepAwake == null && LockOnClose == null && MaxSize == null && VideoCodec == null
         && BitrateMbps == null && MaxFps == null && AutoMirror == null && PushTarget == null && OnConnectScripts.Count == 0
         && string.IsNullOrEmpty(Hotkey) && Assistant == null;
 }
 
 /// <summary>What actually applies to a device after combining device, group and global settings.</summary>
 public sealed record EffectiveProfile(
-    bool ScreenOff, bool Audio, bool OnTop, bool KeepAwake, string MaxSize, string VideoCodec, int BitrateMbps, int MaxFps,
+    bool ScreenOff, bool Audio, bool OnTop, bool KeepAwake, bool LockOnClose, string MaxSize, string VideoCodec, int BitrateMbps, int MaxFps,
     bool AutoMirror, string PushTarget, IReadOnlyList<string> OnConnectScripts, string? Hotkey, AssistantAccess Assistant)
 {
     public int? MaxSizePixels => int.TryParse(MaxSize.Split(' ')[0], out var px) ? px : null;
 
     public MirrorOptions ToMirrorOptions() =>
-        new(ScreenOff, Audio, OnTop, KeepAwake || ScreenOff, MaxSizePixels, VideoCodec, BitrateMbps, MaxFps);
+        new(ScreenOff, Audio, OnTop, KeepAwake || ScreenOff, MaxSizePixels, VideoCodec, BitrateMbps, MaxFps, LockOnClose);
 
     public static EffectiveProfile Resolve(AppSettings global, DeviceProfile? group, DeviceProfile? device)
     {
@@ -71,6 +72,7 @@ public sealed record EffectiveProfile(
             Pick(p => p.Audio, global.Audio),
             Pick(p => p.OnTop, global.OnTop),
             Pick(p => p.KeepAwake, global.KeepAwake),
+            Pick(p => p.LockOnClose, global.LockOnClose),
             PickS(p => p.MaxSize, global.MaxSize),
             PickS(p => p.VideoCodec, global.VideoCodec),
             Pick(p => p.BitrateMbps, global.BitrateMbps),

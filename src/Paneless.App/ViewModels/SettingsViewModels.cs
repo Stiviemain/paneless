@@ -98,6 +98,8 @@ public static class SettingChoices
             v => { if (p != null) p.ScreenOff = v; else g!.ScreenOff = v ?? false; });
         Bool(Loc.T("Keep awake"), Loc.T("The device doesn't time out and lock while it's mirrored."), p?.KeepAwake, e?.KeepAwake ?? g!.KeepAwake,
             v => { if (p != null) p.KeepAwake = v; else g!.KeepAwake = v ?? false; });
+        Bool(Loc.T("Lock device when mirror closes"), Loc.T("Puts the device to sleep (and locks it) when its last mirror or second-screen window closes."), p?.LockOnClose, e?.LockOnClose ?? g!.LockOnClose,
+            v => { if (p != null) p.LockOnClose = v; else g!.LockOnClose = v ?? false; });
         Bool(Loc.T("Play device audio here"), null, p?.Audio, e?.Audio ?? g!.Audio,
             v => { if (p != null) p.Audio = v; else g!.Audio = v ?? false; });
         Bool(Loc.T("Mirror window always on top"), null, p?.OnTop, e?.OnTop ?? g!.OnTop,

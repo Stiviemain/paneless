@@ -152,6 +152,7 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     public bool KeepAwakeEnabled => !S.ScreenOff;
+    public bool LockOnClose { get => S.LockOnClose; set { if (S.LockOnClose == value) return; S.LockOnClose = value; SaveSettings(); OnPropertyChanged(); } }
     public bool Audio { get => S.Audio; set { if (S.Audio == value) return; S.Audio = value; SaveSettings(); OnPropertyChanged(); } }
     public bool OnTop { get => S.OnTop; set { if (S.OnTop == value) return; S.OnTop = value; SaveSettings(); OnPropertyChanged(); } }
 
@@ -165,6 +166,7 @@ public sealed partial class MainViewModel : ObservableObject
     public void SettingsChanged()
     {
         OnPropertyChanged(nameof(ScreenOff)); OnPropertyChanged(nameof(KeepAwake)); OnPropertyChanged(nameof(KeepAwakeEnabled));
+        OnPropertyChanged(nameof(LockOnClose));
         OnPropertyChanged(nameof(Audio)); OnPropertyChanged(nameof(OnTop)); OnPropertyChanged(nameof(MaxSize));
         UpdateHotkeys();
     }
