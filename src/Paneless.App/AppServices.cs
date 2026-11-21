@@ -41,6 +41,20 @@ public sealed class AppServices
     public ProfileStore Profiles => _profiles ??= Demo ? new ProfileStore(new(), persist: false) : new ProfileStore();
     ProfileStore? _profiles;
 
+    /// <summary>Provisioning recipes, scheduled tasks and alerts. In demo mode examples in memory only.</summary>
+    public RecipeStore Recipes => _recipes ??= Demo ? new RecipeStore(DemoData.Recipes(), false) : new RecipeStore();
+    RecipeStore? _recipes;
+    public ScheduleStore Schedules => _schedules ??= Demo ? new ScheduleStore(DemoData.Schedules(), false) : new ScheduleStore();
+    ScheduleStore? _schedules;
+    public AlertStore Alerts => _alerts ??= Demo ? new AlertStore(DemoData.Alerts(), false) : new AlertStore();
+    AlertStore? _alerts;
+
+    /// <summary>The latest inventory read-out per device id (serial number), shared by Inventory, Alerts and Claude.</summary>
+    public System.Collections.Concurrent.ConcurrentDictionary<string, DeviceInventory> Inventory { get; } = new();
+
+    /// <summary>A script by id (yours or built-in).</summary>
+    public AdbScript? FindScript(string id) => AllScripts().FirstOrDefault(s => s.Id == id);
+
     /// <summary>Saves settings.json (not in demo mode).</summary>
     public void SaveSettings() { if (Demo) return; try { Data.SaveSettings(); } catch { /* not fatal */ } }
 

@@ -1,3 +1,4 @@
+using Paneless.App.Localization;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
@@ -37,9 +38,9 @@ public partial class KeymapEditor : Window
     public KeymapEditor(AppServices services, string serial, DeviceRow row, Action? changed) : this()
     {
         _s = services; _serial = serial; _row = row; _changed = changed;
-        TitleText.Text = $"Key mapping: {row.Name}";
-        UseBox.Content = $"Use this profile for {row.Name}";
-        JoyKeysBox.ItemsSource = new[] { "W A S D", "Arrow keys" };
+        TitleText.Text = Loc.F("Key mapping: {0}", row.Name);
+        UseBox.Content = Loc.F("Use this profile for {0}", row.Name);
+        JoyKeysBox.ItemsSource = new[] { Loc.T("W A S D"), Loc.T("Arrow keys") };
 
         NewButton.Click += (_, _) => NewProfile();
         DeleteButton.Click += async (_, _) => await DeleteProfileAsync();
@@ -51,7 +52,7 @@ public partial class KeymapEditor : Window
         NameBox.TextChanged += (_, _) =>
         {
             if (_loading || _profile == null) return;
-            _profile.Name = NameBox.Text?.Trim() is { Length: > 0 } n ? n : "Profile";
+            _profile.Name = NameBox.Text?.Trim() is { Length: > 0 } n ? n : Loc.T("Profile");
             Save(refreshList: true);
         };
         UseBox.IsCheckedChanged += (_, _) =>
@@ -100,7 +101,7 @@ public partial class KeymapEditor : Window
             GradientStops = { new GradientStop(Color.Parse("#2d3b52"), 0), new GradientStop(Color.Parse("#1b1c21"), 1) },
         };
         LoadingText.IsVisible = false;
-        var p = new KeymapProfile { Name = "Shooter", Landscape = true };
+        var p = new KeymapProfile { Name = Loc.T("Shooter"), Landscape = true };
         p.Mappings.Add(new KeyMapping { Kind = MappingKind.Joystick, X = 0.16, Y = 0.7, Radius = 0.13 });
         foreach (var (key, x, y) in new[] { ("Space", 0.9, 0.62), ("F", 0.7, 0.4), ("R", 0.79, 0.85), ("LeftShift", 0.83, 0.78), ("1", 0.45, 0.88), ("2", 0.55, 0.88), ("M", 0.93, 0.12) })
             p.Mappings.Add(new KeyMapping { Key = key, X = x, Y = y });
@@ -113,7 +114,7 @@ public partial class KeymapEditor : Window
         UseBox.IsChecked = true;
         _selected = p.Mappings[2];
         Redraw(); UpdateHint();
-        StatusText.Text = "8 keys in this profile. Changes are saved straight away.";
+        StatusText.Text = Loc.T("8 keys in this profile. Changes are saved straight away.");
     }
 
     KeymapStore Store => _s!.Keymaps;
@@ -160,7 +161,7 @@ public partial class KeymapEditor : Window
     async Task DeleteProfileAsync()
     {
         if (_profile == null) return;
-        if (!await ConfirmWindow.AskAsync(this, "Delete profile", $"Delete the key profile \"{_profile.Name}\"?", null)) return;
+        if (!await ConfirmWindow.AskAsync(this, Loc.T("Delete profile"), Loc.F("Delete the key profile \"{0}\"?", _profile.Name), null)) return;
         Store.Data.Profiles.Remove(_profile);
         foreach (var k in Store.Data.ActiveProfile.Where(kv => kv.Value == _profile.Id).Select(kv => kv.Key).ToList())
             Store.Data.ActiveProfile.Remove(k);
@@ -172,7 +173,7 @@ public partial class KeymapEditor : Window
     void Save(bool refreshList = false)
     {
         if (_s?.Demo == true) return;   // demo/snapshot mode never touches the real key profiles
-        try { Store.Save(); } catch (Exception ex) { StatusText.Text = "Couldn't save: " + ex.Message; }
+        try { Store.Save(); } catch (Exception ex) { StatusText.Text = Loc.T("Couldn't save: ") + ex.Message; }
         if (refreshList)
         {
             _loading = true;
@@ -189,11 +190,11 @@ public partial class KeymapEditor : Window
 
     async Task LoadScreenshotAsync()
     {
-        if (_s?.Adb == null) { LoadingText.Text = "No device connection (demo mode)."; return; }
+        if (_s?.Adb == null) { LoadingText.Text = Loc.T("No device connection (demo mode)."); return; }
         LoadingText.IsVisible = true;
-        LoadingText.Text = "Taking a screenshot of the device…";
+        LoadingText.Text = Loc.T("Taking a screenshot of the device…");
         var png = await _s.Adb.ScreencapAsync(_serial);
-        if (png == null) { LoadingText.Text = "Couldn't get a screenshot. Is the device unlocked?"; return; }
+        if (png == null) { LoadingText.Text = Loc.T("Couldn't get a screenshot. Is the device unlocked?"); return; }
         using var ms = new MemoryStream(png);
         var bmp = new Bitmap(ms);
         Shot.Source = bmp;
@@ -209,8 +210,8 @@ public partial class KeymapEditor : Window
         if (_profile == null || Shot.Source == null) { StatusText.Text = ""; return; }
         var landscape = _w > _h;
         StatusText.Text = _profile.Mappings.Count > 0 && landscape != _profile.Landscape
-            ? $"This profile was made in {(_profile.Landscape ? "landscape" : "portrait")}, but the device is in {(landscape ? "landscape" : "portrait")} now. Rotate it (toolbar) and take a new screenshot."
-            : $"{_profile.Mappings.Count} key{(_profile.Mappings.Count == 1 ? "" : "s")} in this profile. Changes are saved straight away.";
+            ? Loc.F("This profile was made in {0}, but the device is in {1} now. Rotate it (toolbar) and take a new screenshot.", (_profile.Landscape ? Loc.T("landscape") : Loc.T("portrait")), (landscape ? Loc.T("landscape") : Loc.T("portrait")))
+            : Loc.Count(_profile.Mappings.Count, "{0} key in this profile. Changes are saved straight away.", "{0} keys in this profile. Changes are saved straight away.");
         if (_profile.Mappings.Count == 0) _profile.Landscape = landscape;
     }
 
@@ -226,12 +227,12 @@ public partial class KeymapEditor : Window
     void UpdateHint()
     {
         HintText.Foreground = _placing != Placing.None || (_selected?.Kind == MappingKind.Tap) ? Paneless.App.Theme.Blue : Paneless.App.Theme.Dim;
-        HintText.Text = _profile == null ? "Click \"New profile\" to start a key layout for this device."
-            : _placing == Placing.Tap ? "Click on the screenshot where the button is. Esc cancels."
-            : _placing == Placing.Joystick ? "Click the centre of the game's movement joystick. Esc cancels."
-            : _selected?.Kind == MappingKind.Tap ? $"Press the key for this spot{(_selected.Key.Length > 0 ? $" (now: {_selected.Key})" : "")}. Drag to move it."
-            : _selected?.Kind == MappingKind.Joystick ? "Joystick selected: choose its keys and size above, or drag it to move."
-            : "Add keys with the buttons above. Click a key to select it, press a key to change it, drag to move it.";
+        HintText.Text = _profile == null ? Loc.T("Click \"New profile\" to start a key layout for this device.")
+            : _placing == Placing.Tap ? Loc.T("Click on the screenshot where the button is. Esc cancels.")
+            : _placing == Placing.Joystick ? Loc.T("Click the centre of the game's movement joystick. Esc cancels.")
+            : _selected?.Kind == MappingKind.Tap ? Loc.F("Press the key for this spot{0}. Drag to move it.", (_selected.Key.Length > 0 ? Loc.F(" (now: {0})", _selected.Key) : ""))
+            : _selected?.Kind == MappingKind.Joystick ? Loc.T("Joystick selected: choose its keys and size above, or drag it to move.")
+            : Loc.T("Add keys with the buttons above. Click a key to select it, press a key to change it, drag to move it.");
         JoyPanel.IsVisible = _selected?.Kind == MappingKind.Joystick;
         RemoveButton.IsEnabled = _selected != null;
         if (_selected is { Kind: MappingKind.Joystick } j)
@@ -291,10 +292,10 @@ public partial class KeymapEditor : Window
         if (_selected is not { Kind: MappingKind.Tap } m || FocusManager?.GetFocusedElement() is TextBox) return;
         e.Handled = true;
         var name = AvaloniaKeys.Name(e.Key);
-        if (name == null) { StatusText.Text = $"{e.Key} can't be used for key mapping."; return; }
+        if (name == null) { StatusText.Text = Loc.F("{0} can't be used for key mapping.", e.Key); return; }
         m.Key = name;
         var clash = _profile!.Mappings.Any(o => o != m && o.Keys.Contains(name, StringComparer.OrdinalIgnoreCase));
-        StatusText.Text = clash ? $"{name} is also used by another key here; both will be pressed together." : $"Set to {name}.";
+        StatusText.Text = clash ? Loc.F("{0} is also used by another key here; both will be pressed together.", name) : Loc.F("Set to {0}.", name);
         Save(); Redraw(); UpdateHint();
     }
 

@@ -73,11 +73,11 @@ public sealed class DeviceControl : IAsyncDisposable
         var socketName = $"scrcpy_{scid:x8}";
 
         var push = await adb.RunAsync(TimeSpan.FromSeconds(30), "-s", serial, "push", server.Path, DevicePath);
-        if (!push.Ok) throw new InvalidOperationException("Couldn't copy the control helper to the device: " + push.LastLine);
+        if (!push.Ok) throw new InvalidOperationException(Text.T("Couldn't copy the control helper to the device: ") + push.LastLine);
 
         var fwd = await adb.RunAsync("-s", serial, "forward", "tcp:0", "localabstract:" + socketName);
         if (!fwd.Ok || !int.TryParse(fwd.Output.Trim().Split('\n')[0].Trim(), out var port))
-            throw new InvalidOperationException("Couldn't open a connection to the device: " + fwd.LastLine);
+            throw new InvalidOperationException(Text.T("Couldn't open a connection to the device: ") + fwd.LastLine);
 
         var args = $"CLASSPATH={DevicePath} app_process / com.genymobile.scrcpy.Server {server.Version} scid={scid:x8} " +
                    "log_level=warn video=false audio=false control=true tunnel_forward=true send_device_meta=false " +

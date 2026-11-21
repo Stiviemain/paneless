@@ -1,0 +1,134 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Paneless.App.ViewModels"
+             xmlns:l="using:Paneless.App.Localization"
+             x:Class="Paneless.App.Views.ClaudePage"
+             x:DataType="vm:ClaudeViewModel">
+  <UserControl.Styles>
+    <Style Selector="TextBox.code">
+      <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, Menlo, monospace" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="IsReadOnly" Value="True" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+  </UserControl.Styles>
+  <DockPanel>
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+      <StackPanel Spacing="3">
+        <TextBlock Classes="pagetitle" Text="{l:T 'Claude'}" />
+        <TextBlock Classes="pagehint" Text="{l:T 'Let Claude (Claude Desktop or Claude Code) look after your devices: answer questions about them, install apps, run scripts, or operate a screen. You decide what it may do on each device.'}" />
+      </StackPanel>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Bottom" Margin="16,0,0,0">
+        <ToggleSwitch IsChecked="{Binding Enabled}" OnContent="{l:T 'Claude may use Paneless'}" OffContent="{l:T 'Claude may use Paneless'}" />
+        <ToggleButton Content="{l:T 'Pause'}" IsChecked="{Binding Paused}" IsEnabled="{Binding Enabled}" ToolTip.Tip="{l:T 'Refuse everything Claude asks until you resume'}" />
+      </StackPanel>
+    </Grid>
+
+    <Border DockPanel.Dock="Top" Classes="card" Padding="14,10" Margin="0,0,0,12">
+      <Grid ColumnDefinitions="Auto,*">
+        <TextBlock Text="●" Foreground="{Binding StatusBrush}" Margin="0,0,10,0" VerticalAlignment="Center" />
+        <TextBlock Grid.Column="1" Text="{Binding Status}" VerticalAlignment="Center" TextWrapping="Wrap" />
+      </Grid>
+    </Border>
+
+    <Grid ColumnDefinitions="*,16,*">
+      <!-- left: set up and permissions -->
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Spacing="14" Margin="0,0,16,0">
+          <StackPanel Spacing="6">
+            <TextBlock Classes="heading" Text="{l:T '1. Connect Claude'}" />
+            <TextBlock Classes="small" TextWrapping="Wrap" Text="{l:T 'Claude Desktop: add Paneless with one click, then restart Claude Desktop.'}" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Classes="accent" Content="{l:T 'Add to Claude Desktop'}" Command="{Binding AddToDesktopCommand}" />
+              <Button Content="{l:T 'Copy settings'}" Command="{Binding CopyDesktopCommand}" />
+            </StackPanel>
+            <TextBlock Classes="small" TextWrapping="Wrap" Margin="0,6,0,0" Text="{l:T 'Claude Code: run this once in a terminal.'}" />
+            <Grid ColumnDefinitions="*,8,Auto">
+              <TextBox Classes="code" Text="{Binding CodeCommand, Mode=OneWay}" />
+              <Button Grid.Column="2" Content="{l:T 'Copy'}" Command="{Binding CopyCodeCommand}" VerticalAlignment="Top" />
+            </Grid>
+            <TextBlock Classes="small" Foreground="{StaticResource AmberBrush}" Text="{Binding Message}" TextWrapping="Wrap" />
+          </StackPanel>
+
+          <StackPanel Spacing="6">
+            <TextBlock Classes="heading" Text="{l:T '2. Decide what Claude may do'}" />
+            <Grid ColumnDefinitions="Auto,*">
+              <TextBlock Classes="small" Text="{l:T 'On every device'}" VerticalAlignment="Center" Margin="0,0,10,0" />
+              <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding DefaultChoices}" SelectedItem="{Binding DefaultAccess}" />
+            </Grid>
+            <CheckBox IsChecked="{Binding Confirm}">
+              <TextBlock TextWrapping="Wrap" Text="{l:T 'Ask me in Paneless before Claude changes anything (taps, typing, installs, commands)'}" />
+            </CheckBox>
+
+            <TextBlock Classes="small" Text="{l:T 'Groups'}" Margin="0,6,0,0" IsVisible="{Binding !!GroupRows.Count}" />
+            <ItemsControl ItemsSource="{Binding GroupRows}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:AccessRow">
+                  <Grid ColumnDefinitions="*,250" Margin="0,0,0,6">
+                    <StackPanel VerticalAlignment="Center">
+                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                      <TextBlock Classes="small" Text="{Binding Detail}" />
+                    </StackPanel>
+                    <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding Choices}" SelectedItem="{Binding Selected}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <TextBlock Classes="small" Text="{l:T 'Devices'}" Margin="0,6,0,0" />
+            <ItemsControl ItemsSource="{Binding Devices}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:AccessRow">
+                  <Grid ColumnDefinitions="*,250" Margin="0,0,0,6">
+                    <StackPanel VerticalAlignment="Center">
+                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                      <TextBlock Classes="small" Text="{Binding Detail}" />
+                    </StackPanel>
+                    <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding Choices}" SelectedItem="{Binding Selected}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
+
+      <!-- right: try it and what happened -->
+      <DockPanel Grid.Column="2">
+        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,12">
+          <TextBlock Classes="heading" Text="{l:T '3. Ask Claude'}" />
+          <TextBlock Classes="small" Text="{l:T 'For example:'}" />
+          <Border Classes="card" Padding="12,8">
+            <TextBlock Text="{Binding ExamplePrompts}" TextWrapping="Wrap" FontStyle="Italic" LineHeight="22" />
+          </Border>
+        </StackPanel>
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,6">
+          <TextBlock Classes="heading" Text="{l:T 'What Claude did'}" />
+          <Button Grid.Column="1" Classes="flat" Content="{l:T 'Clear'}" Command="{Binding ClearActivityCommand}" />
+        </Grid>
+        <Border Classes="card" ClipToBounds="True">
+          <Panel>
+            <ListBox Classes="plain" ItemsSource="{Binding Activity}" Background="Transparent">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:ActivityItem">
+                  <Grid ColumnDefinitions="18,*,Auto">
+                    <TextBlock Text="{Binding Mark}" Foreground="{Binding Brush}" />
+                    <StackPanel Grid.Column="1">
+                      <TextBlock>
+                        <Run Text="{Binding Tool}" FontWeight="SemiBold" />
+                        <Run Text="{Binding Target}" Foreground="{StaticResource DimBrush}" />
+                      </TextBlock>
+                      <TextBlock Classes="small" Text="{Binding Detail}" Foreground="{Binding Brush}" TextWrapping="Wrap" MaxHeight="40" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="2" Classes="small" Text="{Binding Time}" Margin="8,0,0,0" />
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+            <TextBlock Classes="dim" IsVisible="{Binding NoActivity}" HorizontalAlignment="Center" VerticalAlignment="Center" Text="{l:T 'Nothing yet.'}" />
+          </Panel>
+        </Border>
+      </DockPanel>
+    </Grid>
+  </DockPanel>
+</UserControl>

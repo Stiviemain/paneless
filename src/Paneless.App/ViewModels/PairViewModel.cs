@@ -1,3 +1,4 @@
+using Paneless.App.Localization;
 using Avalonia.Media;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -19,7 +20,7 @@ public sealed partial class PairViewModel : ObservableObject
         if (!string.IsNullOrEmpty(prefill))
         {
             SetAddress(prefill);
-            SetStatus($"Found a device waiting to pair at {prefill}. Type its 6-digit code.", Theme.Green);
+            SetStatus(Loc.F("Found a device waiting to pair at {0}. Type its 6-digit code.", prefill), Theme.Green);
         }
         _poll.Tick += async (_, _) => await PollAsync();
     }
@@ -52,7 +53,7 @@ public sealed partial class PairViewModel : ObservableObject
         if (svc?.Pair != null && svc.Pair != Address)
         {
             SetAddress(svc.Pair);
-            SetStatus($"Found a device waiting to pair at {svc.Pair}. Type its 6-digit code.", Theme.Green);
+            SetStatus(Loc.F("Found a device waiting to pair at {0}. Type its 6-digit code.", svc.Pair), Theme.Green);
         }
     }
 
@@ -63,22 +64,22 @@ public sealed partial class PairViewModel : ObservableObject
     {
         var addr = Address.Trim();
         var code = new string(Code.Where(char.IsDigit).ToArray());
-        if (!AdbClient.IsIpPort(addr)) { SetStatus("Enter the IP address and port shown on the pairing screen, e.g. 192.168.2.40:41234.", Theme.Red); return; }
-        if (code.Length != 6) { SetStatus("The pairing code has 6 digits.", Theme.Red); return; }
-        if (_adb == null) { SetStatus("Demo mode: nothing to pair with.", Theme.Amber); return; }
+        if (!AdbClient.IsIpPort(addr)) { SetStatus(Loc.T("Enter the IP address and port shown on the pairing screen, e.g. 192.168.2.40:41234."), Theme.Red); return; }
+        if (code.Length != 6) { SetStatus(Loc.T("The pairing code has 6 digits."), Theme.Red); return; }
+        if (_adb == null) { SetStatus(Loc.T("Demo mode: nothing to pair with."), Theme.Amber); return; }
 
         IsBusy = true;
-        SetStatus("Pairing…", Theme.Dim);
+        SetStatus(Loc.T("Pairing…"), Theme.Dim);
         try
         {
             var r = await _adb.PairAsync(addr, code);
             if (!r.Output.Contains("Successfully paired"))
             {
-                var why = r.TimedOut ? "no answer. Is the device on the same Wi-Fi with the pairing screen still open?" : r.LastLine;
-                SetStatus("Pairing failed: " + why, Theme.Red);
+                var why = r.TimedOut ? Loc.T("no answer. Is the device on the same Wi-Fi with the pairing screen still open?") : r.LastLine;
+                SetStatus(Loc.T("Pairing failed: ") + why, Theme.Red);
                 return;
             }
-            SetStatus("Paired! Connecting…", Theme.Green);
+            SetStatus(Loc.T("Paired! Connecting…"), Theme.Green);
             var ip = addr.Split(':')[0];
             for (var i = 0; i < 12; i++)
             {

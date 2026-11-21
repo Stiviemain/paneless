@@ -39,6 +39,7 @@
 - [Install](#install)
 - [First use](#first-use)
 - [Using Paneless](#using-paneless)
+- [Claude](#claude)
 - [Privacy and security](#privacy-and-security)
 - [Troubleshooting](#troubleshooting)
 - [Building from source](#building-from-source)
@@ -56,7 +57,8 @@
   - Run adb scripts.
   - Apply settings.
 - **Control:** use your keyboard and mouse on a device, map keys for games, or do something once and have it happen on every device of a group.
-- **Automate:** connect known devices by themselves, run scripts every time a device connects (e.g. turn off Doze), start mirrors by themselves.
+- **Automate:** set devices up with recipes, run tasks on a schedule, get alerts when a battery runs low or an app crashes, and run scripts every time a device connects (e.g. turn off Doze).
+- **Ask Claude:** let [Claude](https://claude.ai) answer questions about your devices or work on them for you, within the limits you set per device.
 
 That makes it handy at home with a phone and a tablet, and just as useful with a shelf of test devices, kiosk tablets or a family's phones.
 
@@ -105,10 +107,28 @@ The interface is built with [Avalonia](https://avaloniaui.net/), a cross-platfor
 
 <p align="center"><img src="docs/images/scripts.png" width="760" alt="Scripts window"></p>
 
+**Automation** (the *Automation* page)
+- **Recipes:** a list of apps, files, scripts, commands and a restart that sets up a new or reset device in one go. Run one on the selected devices or a group, with progress per device.
+- **Scheduled tasks:** run a script, a recipe, a restart or a command daily, weekly or every few hours, e.g. restart the lobby tablets every night.
+- **Alerts:** a Windows notification when a battery runs low, storage gets full, a device gets hot, drops off the network, or an app crashes. Each alert fires once, not every minute.
+
+**Overviews**
+- **Wall:** a live picture of every device, refreshed every few seconds while the page is open. Click one to mirror it.
+- **Logs:** the live log (logcat) of a device, filtered by importance, text or app, with crashes in red. Save it to a file.
+- **Inventory:** model, Android version, security patch, battery, storage, RAM, address and uptime of every device. Export it as CSV for Excel or as an HTML report.
+
+<p align="center"><img src="docs/images/automation.png" width="760" alt="Automation page with a provisioning recipe"></p>
+<p align="center"><img src="docs/images/inventory.png" width="760" alt="Inventory page"></p>
+
+**Claude**
+- Paneless can be a tool for Claude Desktop and Claude Code (an [MCP](https://modelcontextprotocol.io) server). Ask Claude about your devices, or let it install apps, run scripts or operate a screen. See [Claude](#claude).
+
 **Around the app**
 - Notification-area icon, optional start with Windows.
 - A global shortcut per device (e.g. Ctrl+Alt+P).
-- Optional update checks.
+- **Automatic updates** from GitHub Releases: downloaded in the background and installed when you close Paneless. Can be turned off.
+- **Share scripts:** export one or all of your scripts as a file or to the clipboard; import from a file, the clipboard or a link (e.g. a GitHub Gist). Imported scripts are shown before they're added and ask before running.
+- **English, German and French**, following Windows' language or chosen in Settings.
 
 ## Install
 
@@ -148,19 +168,53 @@ From then on, the device appears whenever Wireless debugging is on and it's on t
 | Install an app | Drop the APK on a device or group, or **More › Apps…** |
 | Turn the camera picture | It follows the phone; Alt+← / Alt+→ in the camera window turn it by hand |
 | Repeat your taps on a group | Toolbar › **Group control** |
+| Set up new devices the same way | **Automation › Recipes**, then **Run recipe** |
+| Restart devices every night | **Automation › Scheduled tasks › + New** |
+| Get told about low batteries or crashes | **Automation › Alerts** |
+| See every screen at once | **Wall** |
+| Find out why an app crashes | **Logs**, then **Crashes only** |
+| Get a list of all devices for Excel | **Inventory › Read devices › Export** |
+| Share a script | **Scripts**, select it, **Share** (to add one: **Import**) |
+| Change the language | **Settings › Language**, then restart Paneless |
 
 <p align="center"><img src="docs/images/device-settings.png" width="640" alt="Device settings"></p>
 
 **Where your data is** (Windows): `%LOCALAPPDATA%\Paneless`.
 - `known-devices.json`, `settings.json`, `groups.json`, `profiles.json`, `scripts.json`, `keymaps.json`
+- `recipes.json`, `schedules.json`, `alerts.json`
 - `unlock-codes.json`, encrypted (see below)
 
-Screenshots and recordings go to `Documents\Paneless`. Logs are in `%TEMP%\paneless`.
+Screenshots and recordings go to `Documents\Paneless`. Logs, including what Claude did, are in `%TEMP%\paneless`.
+
+## Claude
+
+Paneless can work as a tool for [Claude Desktop](https://claude.ai/download) and [Claude Code](https://claude.com/claude-code). Claude can then answer questions like *"Which of my devices have less than 20 % battery?"* or do things like *"Install this APK on the Test lab group"*.
+
+1. In Paneless, open the **Claude** page and switch on **Claude may use Paneless**.
+2. Connect Claude:
+   - **Claude Desktop:** click **Add to Claude Desktop**, then restart Claude Desktop.
+   - **Claude Code:** copy the command shown and run it once in a terminal.
+3. Decide what Claude may do, for all devices or per group and device:
+
+| Level | Claude may… |
+|---|---|
+| Nothing | not see the device at all |
+| Read | see status, battery, apps and the log |
+| See | also take screenshots |
+| Control | also tap, swipe, type and open apps |
+| Manage | also install and remove apps, copy files, run scripts, recipes and commands, restart |
+
+By default Claude may only **read**, and Paneless asks you before Claude changes anything (*Allow once*, *Allow for 15 minutes* or *Don't allow*). **Pause** refuses everything until you resume, and the page lists everything Claude did. Paneless never gives Claude unlock codes.
+
+<p align="center"><img src="docs/images/claude.png" width="760" alt="Claude page"></p>
+
+Paneless has to be running (it starts in the notification area by itself when Claude needs it). The connection stays on your PC: Claude's app talks to Paneless through a local pipe only your Windows account can open.
 
 ## Privacy and security
 
-- **Local only.** Paneless talks to your devices over your own network with adb and scrcpy. It sends nothing anywhere else.
-  - The one exception is update checks, and only if you set an update source.
+- **Local only.** Paneless talks to your devices over your own network with adb and scrcpy. It sends nothing anywhere else, with two exceptions:
+  - Update checks ask GitHub for the newest release (switch off in **Settings › Updates**).
+  - If you connect Claude, what Claude reads through Paneless (device facts, logs, screenshots) becomes part of your Claude conversation. Only the devices and levels you allow are visible to it.
 - **Unlock codes** are encrypted with Windows DPAPI, the protection Credential Manager and browsers use. Only your Windows account on this PC can read them (on macOS the keychain, on Linux the Secret Service).
   - A code is typed only after Paneless confirms the device is locked and its lock screen is in front.
   - One failed try pauses auto-unlock for that device.

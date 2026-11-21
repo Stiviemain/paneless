@@ -5,6 +5,7 @@ using System.Text;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Paneless.App.Localization;
 using Paneless.Core;
 
 namespace Paneless.App.ViewModels;
@@ -15,7 +16,7 @@ public sealed record ListHint(string Text);
 public sealed partial class ScriptEntry(AdbScript script) : ObservableObject
 {
     public AdbScript Script { get; } = script;
-    public string Name => string.IsNullOrWhiteSpace(Script.Name) ? "Untitled script" : Script.Name;
+    public string Name => string.IsNullOrWhiteSpace(Script.Name) ? Loc.T("Untitled script") : Script.Name;
     public bool Confirm => Script.Confirm;
     public void Refresh() => OnPropertyChanged(string.Empty);
 }
@@ -82,10 +83,10 @@ public sealed partial class TargetGroup : ObservableObject
     {
         get
         {
-            if (Members.Count == 0) return Total == 0 ? "empty" : "none on the network";
+            if (Members.Count == 0) return Total == 0 ? Loc.T("empty") : Loc.T("none on the network");
             var n = Members.Count(m => m.IsChecked);
-            return n > 0 ? $"{n} of {Members.Count} ticked"
-                : Members.Count == Total ? Members.Count.ToString() : $"{Members.Count} of {Total} on the network";
+            return n > 0 ? Loc.F("{0} of {1} ticked", n, Members.Count)
+                : Members.Count == Total ? Members.Count.ToString() : Loc.F("{0} of {1} on the network", Members.Count, Total);
         }
     }
 
@@ -149,7 +150,7 @@ public sealed partial class ScriptsViewModel : ObservableObject
     public bool HasWarning => !string.IsNullOrEmpty(Warning);
     public bool HasFields => Fields.Count > 0;
     public bool NoTargets => !AllTargets.Any();
-    public string RunLabel => AllTargets.Count(t => t.IsChecked) is var n and > 0 ? $"Run on {n} device{(n == 1 ? "" : "s")}" : "Run";
+    public string RunLabel => AllTargets.Count(t => t.IsChecked) is var n and > 0 ? Loc.Count(n, "Run on {0} device", "Run on {0} devices") : Loc.T("Run");
     public string OutputFolder => ScriptRunner.OutputDir;
 
     partial void OnIsMineChanged(bool value) => OnPropertyChanged(nameof(IsBuiltIn));
@@ -170,8 +171,8 @@ public sealed partial class ScriptsViewModel : ObservableObject
         var keep = _current;
         Items.Clear();
         var mine = _store.Mine.Where(Match).ToList();
-        Items.Add(new CategoryHeader("My scripts"));
-        if (_store.Mine.Count == 0) Items.Add(new ListHint("None yet. Click + New, or Copy to My scripts on any built-in."));
+        Items.Add(new CategoryHeader(Loc.T("My scripts")));
+        if (_store.Mine.Count == 0) Items.Add(new ListHint(Loc.T("None yet. Click + New, or Copy to My scripts on any built-in.")));
         foreach (var s in mine) Items.Add(keep?.Script == s ? keep : new ScriptEntry(s));
         foreach (var group in BuiltInScripts.All.Where(Match).GroupBy(s => s.Category))
         {
@@ -200,7 +201,7 @@ public sealed partial class ScriptsViewModel : ObservableObject
         EditDescription = s?.Description ?? "";
         EditCommands = s?.Commands ?? "";
         EditConfirm = s?.Confirm ?? false;
-        Category = s?.Category ?? "";
+        Category = Loc.T(s?.Category ?? "");
         Warning = s?.Warning;
         _loading = false;
         RebuildFields();
@@ -217,7 +218,7 @@ public sealed partial class ScriptsViewModel : ObservableObject
         if (_loading || _current is not { Script.BuiltIn: false } entry) return;
         apply(entry.Script);
         entry.Refresh();
-        try { _store.Save(); } catch (Exception ex) { SetRunStatus("Couldn't save: " + ex.Message, StatusKind.Error); }
+        try { _store.Save(); } catch (Exception ex) { SetRunStatus(Loc.T("Couldn't save: ") + ex.Message, StatusKind.Error); }
     }
 
     void RebuildFields()
@@ -232,12 +233,101 @@ public sealed partial class ScriptsViewModel : ObservableObject
     [RelayCommand]
     void NewScript()
     {
-        var s = new AdbScript { Name = "New script", Commands = "adb shell " };
+        var s = new AdbScript { Name = Loc.T("New script"), Commands = "adb shell " };
         _store.Mine.Insert(0, s);
         _store.Save();
         Search = "";
         RebuildList();
         SelectedEntry = Items.OfType<ScriptEntry>().First(e => e.Script == s);
+    }
+
+    // ---------------------------------------------------------------- sharing
+
+    /// <summary>Set by the window.</summary>
+    public Func<Task<string?>>? PickImportFileAsync { get; set; }
+    public Func<string, string, Task<string?>>? SaveAsAsync { get; set; }
+    public Func<Task<string?>>? ReadClipboardAsync { get; set; }
+    public Func<string, Task>? WriteClipboardAsync { get; set; }
+    public Func<string, string, string, Task<string?>>? PromptAsync { get; set; }
+
+    [RelayCommand]
+    async Task ImportFile()
+    {
+        if (PickImportFileAsync == null || await PickImportFileAsync() is not { } path) return;
+        try { await ImportAsync(await File.ReadAllTextAsync(path)); }
+        catch (Exception ex) { SetRunStatus(Loc.F("Couldn’t import: {0}", ex.Message), StatusKind.Error); }
+    }
+
+    [RelayCommand]
+    async Task ImportLink()
+    {
+        if (PromptAsync == null) return;
+        var url = await PromptAsync(Loc.T("Import from a link"), Loc.T("A link to a shared script: a GitHub Gist, a raw GitHub file, or any https:// link to a .paneless-script file."), "https://");
+        if (string.IsNullOrWhiteSpace(url) || url.Trim() == "https://") return;
+        SetRunStatus(Loc.T("Downloading…"));
+        try { await ImportAsync(await ScriptSharing.DownloadAsync(url)); }
+        catch (Exception ex) { SetRunStatus(Loc.F("Couldn’t import: {0}", ex.Message), StatusKind.Error); }
+    }
+
+    [RelayCommand]
+    async Task ImportClipboard()
+    {
+        var text = ReadClipboardAsync != null ? await ReadClipboardAsync() : null;
+        try { await ImportAsync(text ?? ""); }
+        catch (Exception ex) { SetRunStatus(Loc.F("Couldn’t import: {0}", ex.Message), StatusKind.Error); }
+    }
+
+    /// <summary>Shows each script before adding it; imported scripts ask before running.</summary>
+    async Task ImportAsync(string text)
+    {
+        var scripts = ScriptSharing.Parse(text);
+        AdbScript? last = null;
+        var added = 0;
+        foreach (var sh in scripts)
+        {
+            var preview = $"{sh.Name}\n\n{sh.Commands.Trim()}";
+            if (ConfirmAsync != null && !await ConfirmAsync(Loc.T("Import script"), preview,
+                    Loc.T("Check the commands before you run them: a script can change or delete things on your devices. It asks before running until you untick that.")))
+                continue;
+            last = new AdbScript { Name = sh.Name, Description = sh.Description, Commands = sh.Commands.Replace("\r\n", "\n"), Confirm = true };
+            _store.Mine.Insert(0, last);
+            added++;
+        }
+        if (added == 0) { SetRunStatus(Loc.T("Nothing imported.")); return; }
+        _store.Save();
+        Search = "";
+        RebuildList();
+        if (last != null) SelectedEntry = Items.OfType<ScriptEntry>().FirstOrDefault(e => e.Script == last);
+        SetRunStatus(Loc.Count(added, "Imported {0} script. It’s under My scripts.", "Imported {0} scripts. They’re under My scripts."), StatusKind.Ok);
+    }
+
+    [RelayCommand]
+    async Task ShareCopy()
+    {
+        if (_current == null || WriteClipboardAsync == null) return;
+        await WriteClipboardAsync(ScriptSharing.Export(_current.Script));
+        SetRunStatus(Loc.T("Copied. Others can paste it with Import › From the clipboard."), StatusKind.Ok);
+    }
+
+    [RelayCommand]
+    async Task ShareSave()
+    {
+        if (_current == null || SaveAsAsync == null) return;
+        var safe = string.Concat(_current.Name.Select(c => char.IsLetterOrDigit(c) ? c : '-'));
+        if (await SaveAsAsync(safe, ScriptSharing.Extension.TrimStart('.')) is not { } path) return;
+        await File.WriteAllTextAsync(path, ScriptSharing.Export(_current.Script));
+        SetRunStatus(Loc.F("Saved {0}", path), StatusKind.Ok);
+        Reveal.File(path);
+    }
+
+    [RelayCommand]
+    async Task ShareAll()
+    {
+        if (_store.Mine.Count == 0) { SetRunStatus(Loc.T("You have no scripts of your own yet.")); return; }
+        if (SaveAsAsync == null || await SaveAsAsync("My-Paneless-scripts", ScriptSharing.Extension.TrimStart('.')) is not { } path) return;
+        await File.WriteAllTextAsync(path, ScriptSharing.ExportMany(_store.Mine));
+        SetRunStatus(Loc.F("Saved {0}", path), StatusKind.Ok);
+        Reveal.File(path);
     }
 
     [RelayCommand]
@@ -257,7 +347,7 @@ public sealed partial class ScriptsViewModel : ObservableObject
     async Task DeleteScript()
     {
         if (_current is not { Script.BuiltIn: false } entry) return;
-        if (ConfirmAsync != null && !await ConfirmAsync("Delete script", $"Delete \"{entry.Name}\"?", null)) return;
+        if (ConfirmAsync != null && !await ConfirmAsync(Loc.T("Delete script"), Loc.F("Delete \"{0}\"?", entry.Name), null)) return;
         _store.Mine.Remove(entry.Script);
         _store.Save();
         _current = null;
@@ -306,7 +396,7 @@ public sealed partial class ScriptsViewModel : ObservableObject
         }
         var others = rows.Where(r => groups.GroupOf(r.GroupId) == null).ToList();
         if (others.Count > 0 || !groups.Any)
-            TargetGroups.Add(new TargetGroup(groups.Any ? "Other devices" : "Devices", groups.Any, Sorted(others), others.Count));
+            TargetGroups.Add(new TargetGroup(groups.Any ? Loc.T("Other devices") : Loc.T("Devices"), groups.Any, Sorted(others), others.Count));
         foreach (var tg in TargetGroups)
         {
             if (expanded.TryGetValue(tg.Name, out var e)) tg.IsExpanded = e;
@@ -341,10 +431,10 @@ public sealed partial class ScriptsViewModel : ObservableObject
         if (_current == null) return;
         var script = _current.Script;
         var lines = ScriptText.Lines(script.Commands);
-        if (lines.Count == 0) { SetRunStatus("This script has no commands yet.", StatusKind.Warn); return; }
+        if (lines.Count == 0) { SetRunStatus(Loc.T("This script has no commands yet."), StatusKind.Warn); return; }
 
         var missing = Fields.Where(f => f.Required && f.Value.Trim().Length == 0).Select(f => f.Name).ToList();
-        if (missing.Count > 0) { SetRunStatus("Fill in: " + string.Join(", ", missing), StatusKind.Warn); return; }
+        if (missing.Count > 0) { SetRunStatus(Loc.T("Fill in: ") + string.Join(", ", missing), StatusKind.Warn); return; }
         var values = Fields.ToDictionary(f => f.Name, f => f.Effective.Trim());
 
         foreach (var line in lines)
@@ -354,18 +444,18 @@ public sealed partial class ScriptsViewModel : ObservableObject
         }
 
         var targets = AllTargets.Where(t => t.IsChecked).ToList();
-        if (targets.Count == 0) { SetRunStatus("Tick at least one device.", StatusKind.Warn); return; }
-        if (_s.Adb == null || _s.Directory == null) { SetRunStatus("Demo mode: scripts don't run.", StatusKind.Warn); return; }
+        if (targets.Count == 0) { SetRunStatus(Loc.T("Tick at least one device."), StatusKind.Warn); return; }
+        if (_s.Adb == null || _s.Directory == null) { SetRunStatus(Loc.T("Demo mode: scripts don't run."), StatusKind.Warn); return; }
 
         if (script.Confirm && ConfirmAsync != null)
         {
             var who = string.Join(", ", targets.Select(t => t.Name));
-            if (!await ConfirmAsync("Run script", $"Run \"{script.Name}\" on {who}?", script.Warning)) return;
+            if (!await ConfirmAsync(Loc.T("Run script"), Loc.F("Run \"{0}\" on {1}?", script.Name, who), script.Warning)) return;
         }
 
         IsRunning = true;
         Output = "";
-        SetRunStatus($"Running on {targets.Count} device{(targets.Count == 1 ? "" : "s")}…");
+        SetRunStatus(Loc.F("Running on {0}…", Loc.Count(targets.Count, "{0} device", "{0} devices")));
         var runner = new ScriptRunner(_s.Adb);
         var ok = 0;
         try
@@ -373,15 +463,15 @@ public sealed partial class ScriptsViewModel : ObservableObject
             await Task.WhenAll(targets.Select(async t =>
             {
                 var serial = await _s.Directory.ConnectAsync(t.Row);
-                if (serial == null) { Append($"━━ {t.Name}   ✗ couldn't connect\n\n"); return; }
+                if (serial == null) { Append(Loc.F("━━ {0}   ✗ couldn't connect\n\n", t.Name)); return; }
                 var res = await runner.RunAsync(serial, t.Name, script, values);
                 if (res.Ok) Interlocked.Increment(ref ok);
                 Append(Format(res));
             }));
-            SetRunStatus($"Done: worked on {ok} of {targets.Count} device{(targets.Count == 1 ? "" : "s")}.",
+            SetRunStatus(Loc.Count(targets.Count, "Done: worked on {1} of {0} device.", "Done: worked on {1} of {0} devices.", ok),
                 ok == targets.Count ? StatusKind.Ok : StatusKind.Warn);
         }
-        catch (Exception ex) { SetRunStatus("Stopped: " + ex.Message, StatusKind.Error); }
+        catch (Exception ex) { SetRunStatus(Loc.T("Stopped: ") + ex.Message, StatusKind.Error); }
         finally { IsRunning = false; }
     }
 
@@ -396,7 +486,7 @@ public sealed partial class ScriptsViewModel : ObservableObject
             sb.Append("$ ").Append(st.Command).Append('\n');
             if (st.Result.Output.Length > 0) sb.Append(st.Result.Output.Replace("\r", "")).Append('\n');
             if (st.Error != null) sb.Append("! ").Append(st.Error).Append('\n');
-            else if (!st.Result.Ok) sb.Append($"! exit code {st.Result.ExitCode}\n");
+            else if (!st.Result.Ok) sb.Append(Loc.F("! exit code {0}\n", st.Result.ExitCode));
         }
         return sb.Append('\n').ToString();
     }
@@ -413,6 +503,6 @@ public sealed partial class ScriptsViewModel : ObservableObject
             else if (OperatingSystem.IsMacOS()) Process.Start("open", OutputFolder);
             else Process.Start("xdg-open", OutputFolder);
         }
-        catch (Exception ex) { SetRunStatus("Couldn't open the folder: " + ex.Message, StatusKind.Error); }
+        catch (Exception ex) { SetRunStatus(Loc.T("Couldn't open the folder: ") + ex.Message, StatusKind.Error); }
     }
 }

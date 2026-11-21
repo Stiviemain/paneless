@@ -32,7 +32,7 @@ public partial class App : Application
         {
             Log(e.Exception);
             e.Handled = true;
-            vm()?.Report("Something went wrong: " + e.Exception.Message + @" (details in %TEMP%\paneless\errors.log)", StatusKind.Error);
+            vm()?.Report(Localization.Loc.F("Something went wrong: {0} (details in %TEMP%\\paneless\\errors.log)", e.Exception.Message), StatusKind.Error);
         };
         TaskScheduler.UnobservedTaskException += (_, e) => { Log(e.Exception); e.SetObserved(); };
         AppDomain.CurrentDomain.UnhandledException += (_, e) => { if (e.ExceptionObject is Exception ex) Log(ex); };
@@ -48,6 +48,18 @@ public partial class App : Application
             var view = ArgAfter(args, "--snapshot-view") ?? "main";
 
             var services = new AppServices(demo);
+            // Language first: every window reads its texts while it's built.
+            Localization.Loc.Init(ArgAfter(args, "--lang") ?? services.Data.Settings.Language);
+            Paneless.Core.Text.Translate = Localization.Loc.T;
+
+            // One Paneless per user: a second start brings the first one forward.
+            if (snapshot == null && !demo && !SingleInstance.TryClaim())
+            {
+                desktop.Shutdown();
+                base.OnFrameworkInitializationCompleted();
+                return;
+            }
+
             var vm = new MainViewModel(services);
             KeepRunningOnErrors(() => vm);
             var window = new MainWindow(services) { DataContext = vm };
@@ -66,13 +78,29 @@ public partial class App : Application
                     e.Cancel = true;
                     window.Hide();
                 };
-                if (!demo && services.Data.Settings.UpdateSource.Length > 0)
+                if (!demo)
+                {
+                    SingleInstance.Listen(() => Dispatcher.UIThread.Post(() =>
+                    {
+                        window.Show();
+                        if (window.WindowState == WindowState.Minimized) window.WindowState = WindowState.Normal;
+                        window.Activate();
+                    }));
+                    // Updates from GitHub Releases: shortly after start-up, then every 6 hours.
                     window.Opened += async (_, _) =>
                     {
-                        await Task.Delay(TimeSpan.FromSeconds(15));
-                        var msg = await Updates.CheckAsync(services, interactive: false);
-                        if (msg.StartsWith("Version")) vm.Report(msg, StatusKind.Ok);
+                        await Task.Delay(TimeSpan.FromSeconds(20));
+                        while (true)
+                        {
+                            if (services.Data.Settings.AutoUpdate)
+                            {
+                                var check = await Updates.CheckAsync(services, interactive: false);
+                                if (check.Downloaded) vm.Report(check.Message, StatusKind.Ok);
+                            }
+                            await Task.Delay(TimeSpan.FromHours(6));
+                        }
                     };
+                }
             }
         }
         base.OnFrameworkInitializationCompleted();
@@ -91,12 +119,12 @@ public partial class App : Application
         }
 
         var mirrorMenu = new NativeMenu();
-        var mirrorItem = new NativeMenuItem("Mirror") { Menu = mirrorMenu };
-        var open = new NativeMenuItem("Open Paneless");
+        var mirrorItem = new NativeMenuItem(Localization.Loc.T("Mirror")) { Menu = mirrorMenu };
+        var open = new NativeMenuItem(Localization.Loc.T("Open Paneless"));
         open.Click += (_, _) => ShowWindow();
-        var settings = new NativeMenuItem("Settings…");
+        var settings = new NativeMenuItem(Localization.Loc.T("Settings…"));
         settings.Click += (_, _) => { ShowWindow(); window.ShowSettings(); };
-        var quit = new NativeMenuItem("Quit Paneless");
+        var quit = new NativeMenuItem(Localization.Loc.T("Quit Paneless"));
         quit.Click += (_, _) => { _quitting = true; desktop.Shutdown(); };
 
         var menu = new NativeMenu();
@@ -115,10 +143,10 @@ public partial class App : Application
             if (now == shape) return;
             shape = now;
             mirrorMenu.Items.Clear();
-            if (rows.Count == 0) mirrorMenu.Items.Add(new NativeMenuItem("No devices on the network") { IsEnabled = false });
+            if (rows.Count == 0) mirrorMenu.Items.Add(new NativeMenuItem(Localization.Loc.T("No devices on the network")) { IsEnabled = false });
             foreach (var r in rows)
             {
-                var item = new NativeMenuItem(r.State == DeviceState.Mirroring ? $"{r.Name} (mirroring)" : r.Name);
+                var item = new NativeMenuItem(r.State == DeviceState.Mirroring ? Localization.Loc.F("{0} (mirroring)", r.Name) : r.Name);
                 var id = r.GroupId;
                 item.Click += (_, _) => _ = vm.MirrorByIdAsync(id);
                 mirrorMenu.Items.Add(item);
@@ -194,6 +222,43 @@ public partial class App : Application
         await File.WriteAllTextAsync(path + ".dock.txt", log.ToString());
     }
 
+    /// <summary>Testing aid: talks to Paneless through the real Claude bridge ("Paneless.exe --mcp") in demo mode,
+    /// like Claude Desktop does, and writes the conversation to a log. Touches no device.</summary>
+    static async Task McpSelfTestAsync(MainWindow main, string path)
+    {
+        var log = new System.Text.StringBuilder();
+        main.StartClaudeServerForTest();
+        var psi = new System.Diagnostics.ProcessStartInfo(Environment.ProcessPath!, "--mcp")
+        {
+            UseShellExecute = false, RedirectStandardInput = true, RedirectStandardOutput = true, CreateNoWindow = true,
+        };
+        using var p = System.Diagnostics.Process.Start(psi)!;
+        async Task<string> Ask(string json)
+        {
+            log.AppendLine(">> " + json);
+            await p.StandardInput.WriteLineAsync(json);
+            await p.StandardInput.FlushAsync();
+            var readTask = p.StandardOutput.ReadLineAsync();
+            var line = await Task.WhenAny(readTask, Task.Delay(15000)) == readTask ? await readTask ?? "(closed)" : "(no answer in 15 s)";
+            log.AppendLine("<< " + (line.Length > 1500 ? line[..1500] + "…" : line));
+            log.AppendLine();
+            return line;
+        }
+        await Ask("""{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"selftest","version":"1"}}}""");
+        await p.StandardInput.WriteLineAsync("""{"jsonrpc":"2.0","method":"notifications/initialized"}""");
+        await Ask("""{"jsonrpc":"2.0","id":2,"method":"tools/list"}""");
+        await Ask("""{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"list_devices","arguments":{}}}""");
+        await Ask("""{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"list_groups","arguments":{}}}""");
+        await Ask("""{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"device_info","arguments":{"device":"Lab phone 03"}}}""");
+        await Ask("""{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"run_command","arguments":{"device":"Pixel 11 Pro","command":"echo hi"}}}""");
+        await Ask("""{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"no_such_tool","arguments":{}}}""");
+        await Ask("""{"jsonrpc":"2.0","id":8,"method":"ping"}""");
+        p.StandardInput.Close();
+        p.WaitForExit(5000);
+        try { if (!p.HasExited) p.Kill(); } catch { }
+        await File.WriteAllTextAsync(path + ".mcp.txt", log.ToString());
+    }
+
     /// <summary>Testing aid: renders a window to a PNG and exits (--snapshot file.png [--snapshot-view main|pair|unlock]).</summary>
     static async Task SnapshotAsync(IClassicDesktopStyleApplicationLifetime desktop, MainWindow main, AppServices s, string view, string path)
     {
@@ -239,6 +304,24 @@ public partial class App : Application
                 svm.SelectedEntry = svm.Items.OfType<ScriptEntry>().FirstOrDefault(e => e.Script.Name == name);
                 if (view == "scripts-run") await svm.RunCommand.ExecuteAsync(null);   // read-only script, first selected device
             }
+        }
+        else if (view.StartsWith("page-") && main.DataContext is MainViewModel pvm)
+        {
+            // A page of the main window: page-wall, page-logs, page-inventory, page-claude, page-automation[-1|-2] (tab).
+            main.Height = 780; main.Width = 1240;
+            var parts = view[5..].Split('-');
+            pvm.Page = char.ToUpperInvariant(parts[0][0]) + parts[0][1..];
+            await Task.Delay(400);
+            if (parts.Length > 1 && main.GetVisualDescendants().OfType<TabControl>().FirstOrDefault() is { } tabs) tabs.SelectedIndex = int.Parse(parts[1]);
+            if (pvm.IsLogsPage && main.Logs is { } logs) { logs.Device = logs.Devices.FirstOrDefault(); await logs.ToggleCommand.ExecuteAsync(null); }
+            if (pvm.IsInventoryPage && main.Inventory is { } inv) await inv.Refresh();
+            await Task.Delay(800);
+        }
+        else if (view == "mcp-selftest" && main.DataContext is MainViewModel)
+        {
+            await McpSelfTestAsync(main, path);
+            desktop.Shutdown();
+            return;
         }
         else if (view == "settings") target = main.ShowSettings();
         else if (view == "device-settings") target = main.ShowDeviceSettings("A", "Pixel 11 Pro", null);

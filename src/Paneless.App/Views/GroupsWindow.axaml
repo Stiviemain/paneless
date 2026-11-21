@@ -1,9 +1,10 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="using:Paneless.App.Localization"
         xmlns:vm="using:Paneless.App.ViewModels"
         x:Class="Paneless.App.Views.GroupsWindow"
         x:DataType="vm:GroupsViewModel"
-        Title="Paneless groups" Icon="/Assets/Paneless.ico"
+        Title="{l:T 'Paneless groups'}" Icon="/Assets/Paneless.ico"
         Width="900" Height="600" MinWidth="720" MinHeight="420"
         WindowStartupLocation="CenterOwner">
 
@@ -32,7 +33,7 @@
     <!-- message line and Close -->
     <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto" Margin="0,14,0,0">
       <TextBlock Text="{Binding Message}" Foreground="{Binding MessageBrush}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-      <Button Grid.Column="1" x:Name="CloseButton" Content="Close" MinWidth="90" IsCancel="True" />
+      <Button Grid.Column="1" x:Name="CloseButton" Content="{l:T 'Close'}" MinWidth="90" IsCancel="True" />
     </Grid>
 
     <Grid ColumnDefinitions="260,20,*">
@@ -40,14 +41,14 @@
       <!-- groups -->
       <DockPanel>
         <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Height="34" Margin="0,0,0,10">
-          <TextBlock Text="Groups" FontWeight="SemiBold" FontSize="16" VerticalAlignment="Center" />
-          <Button Grid.Column="1" Classes="accent small" Content="+ New group" Command="{Binding NewGroupCommand}" />
+          <TextBlock Text="{l:T 'Groups'}" FontWeight="SemiBold" FontSize="16" VerticalAlignment="Center" />
+          <Button Grid.Column="1" Classes="accent small" Content="{l:T '+ New group'}" Command="{Binding NewGroupCommand}" />
         </Grid>
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="6" Margin="0,10,0,0">
-          <Button Classes="small" Content="Rename…" Command="{Binding RenameCommand}" />
-          <Button Classes="small" Content="↑" Command="{Binding MoveUpCommand}" ToolTip.Tip="Move up (order in the device list)" />
-          <Button Classes="small" Content="↓" Command="{Binding MoveDownCommand}" ToolTip.Tip="Move down" />
-          <Button Classes="small" Content="Delete" Command="{Binding DeleteCommand}" />
+          <Button Classes="small" Content="{l:T 'Rename…'}" Command="{Binding RenameCommand}" />
+          <Button Classes="small" Content="↑" Command="{Binding MoveUpCommand}" ToolTip.Tip="{l:T 'Move up (order in the device list)'}" />
+          <Button Classes="small" Content="↓" Command="{Binding MoveDownCommand}" ToolTip.Tip="{l:T 'Move down'}" />
+          <Button Classes="small" Content="{l:T 'Delete'}" Command="{Binding DeleteCommand}" />
         </StackPanel>
         <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
           <Panel>
@@ -62,7 +63,7 @@
               </ListBox.ItemTemplate>
             </ListBox>
             <TextBlock IsVisible="{Binding NoGroups}" Classes="dim" TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center" Margin="20"
-                       Text="No groups yet. Click + New group, e.g. for Test lab or Family tablets." />
+                       Text="{l:T 'No groups yet. Click + New group, e.g. for Test lab or Family tablets.'}" />
           </Panel>
         </Border>
       </DockPanel>
@@ -71,14 +72,14 @@
       <DockPanel Grid.Column="2">
         <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Height="34" Margin="0,0,0,4">
           <TextBlock Text="{Binding DevicesTitle}" FontWeight="SemiBold" FontSize="16" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-          <TextBox Grid.Column="1" Width="220" Text="{Binding Filter}" PlaceholderText="Filter devices" />
+          <TextBox Grid.Column="1" Width="220" Text="{Binding Filter}" PlaceholderText="{l:T 'Filter devices'}" />
         </Grid>
         <TextBlock DockPanel.Dock="Top" Classes="dim" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,10"
-                   Text="Tick the devices that belong in this group. A device is in one group at a time, so ticking one that's in another group moves it here." />
+                   Text="{l:T 'Tick the devices that belong in this group. A device is in one group at a time, so ticking one that’s in another group moves it here.'}" />
         <Grid DockPanel.Dock="Bottom" ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,10,0,0" IsEnabled="{Binding HasGroup}">
           <Button Classes="small" Content="{Binding AddSelectedLabel}" Command="{Binding AddSelectedCommand}" />
-          <Button Grid.Column="2" Classes="link" Content="Tick all shown" Command="{Binding TickAllShownCommand}" />
-          <Button Grid.Column="3" Classes="link" Content="Untick all shown" Command="{Binding UntickAllShownCommand}" />
+          <Button Grid.Column="2" Classes="link" Content="{l:T 'Tick all shown'}" Command="{Binding TickAllShownCommand}" />
+          <Button Grid.Column="3" Classes="link" Content="{l:T 'Untick all shown'}" Command="{Binding UntickAllShownCommand}" />
         </Grid>
         <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
           <Panel>
@@ -92,14 +93,14 @@
                       <TextBlock Grid.Column="2" Text="{Binding Detail}" Classes="dim" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="10,0" />
                       <TextBlock Grid.Column="3" Text="{Binding WhereText}" Foreground="{StaticResource AmberBrush}" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                       <TextBlock Grid.Column="4" Text="{Binding OnlineText}" Foreground="{Binding OnlineBrush}" VerticalAlignment="Center" Margin="10,0,4,0"
-                                 ToolTip.Tip="● on the network now · ○ not on the network" />
+                                 ToolTip.Tip="{l:T '● on the network now · ○ not on the network'}" />
                     </Grid>
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
             </ScrollViewer>
             <TextBlock IsVisible="{Binding !HasGroup}" Classes="dim" TextAlignment="Center" VerticalAlignment="Center" Margin="20" TextWrapping="Wrap"
-                       Text="Create a group on the left, then tick its devices here." />
+                       Text="{l:T 'Create a group on the left, then tick its devices here.'}" />
           </Panel>
         </Border>
       </DockPanel>

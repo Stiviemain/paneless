@@ -1,10 +1,11 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="using:Paneless.App.Localization"
         xmlns:vm="using:Paneless.App.ViewModels"
         xmlns:app="using:Paneless.App"
         x:Class="Paneless.App.Views.SettingsWindow"
         x:DataType="vm:SettingsViewModel"
-        Title="Paneless settings" Icon="/Assets/Paneless.ico"
+        Title="{l:T 'Paneless settings'}" Icon="/Assets/Paneless.ico"
         Width="820" Height="680" MinWidth="700" MinHeight="440"
         WindowStartupLocation="CenterOwner">
 
@@ -28,17 +29,17 @@
   </Window.Styles>
 
   <DockPanel Margin="22,18">
-    <TextBlock DockPanel.Dock="Top" Text="Settings" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,14" />
+    <TextBlock DockPanel.Dock="Top" Text="{l:T 'Settings'}" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,14" />
     <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto" Margin="0,14,0,0">
       <TextBlock Classes="dim" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center"
-                 Text="Devices and groups can have their own settings: right-click a device › Device settings, or a group's ⋯ › Group settings." />
-      <Button Grid.Column="1" x:Name="CloseButton" Classes="accent" Content="Done" MinWidth="90" IsCancel="True" IsDefault="True" Margin="12,0,0,0" />
+                 Text="{l:T 'Devices and groups can have their own settings: right-click a device › Device settings, or a group’s ⋯ › Group settings.'}" />
+      <Button Grid.Column="1" x:Name="CloseButton" Classes="accent" Content="{l:T 'Done'}" MinWidth="90" IsCancel="True" IsDefault="True" Margin="12,0,0,0" />
     </Grid>
 
     <Grid ColumnDefinitions="*,24,*">
       <ScrollViewer HorizontalScrollBarVisibility="Disabled">
         <StackPanel Spacing="10">
-          <TextBlock Classes="section" Text="Mirroring (for every device)" />
+          <TextBlock Classes="section" Text="{l:T 'Mirroring (for every device)'}" />
           <ItemsControl ItemsSource="{Binding Rows}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:SettingRow">
@@ -49,44 +50,55 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
-          <TextBlock Classes="label" Text="Folder on the device for files you drop on it" Margin="0,6,0,0" />
-          <TextBox Text="{Binding PushTarget}" PlaceholderText="/sdcard/Download/" />
+          <TextBlock Classes="label" Text="{l:T 'Folder on the device for files you drop on it'}" Margin="0,6,0,0" />
+          <TextBox Text="{Binding PushTarget}" PlaceholderText="{l:T '/sdcard/Download/'}" />
         </StackPanel>
       </ScrollViewer>
 
       <ScrollViewer Grid.Column="2" HorizontalScrollBarVisibility="Disabled">
         <StackPanel Spacing="10">
-          <TextBlock Classes="section" Text="Connecting" />
-          <CheckBox Content="Connect to known devices by themselves" IsChecked="{Binding AutoConnect}"
-                    ToolTip.Tip="Devices you've paired before are connected as soon as they show up on the network. On Android 17, wireless debugging also turns itself back on when the device returns to a trusted Wi-Fi." />
+          <TextBlock Classes="section" Text="{l:T 'Connecting'}" />
+          <CheckBox Content="{l:T 'Connect to known devices by themselves'}" IsChecked="{Binding AutoConnect}"
+                    ToolTip.Tip="{l:T 'Devices you’ve paired before are connected as soon as they show up on the network. On Android 17, wireless debugging also turns itself back on when the device returns to a trusted Wi-Fi.'}" />
 
-          <TextBlock Classes="section" Text="Start-up and notification area" Margin="0,10,0,4" />
-          <CheckBox Content="Start Paneless with Windows (in the notification area)" IsChecked="{Binding StartWithSystem}"
+          <TextBlock Classes="section" Text="{l:T 'Start-up and notification area'}" Margin="0,10,0,4" />
+          <CheckBox Content="{l:T 'Start Paneless with Windows (in the notification area)'}" IsChecked="{Binding StartWithSystem}"
                     IsVisible="{Binding AutostartSupported}" />
-          <CheckBox Content="Keep running in the notification area when the window is closed" IsChecked="{Binding CloseToTray}"
-                    ToolTip.Tip="Shortcuts, auto-connect and on-connect scripts keep working. Quit from the notification-area icon." />
+          <CheckBox Content="{l:T 'Keep running in the notification area when the window is closed'}" IsChecked="{Binding CloseToTray}"
+                    ToolTip.Tip="{l:T 'Shortcuts, auto-connect and on-connect scripts keep working. Quit from the notification-area icon.'}" />
 
-          <TextBlock Classes="section" Text="Updates" Margin="0,10,0,4" />
-          <TextBlock Classes="label" TextWrapping="Wrap"
-                     Text="Where new versions are published: a web address or a folder with the releases (e.g. a shared folder). Leave empty for no update checks." />
-          <TextBox Text="{Binding UpdateSource}" PlaceholderText="https://… or C:\…\releases" />
+          <TextBlock Classes="section" Text="{l:T 'Language'}" Margin="0,10,0,4" />
+          <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding LanguageChoices}" SelectedItem="{Binding Language}" />
+          <TextBlock Classes="label" TextWrapping="Wrap" Text="{Binding LanguageNote}" IsVisible="{Binding LanguageChanged}" Foreground="{StaticResource AmberBrush}" />
+
+          <TextBlock Classes="section" Text="{l:T 'Updates'}" Margin="0,10,0,4" />
+          <CheckBox Content="{l:T 'Install new versions automatically (from GitHub)'}" IsChecked="{Binding AutoUpdate}"
+                    ToolTip.Tip="{l:T 'Paneless looks for a new version at start-up and every few hours, downloads it in the background and installs it when you close Paneless.'}" />
+          <CheckBox Content="{l:T 'Include beta versions'}" IsChecked="{Binding BetaUpdates}" />
+          <Expander Header="{l:T 'Other update source'}" Padding="0,6,0,0">
+            <StackPanel Spacing="6">
+              <TextBlock Classes="label" TextWrapping="Wrap"
+                         Text="{l:T 'Only if your organisation publishes its own builds: a web address or a folder with the releases. Leave empty for GitHub.'}" />
+              <TextBox Text="{Binding UpdateSource}" PlaceholderText="{l:T 'https://… or C:\…\releases'}" />
+            </StackPanel>
+          </Expander>
           <StackPanel Orientation="Horizontal" Spacing="10">
-            <Button Content="Check for updates now" Command="{Binding CheckUpdatesCommand}" IsEnabled="{Binding !IsChecking}" />
+            <Button Content="{l:T 'Check for updates now'}" Command="{Binding CheckUpdatesCommand}" IsEnabled="{Binding !IsChecking}" />
             <TextBlock Text="{Binding UpdateStatus}" Classes="dim" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="220" />
           </StackPanel>
 
-          <TextBlock Classes="section" Text="Support Paneless" Margin="0,10,0,4" />
+          <TextBlock Classes="section" Text="{l:T 'Support Paneless'}" Margin="0,10,0,4" />
           <TextBlock Classes="label" TextWrapping="Wrap"
-                     Text="Paneless is free and open source. If it saves you time, you can support its development. It never asks by itself." />
+                     Text="{l:T 'Paneless is free and open source. If it saves you time, you can support its development. It never asks by itself.'}" />
           <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button Tag="{x:Static app:AppLinks.KoFi}" Click="OpenLink" ToolTip.Tip="ko-fi.com/Stiviemain: a one-off coffee, no account needed">
+            <Button Tag="{x:Static app:AppLinks.KoFi}" Click="OpenLink" ToolTip.Tip="{l:T 'ko-fi.com/Stiviemain: a one-off coffee, no account needed'}">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <TextBlock Text="☕" />
-                <TextBlock Text="Buy me a coffee on Ko-fi" />
+                <TextBlock Text="{l:T 'Buy me a coffee on Ko-fi'}" />
               </StackPanel>
             </Button>
           </StackPanel>
-          <Button Classes="linkish" Tag="{x:Static app:AppLinks.Repository}" Click="OpenLink" Content="Paneless on GitHub: star it, report a bug, suggest an idea" Padding="0,4" />
+          <Button Classes="linkish" Tag="{x:Static app:AppLinks.Repository}" Click="OpenLink" Content="{l:T 'Paneless on GitHub: star it, report a bug, suggest an idea'}" Padding="0,4" />
         </StackPanel>
       </ScrollViewer>
     </Grid>

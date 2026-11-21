@@ -1,3 +1,4 @@
+using Paneless.App.Localization;
 using System.Collections.ObjectModel;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -50,11 +51,11 @@ public sealed partial class ScriptPick : ObservableObject
     bool _isChecked;
     public AdbScript Script { get; }
     public string Name => Script.Name;
-    public string Category => Script.BuiltIn ? Script.Category : "My scripts";
+    public string Category => Script.BuiltIn ? Script.Category : Loc.T("My scripts");
     /// <summary>Set when the group already runs it: shown ticked and greyed.</summary>
     public string? InheritedFrom { get; }
     public bool Editable => InheritedFrom == null;
-    public string Note => InheritedFrom != null ? $"from {InheritedFrom}" : Script.Confirm ? "asks first when run by hand" : "";
+    public string Note => InheritedFrom != null ? Loc.F("from {0}", InheritedFrom) : Script.Confirm ? Loc.T("asks first when run by hand") : "";
     public bool IsChecked { get => _isChecked; set { if (SetProperty(ref _isChecked, value)) _changed(); } }
 }
 
@@ -62,13 +63,13 @@ public sealed partial class ScriptPick : ObservableObject
 public static class SettingChoices
 {
     public static readonly string[] Sizes = ["Full resolution", "1920 px", "1600 px", "1280 px", "1024 px"];
-    public static readonly (string Label, string Value)[] Codecs = [("H.264", "h264"), ("H.265 (sharper)", "h265"), ("AV1 (newest devices)", "av1")];
+    public static readonly (string Label, string Value)[] Codecs = [("H.264", "h264"), (Loc.T("H.265 (sharper)"), "h265"), (Loc.T("AV1 (newest devices)"), "av1")];
     public static readonly int[] Bitrates = [2, 4, 8, 12, 16, 24, 32, 50];
     public static readonly int[] Fps = [0, 30, 60, 90, 120];
 
-    public static string OnOff(bool b) => b ? "On" : "Off";
+    public static string OnOff(bool b) => b ? Loc.T("On") : Loc.T("Off");
     public static string Codec(string v) => Codecs.FirstOrDefault(c => c.Value == v).Label?.Split(' ')[0] ?? v;
-    public static string FpsText(int v) => v == 0 ? "No limit" : $"{v} fps";
+    public static string FpsText(int v) => v == 0 ? Loc.T("No limit") : $"{v} fps";
 
     /// <summary>The rows for the mirroring options. With <paramref name="inherited"/>, each row starts with "Default (…)".</summary>
     public static List<SettingRow> MirrorRows(Func<DeviceProfile>? profile, EffectiveProfile? inherited, AppSettings? global, Action save)
@@ -77,15 +78,15 @@ public static class SettingChoices
         void Bool(string label, string? tip, bool? current, bool fallback, Action<bool?> set)
         {
             var choices = new List<Choice>();
-            if (inherited != null) choices.Add(new Choice($"Default ({OnOff(fallback)})", null));
-            choices.Add(new Choice("On", true));
-            choices.Add(new Choice("Off", false));
+            if (inherited != null) choices.Add(new Choice(Loc.F("Default ({0})", OnOff(fallback)), null));
+            choices.Add(new Choice(Loc.T("On"), true));
+            choices.Add(new Choice(Loc.T("Off"), false));
             rows.Add(new SettingRow(label, tip, choices, inherited != null ? current : fallback, v => { set((bool?)v); save(); }));
         }
         void Pick<T>(string label, string? tip, IEnumerable<(string Label, T Value)> options, T? current, string fallbackLabel, Action<T?> set) where T : notnull
         {
             var choices = new List<Choice>();
-            if (inherited != null) choices.Add(new Choice($"Default ({fallbackLabel})", null));
+            if (inherited != null) choices.Add(new Choice(Loc.F("Default ({0})", fallbackLabel), null));
             choices.AddRange(options.Select(o => new Choice(o.Label, o.Value)));
             rows.Add(new SettingRow(label, tip, choices, current, v => { set(v is T t ? t : default); save(); }));
         }
@@ -93,21 +94,21 @@ public static class SettingChoices
         var p = profile?.Invoke();
         var g = global;
         var e = inherited;
-        Bool("Keep device screen off", "The device's own screen stays dark while it's mirrored.", p?.ScreenOff, e?.ScreenOff ?? g!.ScreenOff,
+        Bool(Loc.T("Keep device screen off"), Loc.T("The device's own screen stays dark while it's mirrored."), p?.ScreenOff, e?.ScreenOff ?? g!.ScreenOff,
             v => { if (p != null) p.ScreenOff = v; else g!.ScreenOff = v ?? false; });
-        Bool("Keep awake", "The device doesn't time out and lock while it's mirrored.", p?.KeepAwake, e?.KeepAwake ?? g!.KeepAwake,
+        Bool(Loc.T("Keep awake"), Loc.T("The device doesn't time out and lock while it's mirrored."), p?.KeepAwake, e?.KeepAwake ?? g!.KeepAwake,
             v => { if (p != null) p.KeepAwake = v; else g!.KeepAwake = v ?? false; });
-        Bool("Play device audio here", null, p?.Audio, e?.Audio ?? g!.Audio,
+        Bool(Loc.T("Play device audio here"), null, p?.Audio, e?.Audio ?? g!.Audio,
             v => { if (p != null) p.Audio = v; else g!.Audio = v ?? false; });
-        Bool("Mirror window always on top", null, p?.OnTop, e?.OnTop ?? g!.OnTop,
+        Bool(Loc.T("Mirror window always on top"), null, p?.OnTop, e?.OnTop ?? g!.OnTop,
             v => { if (p != null) p.OnTop = v; else g!.OnTop = v ?? false; });
-        Pick("Max size", "Longer side of the picture. Smaller is smoother on slow Wi-Fi.", Sizes.Select(s => (s, s)),
-            p != null ? p.MaxSize : g!.MaxSize, e?.MaxSize ?? "", v => { if (p != null) p.MaxSize = v; else if (v != null) g!.MaxSize = v; });
-        Pick("Video codec", "H.265 and AV1 look better at the same bit rate if the device can encode them.", Codecs.Select(c => (c.Label, c.Value)),
+        Pick(Loc.T("Max size"), Loc.T("Longer side of the picture. Smaller is smoother on slow Wi-Fi."), Sizes.Select(s => (Loc.T(s), s)),
+            p != null ? p.MaxSize : g!.MaxSize, Loc.T(e?.MaxSize ?? ""), v => { if (p != null) p.MaxSize = v; else if (v != null) g!.MaxSize = v; });
+        Pick(Loc.T("Video codec"), Loc.T("H.265 and AV1 look better at the same bit rate if the device can encode them."), Codecs.Select(c => (c.Label, c.Value)),
             p != null ? p.VideoCodec : g!.VideoCodec, e != null ? Codec(e.VideoCodec) : "", v => { if (p != null) p.VideoCodec = v; else if (v != null) g!.VideoCodec = v; });
-        Pick("Bit rate", "Higher is sharper but needs a stronger Wi-Fi connection.", Bitrates.Select(b => ($"{b} Mbit/s", (object)b)),
+        Pick(Loc.T("Bit rate"), Loc.T("Higher is sharper but needs a stronger Wi-Fi connection."), Bitrates.Select(b => ($"{b} Mbit/s", (object)b)),
             p != null ? p.BitrateMbps : g!.BitrateMbps, e != null ? $"{e.BitrateMbps} Mbit/s" : "", v => { if (p != null) p.BitrateMbps = (int?)v; else if (v is int i) g!.BitrateMbps = i; });
-        Pick("Frame rate limit", "Lower saves battery and Wi-Fi.", Fps.Select(f => (FpsText(f), (object)f)),
+        Pick(Loc.T("Frame rate limit"), Loc.T("Lower saves battery and Wi-Fi."), Fps.Select(f => (FpsText(f), (object)f)),
             p != null ? p.MaxFps : g!.MaxFps, e != null ? FpsText(e.MaxFps) : "", v => { if (p != null) p.MaxFps = (int?)v; else if (v is int i) g!.MaxFps = i; });
         return rows;
     }
@@ -128,23 +129,23 @@ public sealed partial class ProfileEditorViewModel : ObservableObject
         _group = deviceId == null ? group : null;
         var memberOf = deviceId != null ? _s.Groups.GroupOf(deviceId) : null;
 
-        Title = deviceId != null ? $"Settings for {deviceName}" : $"Settings for the group {group!.Name}";
+        Title = deviceId != null ? Loc.F("Settings for {0}", deviceName) : Loc.F("Settings for the group {0}", group!.Name);
         Subtitle = deviceId != null
-            ? memberOf != null ? $"Anything left on Default uses the group {memberOf.Name}'s setting, or else the one in Paneless settings." : "Anything left on Default uses the setting in Paneless settings."
-            : "These apply to every device in the group. A device's own settings win.";
+            ? memberOf != null ? Loc.F("Anything left on Default uses the group {0}'s setting, or else the one in Paneless settings.", memberOf.Name) : Loc.T("Anything left on Default uses the setting in Paneless settings.")
+            : Loc.T("These apply to every device in the group. A device's own settings win.");
         IsDevice = deviceId != null;
 
         // What "Default" means here: for a device, its group's settings over the global ones; for a group, the global ones.
         var inherited = EffectiveProfile.Resolve(_s.Data.Settings, deviceId != null ? memberOf?.Profile : null, null);
         Rows = new(SettingChoices.MirrorRows(Profile, inherited, null, Save));
-        AutoMirror = new SettingRow("Mirror by itself when it connects", "Opens the mirror as soon as the device is on the network and connected. Once per connection.",
-            [new Choice($"Default ({SettingChoices.OnOff(inherited.AutoMirror)})", null), new Choice("On", true), new Choice("Off", false)],
+        AutoMirror = new SettingRow(Loc.T("Mirror by itself when it connects"), Loc.T("Opens the mirror as soon as the device is on the network and connected. Once per connection."),
+            [new Choice(Loc.F("Default ({0})", SettingChoices.OnOff(inherited.AutoMirror)), null), new Choice(Loc.T("On"), true), new Choice(Loc.T("Off"), false)],
             Profile().AutoMirror, v => { Profile().AutoMirror = (bool?)v; Save(); });
 
         var p = Profile();
         _loading = true;
         PushTarget = p.PushTarget ?? "";
-        PushPlaceholder = $"Default: {inherited.PushTarget}";
+        PushPlaceholder = Loc.F("Default: {0}", inherited.PushTarget);
         Hotkey = p.Hotkey ?? "";
         _loading = false;
 
@@ -188,7 +189,7 @@ public sealed partial class ProfileEditorViewModel : ObservableObject
     {
         if (_deviceId != null) _s.Profiles.Save();
         else _s.Groups.Save();
-        Message = "Saved. Applies the next time a mirror starts.";
+        Message = Loc.T("Saved. Applies the next time a mirror starts.");
         MessageBrush = Theme.Green;
     }
 
@@ -234,7 +235,7 @@ public sealed partial class ProfileEditorViewModel : ObservableObject
         foreach (var s in Scripts.Where(s => s.Editable)) s.IsChecked = false;
         PushTarget = "";
         Save();
-        Message = "Everything is back to Default.";
+        Message = Loc.T("Everything is back to Default.");
     }
 }
 
@@ -250,6 +251,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         Rows = new(SettingChoices.MirrorRows(null, null, g, Save));
         _pushTarget = g.PushTarget;
         _updateSource = g.UpdateSource;
+        _startLanguage = g.Language;
         _startWithSystem = Platform.Autostart.IsEnabled;
     }
 
@@ -266,6 +268,26 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     public bool AutoConnect { get => G.AutoConnect; set { G.AutoConnect = value; Save(); OnPropertyChanged(); } }
     public bool CloseToTray { get => G.CloseToTray; set { G.CloseToTray = value; Save(); OnPropertyChanged(); } }
+    public bool AutoUpdate { get => G.AutoUpdate; set { G.AutoUpdate = value; Save(); OnPropertyChanged(); } }
+    public bool BetaUpdates { get => G.BetaUpdates; set { G.BetaUpdates = value; Save(); OnPropertyChanged(); } }
+
+    /// <summary>Language: takes effect after a restart (every window reads its texts once).</summary>
+    public IReadOnlyList<Choice> LanguageChoices { get; } = Localization.Loc.Languages.Select(l => new Choice(l.Code == "" ? Localization.Loc.T(l.Name) : l.Name, l.Code)).ToList();
+    readonly string _startLanguage = "";
+    public Choice Language
+    {
+        get => LanguageChoices.FirstOrDefault(c => (string?)c.Value == G.Language) ?? LanguageChoices[0];
+        set
+        {
+            if (value == null) return;
+            G.Language = (string?)value.Value ?? "";
+            Save();
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(LanguageChanged));
+        }
+    }
+    public bool LanguageChanged => G.Language != _startLanguage;
+    public string LanguageNote => Localization.Loc.T("Restart Paneless to switch the language.");
 
     bool _startWithSystem;
     public bool StartWithSystem
@@ -276,7 +298,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             if (_s.Demo) { _startWithSystem = value; OnPropertyChanged(); return; }
             var ok = Platform.Autostart.Set(value);
             _startWithSystem = Platform.Autostart.IsEnabled;
-            UpdateStatus = ok ? "" : "Couldn't change the start-up setting.";
+            UpdateStatus = ok ? "" : Loc.T("Couldn't change the start-up setting.");
             OnPropertyChanged();
         }
     }
@@ -309,7 +331,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     {
         if (CheckUpdatesAsync == null) return;
         IsChecking = true;
-        UpdateStatus = "Checking…";
+        UpdateStatus = Loc.T("Checking…");
         try { UpdateStatus = await CheckUpdatesAsync(); }
         finally { IsChecking = false; }
     }

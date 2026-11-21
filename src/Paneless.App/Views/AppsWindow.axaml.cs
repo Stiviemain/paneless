@@ -1,3 +1,4 @@
+using Paneless.App.Localization;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using Paneless.App.ViewModels;
@@ -19,9 +20,9 @@ public partial class AppsWindow : Window
             {
                 var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
                 {
-                    Title = "APK to install",
+                    Title = Loc.T("APK to install"),
                     AllowMultiple = true,
-                    FileTypeFilter = [new FilePickerFileType("Android apps") { Patterns = ["*.apk"] }],
+                    FileTypeFilter = [new FilePickerFileType(Loc.T("Android apps")) { Patterns = ["*.apk"] }],
                 });
                 return files.Select(f => f.TryGetLocalPath()).OfType<string>().ToList();
             };

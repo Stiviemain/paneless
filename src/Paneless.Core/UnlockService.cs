@@ -47,29 +47,29 @@ public sealed partial class UnlockService(AdbClient adb, DataStore data, ISecret
 
     public async Task<UnlockResult> UnlockAsync(string serial, string sn, string name)
     {
-        if (!data.Unlock.TryGetValue(sn, out var entry)) return new(false, $"No unlock code is saved for {name}.");
-        if (!entry.Enabled) return new(false, $"Auto-unlock for {name} is paused after a failed try. Save its code again to turn it back on.");
+        if (!data.Unlock.TryGetValue(sn, out var entry)) return new(false, Text.F("No unlock code is saved for {0}.", name));
+        if (!entry.Enabled) return new(false, Text.F("Auto-unlock for {0} is paused after a failed try. Save its code again to turn it back on.", name));
 
         var st = await GetLockInfoAsync(serial);
-        if (st.Locked == null) return new(false, $"Couldn't read the lock state of {name}, so nothing was typed.");
+        if (st.Locked == null) return new(false, Text.F("Couldn't read the lock state of {0}, so nothing was typed.", name));
         if (st.Locked == false)
         {
             await adb.ShellAsync(serial, "input keyevent KEYCODE_WAKEUP", TimeSpan.FromSeconds(5));
-            return new(true, $"{name} is already unlocked.");
+            return new(true, Text.F("{0} is already unlocked.", name));
         }
 
         // Wake the screen and ask for the PIN/password pad.
         await adb.ShellAsync(serial, "input keyevent KEYCODE_WAKEUP; sleep 0.4; wm dismiss-keyguard; sleep 0.9");
         st = await GetLockInfoAsync(serial);
-        if (st.Locked == false) return new(true, $"{name} unlocked.");
+        if (st.Locked == false) return new(true, Text.F("{0} unlocked.", name));
         // Only type when the lock screen is definitely in front, so the code can never land in an app.
-        if (!st.OnLockScreen) return new(false, $"The lock screen on {name} didn't come up as expected, so nothing was typed.");
+        if (!st.OnLockScreen) return new(false, Text.F("The lock screen on {0} didn't come up as expected, so nothing was typed.", name));
 
         var code = await vault.RevealAsync(sn, entry.Secret ?? "");
         if (string.IsNullOrEmpty(code))
         {
             Pause(sn);
-            return new(false, $"The saved code for {name} couldn't be read. Save it again.");
+            return new(false, Text.F("The saved code for {0} couldn't be read. Save it again.", name));
         }
         var quoted = ("'" + code.Replace("'", "'\\''") + "'").Replace(" ", "%s");
         await adb.ShellAsync(serial, "input text " + quoted);
@@ -87,9 +87,9 @@ public sealed partial class UnlockService(AdbClient adb, DataStore data, ISecret
         if (st.Locked != false)
         {
             Pause(sn);
-            return new(false, $"Couldn't unlock {name}. Auto-unlock is paused for it so repeated tries can't lock you out. Check the code and save it again.");
+            return new(false, Text.F("Couldn't unlock {0}. Auto-unlock is paused for it so repeated tries can't lock you out. Check the code and save it again.", name));
         }
-        return new(true, $"{name} unlocked.");
+        return new(true, Text.F("{0} unlocked.", name));
     }
 
     [GeneratedRegex(@"deviceLocked=(\d)")]

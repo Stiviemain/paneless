@@ -1,0 +1,76 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Paneless.App.ViewModels"
+             xmlns:l="using:Paneless.App.Localization"
+             x:Class="Paneless.App.Views.InventoryPage"
+             x:DataType="vm:InventoryViewModel">
+  <DockPanel>
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+      <StackPanel Spacing="3">
+        <TextBlock Classes="pagetitle" Text="{l:T 'Inventory'}" />
+        <TextBlock Classes="pagehint" Text="{l:T 'Model, Android version, security patch, battery, storage and more for every device. Export it for Excel or as a report.'}" />
+      </StackPanel>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+        <ComboBox Width="170" ItemsSource="{Binding GroupChoices}" SelectedItem="{Binding GroupFilter}" />
+        <Button Classes="accent" Content="{l:T 'Read devices'}" Command="{Binding RefreshCommand}" IsEnabled="{Binding !IsBusy}" />
+        <DropDownButton Content="{l:T 'Export'}">
+          <DropDownButton.Flyout>
+            <MenuFlyout Placement="BottomEdgeAlignedRight">
+              <MenuItem Header="{l:T 'CSV for Excel…'}" Command="{Binding ExportCsvCommand}" />
+              <MenuItem Header="{l:T 'HTML report…'}" Command="{Binding ExportHtmlCommand}" />
+            </MenuFlyout>
+          </DropDownButton.Flyout>
+        </DropDownButton>
+      </StackPanel>
+    </Grid>
+
+    <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto" Margin="0,8,0,0">
+      <TextBlock Classes="small" Text="{Binding Summary}" TextTrimming="CharacterEllipsis" />
+      <TextBlock Grid.Column="1" Classes="small" Text="{Binding Status}" Margin="12,0,0,0" />
+    </Grid>
+
+    <Border Classes="card" ClipToBounds="True">
+      <DockPanel>
+        <Grid DockPanel.Dock="Top" Height="32" Background="{StaticResource HeaderBrush}" ColumnDefinitions="1.5*,1.5*,0.9*,0.9*,0.7*,1.7*,0.6*,1*,0.6*">
+          <TextBlock Grid.Column="0" Classes="colhead" Text="{l:T 'Device'}" />
+          <TextBlock Grid.Column="1" Classes="colhead" Text="{l:T 'Model'}" />
+          <TextBlock Grid.Column="2" Classes="colhead" Text="{l:T 'Android'}" />
+          <TextBlock Grid.Column="3" Classes="colhead" Text="{l:T 'Security patch'}" />
+          <TextBlock Grid.Column="4" Classes="colhead" Text="{l:T 'Battery'}" />
+          <TextBlock Grid.Column="5" Classes="colhead" Text="{l:T 'Storage'}" />
+          <TextBlock Grid.Column="6" Classes="colhead" Text="{l:T 'RAM'}" />
+          <TextBlock Grid.Column="7" Classes="colhead" Text="{l:T 'IP address'}" />
+          <TextBlock Grid.Column="8" Classes="colhead" Text="{l:T 'Uptime'}" />
+        </Grid>
+        <Panel>
+          <ListBox ItemsSource="{Binding Rows}" Background="Transparent" Classes="plain">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:InventoryRow">
+                <Grid ColumnDefinitions="1.5*,1.5*,0.9*,0.9*,0.7*,1.7*,0.6*,1*,0.6*" MinHeight="22">
+                  <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="{Binding NameBrush}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Classes="small" Text="{Binding Group}" IsVisible="{Binding Group, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <TextBlock Classes="small" Text="{Binding Seen}" IsVisible="{Binding Seen, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                  </StackPanel>
+                  <TextBlock Grid.Column="1" Classes="cell" Margin="12,0,0,0" Text="{Binding Model}" />
+                  <TextBlock Grid.Column="2" Classes="cell" Text="{Binding Android}" />
+                  <TextBlock Grid.Column="3" Classes="cell" Text="{Binding Patch}" Foreground="{Binding PatchBrush}" />
+                  <TextBlock Grid.Column="4" Classes="cell" Text="{Binding Battery}" Foreground="{Binding BatteryBrush}" />
+                  <TextBlock Grid.Column="5" Classes="cell" Text="{Binding Storage}" Foreground="{Binding StorageBrush}" />
+                  <TextBlock Grid.Column="6" Classes="cell" Text="{Binding Ram}" />
+                  <TextBlock Grid.Column="7" Classes="cell" Text="{Binding Ip}" />
+                  <TextBlock Grid.Column="8" Classes="cell" Text="{Binding Uptime}" />
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <StackPanel IsVisible="{Binding IsEmpty}" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10" Margin="24">
+            <TextBlock Classes="dim" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="420"
+                       Text="{l:T 'Nothing read yet. Click Read devices to collect the facts of every device on the network.'}" />
+          </StackPanel>
+          <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" VerticalAlignment="Top" />
+        </Panel>
+      </DockPanel>
+    </Border>
+  </DockPanel>
+</UserControl>

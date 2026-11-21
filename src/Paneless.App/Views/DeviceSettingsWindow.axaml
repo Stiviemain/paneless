@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="using:Paneless.App.Localization"
         xmlns:vm="using:Paneless.App.ViewModels"
         x:Class="Paneless.App.Views.DeviceSettingsWindow"
         x:DataType="vm:ProfileEditorViewModel"
@@ -27,15 +28,15 @@
 
     <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto,Auto" Margin="0,14,0,0">
       <TextBlock Text="{Binding Message}" Foreground="{Binding MessageBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-      <Button Grid.Column="1" Content="Reset to Default" Command="{Binding ResetAllCommand}" Margin="0,0,8,0" />
-      <Button Grid.Column="2" x:Name="CloseButton" Classes="accent" Content="Done" MinWidth="90" IsCancel="True" IsDefault="True" />
+      <Button Grid.Column="1" Content="{l:T 'Reset to Default'}" Command="{Binding ResetAllCommand}" Margin="0,0,8,0" />
+      <Button Grid.Column="2" x:Name="CloseButton" Classes="accent" Content="{l:T 'Done'}" MinWidth="90" IsCancel="True" IsDefault="True" />
     </Grid>
 
     <Grid ColumnDefinitions="*,24,*">
       <!-- left: mirroring -->
       <ScrollViewer HorizontalScrollBarVisibility="Disabled">
         <StackPanel Spacing="10">
-          <TextBlock Classes="section" Text="Mirroring" />
+          <TextBlock Classes="section" Text="{l:T 'Mirroring'}" />
           <ItemsControl ItemsSource="{Binding Rows}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:SettingRow">
@@ -47,17 +48,17 @@
             </ItemsControl.ItemTemplate>
           </ItemsControl>
 
-          <TextBlock Classes="section" Text="Files" Margin="0,10,0,4" />
-          <TextBlock Classes="label" Text="Folder on the device for files you drop on it" />
+          <TextBlock Classes="section" Text="{l:T 'Files'}" Margin="0,10,0,4" />
+          <TextBlock Classes="label" Text="{l:T 'Folder on the device for files you drop on it'}" />
           <TextBox Text="{Binding PushTarget}" PlaceholderText="{Binding PushPlaceholder}" />
 
           <StackPanel IsVisible="{Binding IsDevice}" Spacing="6" Margin="0,10,0,0">
-            <TextBlock Classes="section" Text="Shortcut" Margin="0,0,0,0" />
+            <TextBlock Classes="section" Text="{l:T 'Shortcut'}" Margin="0,0,0,0" />
             <TextBlock Classes="label" TextWrapping="Wrap"
-                       Text="Click the box and press a key combination, e.g. Ctrl+Alt+P. It mirrors this device from anywhere (or brings its mirror to the front)." />
+                       Text="{l:T 'Click the box and press a key combination, e.g. Ctrl+Alt+P. It mirrors this device from anywhere (or brings its mirror to the front).'}" />
             <Grid ColumnDefinitions="*,8,Auto">
-              <TextBox x:Name="HotkeyBox" Text="{Binding Hotkey}" IsReadOnly="True" PlaceholderText="No shortcut" />
-              <Button Grid.Column="2" Content="Clear" Command="{Binding ClearHotkeyCommand}" />
+              <TextBox x:Name="HotkeyBox" Text="{Binding Hotkey}" IsReadOnly="True" PlaceholderText="{l:T 'No shortcut'}" />
+              <Button Grid.Column="2" Content="{l:T 'Clear'}" Command="{Binding ClearHotkeyCommand}" />
             </Grid>
           </StackPanel>
         </StackPanel>
@@ -66,14 +67,14 @@
       <!-- right: when it connects -->
       <DockPanel Grid.Column="2">
         <StackPanel DockPanel.Dock="Top" Spacing="8">
-          <TextBlock Classes="section" Text="When it connects" />
+          <TextBlock Classes="section" Text="{l:T 'When it connects'}" />
           <Grid ColumnDefinitions="170,*" ToolTip.Tip="{Binding AutoMirror.Tip}">
             <TextBlock Text="{Binding AutoMirror.Label}" VerticalAlignment="Center" TextWrapping="Wrap" />
             <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding AutoMirror.Choices}" SelectedItem="{Binding AutoMirror.Selected}" />
           </Grid>
           <TextBlock Classes="label" TextWrapping="Wrap" Margin="0,8,0,0"
-                     Text="Run these scripts every time it connects (also after a restart of the device or of Paneless). Only scripts that need no values are listed." />
-          <TextBox Text="{Binding ScriptFilter}" PlaceholderText="Filter scripts" />
+                     Text="{l:T 'Run these scripts every time it connects (also after a restart of the device or of Paneless). Only scripts that need no values are listed.'}" />
+          <TextBox Text="{Binding ScriptFilter}" PlaceholderText="{l:T 'Filter scripts'}" />
         </StackPanel>
         <Border Margin="0,8,0,0" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="8">
           <ScrollViewer HorizontalScrollBarVisibility="Disabled">

@@ -1,9 +1,10 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="using:Paneless.App.Localization"
         xmlns:vm="using:Paneless.App.ViewModels"
         x:Class="Paneless.App.Views.ScriptsWindow"
         x:DataType="vm:ScriptsViewModel"
-        Title="Paneless scripts" Icon="/Assets/Paneless.ico"
+        Title="{l:T 'Paneless scripts'}" Icon="/Assets/Paneless.ico"
         Width="1220" Height="740" MinWidth="980" MinHeight="560"
         WindowStartupLocation="CenterOwner">
 
@@ -53,9 +54,18 @@
 
     <!-- library -->
     <DockPanel>
-      <Grid DockPanel.Dock="Top" ColumnDefinitions="*,8,Auto" Margin="0,0,0,10">
-        <TextBox Text="{Binding Search}" PlaceholderText="Search scripts" />
-        <Button Grid.Column="2" Content="+ New" Command="{Binding NewScriptCommand}" />
+      <Grid DockPanel.Dock="Top" ColumnDefinitions="*,8,Auto,6,Auto" Margin="0,0,0,10">
+        <TextBox Text="{Binding Search}" PlaceholderText="{l:T 'Search scripts'}" />
+        <Button Grid.Column="2" Content="{l:T '+ New'}" Command="{Binding NewScriptCommand}" />
+        <DropDownButton Grid.Column="4" Content="{l:T 'Import'}" ToolTip.Tip="{l:T 'Add scripts someone shared with you'}">
+          <DropDownButton.Flyout>
+            <MenuFlyout Placement="BottomEdgeAlignedRight">
+              <MenuItem Header="{l:T 'From a file…'}" Command="{Binding ImportFileCommand}" />
+              <MenuItem Header="{l:T 'From a link (e.g. a GitHub Gist)…'}" Command="{Binding ImportLinkCommand}" />
+              <MenuItem Header="{l:T 'From the clipboard'}" Command="{Binding ImportClipboardCommand}" />
+            </MenuFlyout>
+          </DropDownButton.Flyout>
+        </DropDownButton>
       </Grid>
       <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
         <ListBox x:Name="ScriptList" ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedEntry}" Background="Transparent">
@@ -70,7 +80,7 @@
             <DataTemplate DataType="vm:ScriptEntry">
               <Grid ColumnDefinitions="*,Auto">
                 <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" Margin="8,0,0,0" />
-                <TextBlock Grid.Column="1" Text="asks first" FontSize="11" Foreground="{StaticResource AmberBrush}"
+                <TextBlock Grid.Column="1" Text="{l:T 'asks first'}" FontSize="11" Foreground="{StaticResource AmberBrush}"
                            IsVisible="{Binding Confirm}" VerticalAlignment="Center" />
               </Grid>
             </DataTemplate>
@@ -86,29 +96,39 @@
           <StackPanel Spacing="2">
             <TextBlock Classes="label" Text="{Binding Category}" Margin="0" />
             <TextBlock Text="{Binding EditName}" FontSize="20" FontWeight="SemiBold" IsVisible="{Binding IsBuiltIn}" TextWrapping="Wrap" />
-            <TextBox Text="{Binding EditName}" FontSize="18" IsVisible="{Binding IsMine}" PlaceholderText="Script name" />
+            <TextBox Text="{Binding EditName}" FontSize="18" IsVisible="{Binding IsMine}" PlaceholderText="{l:T 'Script name'}" />
           </StackPanel>
           <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom" Margin="12,0,0,0">
-            <Button Content="Copy to My scripts" Command="{Binding CopyToMineCommand}" IsVisible="{Binding IsBuiltIn}"
-                    ToolTip.Tip="Make your own editable version of this script" />
-            <Button Content="Delete" Command="{Binding DeleteScriptCommand}" IsVisible="{Binding IsMine}" />
+            <Button Content="{l:T 'Copy to My scripts'}" Command="{Binding CopyToMineCommand}" IsVisible="{Binding IsBuiltIn}"
+                    ToolTip.Tip="{l:T 'Make your own editable version of this script'}" />
+            <DropDownButton Content="{l:T 'Share'}" ToolTip.Tip="{l:T 'Give this script to someone else'}">
+              <DropDownButton.Flyout>
+                <MenuFlyout Placement="BottomEdgeAlignedRight">
+                  <MenuItem Header="{l:T 'Copy to the clipboard'}" Command="{Binding ShareCopyCommand}" />
+                  <MenuItem Header="{l:T 'Save as a file…'}" Command="{Binding ShareSaveCommand}" />
+                  <Separator />
+                  <MenuItem Header="{l:T 'Save all my scripts as a file…'}" Command="{Binding ShareAllCommand}" />
+                </MenuFlyout>
+              </DropDownButton.Flyout>
+            </DropDownButton>
+            <Button Content="{l:T 'Delete'}" Command="{Binding DeleteScriptCommand}" IsVisible="{Binding IsMine}" />
           </StackPanel>
         </Grid>
 
         <TextBlock Classes="dim" Text="{Binding EditDescription}" TextWrapping="Wrap" IsVisible="{Binding IsBuiltIn}" />
-        <TextBox Text="{Binding EditDescription}" PlaceholderText="What does it do? (optional)" IsVisible="{Binding IsMine}" TextWrapping="Wrap" />
+        <TextBox Text="{Binding EditDescription}" PlaceholderText="{l:T 'What does it do? (optional)'}" IsVisible="{Binding IsMine}" TextWrapping="Wrap" />
         <TextBlock Text="{Binding Warning}" Foreground="{StaticResource AmberBrush}" TextWrapping="Wrap" IsVisible="{Binding HasWarning}" />
 
         <StackPanel>
           <TextBlock Classes="label" Text="Commands: one per line. # starts a comment. {name} or {name=default} asks for a value when it runs." />
           <TextBox Classes="mono" Text="{Binding EditCommands}" AcceptsReturn="True" TextWrapping="NoWrap"
                    Height="112" IsReadOnly="{Binding IsBuiltIn}"
-                   PlaceholderText="adb shell dumpsys deviceidle disable" />
-          <CheckBox Content="Ask before running" IsChecked="{Binding EditConfirm}" IsVisible="{Binding IsMine}" Margin="0,6,0,0" />
+                   PlaceholderText="{l:T 'adb shell dumpsys deviceidle disable'}" />
+          <CheckBox Content="{l:T 'Ask before running'}" IsChecked="{Binding EditConfirm}" IsVisible="{Binding IsMine}" Margin="0,6,0,0" />
         </StackPanel>
 
         <StackPanel IsVisible="{Binding HasFields}">
-          <TextBlock Classes="label" Text="Values" />
+          <TextBlock Classes="label" Text="{l:T 'Values'}" />
           <ItemsControl ItemsSource="{Binding Fields}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:FieldInput">
@@ -123,21 +143,21 @@
 
         <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,4,0,0">
           <Button Classes="accent" Content="{Binding RunLabel}" MinWidth="110" FontWeight="SemiBold" Command="{Binding RunCommand}"
-                  ToolTip.Tip="Runs on the devices ticked on the right" />
+                  ToolTip.Tip="{l:T 'Runs on the devices ticked on the right'}" />
           <TextBlock Grid.Column="1" Margin="12,0" VerticalAlignment="Center" Text="{Binding RunStatus}"
                      Foreground="{Binding RunStatusBrush}" TextTrimming="CharacterEllipsis" />
-          <Button Grid.Column="2" Content="Open output folder" Command="{Binding OpenOutputFolderCommand}"
+          <Button Grid.Column="2" Content="{l:T 'Open output folder'}" Command="{Binding OpenOutputFolderCommand}"
                   ToolTip.Tip="{Binding OutputFolder}" />
         </Grid>
       </StackPanel>
 
-      <TextBlock DockPanel.Dock="Top" Classes="dim" Text="Pick a script on the left, or click + New to write your own."
+      <TextBlock DockPanel.Dock="Top" Classes="dim" Text="{l:T 'Pick a script on the left, or click + New to write your own.'}"
                  IsVisible="{Binding !HasScript}" Margin="0,40,0,0" HorizontalAlignment="Center" />
 
       <Border Margin="0,14,0,0" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}"
               BorderThickness="1" CornerRadius="8">
         <TextBox Classes="mono" Text="{Binding Output}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
-                 Background="Transparent" BorderThickness="0" PlaceholderText="Output appears here."
+                 Background="Transparent" BorderThickness="0" PlaceholderText="{l:T 'Output appears here.'}"
                  ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto" />
       </Border>
     </DockPanel>
@@ -145,21 +165,21 @@
     <!-- devices to run on, in the same groups as the main window -->
     <DockPanel Grid.Column="4">
       <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto" Height="32" Margin="0,0,0,10">
-        <TextBlock Text="Run on" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center" />
-        <Button Grid.Column="1" Classes="link" Content="All" Command="{Binding TickAllCommand}" />
-        <Button Grid.Column="2" Classes="link" Content="None" Command="{Binding TickNoneCommand}" />
+        <TextBlock Text="{l:T 'Run on'}" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center" />
+        <Button Grid.Column="1" Classes="link" Content="{l:T 'All'}" Command="{Binding TickAllCommand}" />
+        <Button Grid.Column="2" Classes="link" Content="{l:T 'None'}" Command="{Binding TickNoneCommand}" />
       </Grid>
       <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="8">
         <Panel>
           <TextBlock Classes="dim" Margin="16" TextWrapping="Wrap" IsVisible="{Binding NoTargets}"
-                     Text="No devices on the network. Turn on Wireless debugging on a device, or connect one from the main window." />
+                     Text="{l:T 'No devices on the network. Turn on Wireless debugging on a device, or connect one from the main window.'}" />
           <ScrollViewer HorizontalScrollBarVisibility="Disabled">
             <ItemsControl ItemsSource="{Binding TargetGroups}" Margin="8,6">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:TargetGroup">
                   <StackPanel>
                     <Grid ColumnDefinitions="Auto,*,Auto" MinHeight="34" IsVisible="{Binding ShowHeader}">
-                      <ToggleButton Classes="chev" IsChecked="{Binding IsExpanded}" ToolTip.Tip="Show or hide the devices">
+                      <ToggleButton Classes="chev" IsChecked="{Binding IsExpanded}" ToolTip.Tip="{l:T 'Show or hide the devices'}">
                         <Panel Width="16" Height="16">
                           <Path Classes="chevron" Data="M4 6 L8 10 L12 6" IsVisible="{Binding IsExpanded}" />
                           <Path Classes="chevron" Data="M6 4 L10 8 L6 12" IsVisible="{Binding !IsExpanded}" />

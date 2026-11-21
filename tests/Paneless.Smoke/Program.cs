@@ -3,7 +3,7 @@
 using Paneless.Core;
 
 // --groups and --scripts-parse need no device and no scrcpy (they also run in CI).
-var offline = args.Contains("--groups") || args.Contains("--scripts-parse");
+var offline = args.Contains("--groups") || args.Contains("--scripts-parse") || args.Contains("--automation") || args.Contains("--translations");
 var tools = ToolLocator.Find() ?? (offline ? new ToolPaths("adb", "scrcpy") : null);
 if (tools == null) { Console.WriteLine("scrcpy/adb not found"); return 1; }
 Console.WriteLine($"adb:    {tools.Adb}\nscrcpy: {tools.Scrcpy}\ndata:   {AppPaths.DataDir}");
@@ -273,6 +273,78 @@ if (args.Contains("--screenshot"))
     foreach (var st in res.Steps) Console.WriteLine($"  $ {st.Command}\n    exit={st.Result.ExitCode} timedOut={st.Result.TimedOut} err={st.Error}\n    out={st.Result.Output.Replace("\n", " | ")}");
     foreach (var f in Directory.Exists(ScriptRunner.OutputDir) ? Directory.GetFiles(ScriptRunner.OutputDir) : [])
         if (!before.Contains(f)) { Console.WriteLine($"  new file: {Path.GetFileName(f)} ({new FileInfo(f).Length / 1024} KB) -> deleted"); File.Delete(f); }
+    return 0;
+}
+
+if (args.Contains("--automation"))
+{
+    // Scheduled tasks, alerts, script sharing, the log parser and the inventory export. No device, nothing saved.
+    void Check(bool ok, string what) => Console.WriteLine($"{(ok ? "ok  " : "FAIL")} {what}");
+    var mon = new DateTime(2026, 11, 23, 2, 0, 0);          // a Monday, 02:00
+    var daily = new ScheduledTask { Repeat = ScheduleRepeat.Daily, Time = "03:00" };
+    Check(daily.Next(mon) == mon.Date.AddHours(3), "daily: next run today at 03:00");
+    Check(!daily.IsDue(mon, mon.AddMinutes(30)) && daily.IsDue(mon.AddMinutes(59), mon.AddMinutes(61)), "daily: due only once 03:00 has passed");
+    daily.LastRun = mon.Date.AddHours(3);
+    Check(!daily.IsDue(mon.AddMinutes(59), mon.AddMinutes(61)), "daily: not again after it ran");
+    var weekly = new ScheduledTask { Repeat = ScheduleRepeat.Weekly, Time = "07:30", Days = [DayOfWeek.Wednesday] };
+    Check(weekly.Next(mon) == mon.Date.AddDays(2).AddHours(7.5), "weekly: next run on the chosen day");
+    var hourly = new ScheduledTask { Repeat = ScheduleRepeat.EveryHours, Hours = 6, LastRun = mon.AddHours(-5) };
+    Check(!hourly.IsDue(mon, mon) && hourly.IsDue(mon, mon.AddHours(1)), "every 6 hours: due 6 hours after the last run");
+    Check(new ScheduledTask { Enabled = false }.Next(mon) == null, "switched off: never runs");
+
+    var alerts = new AlertData { Rules = [AlertRule.Default(AlertKind.LowBattery), AlertRule.Default(AlertKind.Offline)] };
+    var low = alerts.Rules[0].Threshold;
+    var w = new AlertWatcher();
+    var t0 = mon;
+    var first = w.Check(alerts, "A", "Lab 1", null, true, low, false, 50, 30, t0).ToList();
+    var again = w.Check(alerts, "A", "Lab 1", null, true, low - 1, false, 50, 30, t0.AddMinutes(1)).ToList();
+    Check(first.Count == 1 && again.Count == 0, "low battery: told once, not every minute");
+    w.Check(alerts, "A", "Lab 1", null, true, low, true, 50, 30, t0.AddMinutes(2)).ToList();
+    Check(w.Check(alerts, "A", "Lab 1", null, true, low, false, 50, 30, t0.AddMinutes(3)).Count() == 1, "told again after it was charging in between");
+    var offMinutes = alerts.Rules[1].Threshold;
+    Check(!w.Check(alerts, "A", "Lab 1", null, false, null, false, null, null, t0.AddMinutes(3).AddMinutes(offMinutes - 1)).Any()
+          && w.Check(alerts, "A", "Lab 1", null, false, null, false, null, null, t0.AddMinutes(3).AddMinutes(offMinutes)).Any(), "offline: only after the set minutes");
+    alerts.Rules[0].Groups = ["Lobby"];
+    Check(!new AlertWatcher().Check(alerts, "B", "Lab 2", "Test lab", true, 1, false, 50, 30, t0).Any(r => r.Rule.Kind == AlertKind.LowBattery), "a rule for one group ignores other groups");
+
+    var shared = ScriptSharing.Export(new AdbScript { Name = "Doze off", Description = "x", Commands = "adb shell dumpsys deviceidle disable" });
+    var back = ScriptSharing.Parse(shared);
+    Check(back.Count == 1 && back[0].Name == "Doze off" && back[0].Commands.Contains("deviceidle"), "script sharing round-trips");
+    Check(ScriptSharing.Parse("adb shell input keyevent 26\nadb shell wm density reset")[0].Commands.Contains("density"), "plain pasted commands are accepted");
+    Check(ScriptSharing.Parse("[" + shared + "," + shared + "]").Count == 2, "a list of scripts is accepted");
+    var refused = 0;
+    foreach (var bad in new[] { "", "{\"name\":\"empty\"}", "[]" })
+        try { ScriptSharing.Parse(bad); } catch (FormatException) { refused++; }
+    Check(refused == 3, "empty or command-less input is refused");
+
+    var l = LogcatSession.Parse("11-21 09:30:06.123  1234  1250 E AndroidRuntime: FATAL EXCEPTION: main");
+    Check(l.Pid == 1234 && l.Level == 'E' && l.Tag == "AndroidRuntime" && l.IsCrash, "log line parsed, crash recognised");
+    Check(LogcatSession.Parse("--------- beginning of main").Level == ' ', "other lines are kept as they are");
+
+    var inv = new DeviceInventory("Lab, 1", "S1", "Google", "Pixel 9a", "15", 35, "2026-11-05", 80, false, "Good", 29.5,
+        131072, 13107, 8192, "1080x2424", "192.168.3.11", TimeSpan.FromHours(30), mon);
+    var csv = InventoryExport.Csv([(inv, "Test \"lab\"")]);
+    Check(csv.Contains("\"Lab, 1\"") && csv.Contains("\"Test \"\"lab\"\"\"") && inv.StorageFreePercent is > 9.9 and < 10.1, "inventory CSV quotes commas and quotes");
+    Check(InventoryExport.Html([(inv, "<b>")], "Report").Contains("&lt;b&gt;"), "inventory report escapes HTML");
+    return 0;
+}
+
+if (args.Contains("--translations"))
+{
+    // German and French: every {0} in a translation must exist in the English text, or the text would break.
+    var repo = AppContext.BaseDirectory;
+    while (repo != null && !File.Exists(Path.Combine(repo, "Paneless.slnx"))) repo = Path.GetDirectoryName(repo);
+    if (repo == null) { Console.WriteLine("FAIL repository not found"); return 1; }
+    var rx = new System.Text.RegularExpressions.Regex(@"\{\d+(:[^}]*)?\}");
+    foreach (var lang in new[] { "de", "fr" })
+    {
+        var map = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(
+            File.ReadAllText(Path.Combine(repo, "src", "Paneless.App", "Localization", lang + ".json")))!;
+        var bad = map.Where(kv => rx.Matches(kv.Value).Select(m => m.Value).Except(rx.Matches(kv.Key).Select(m => m.Value)).Any()
+                                  || kv.Value.Trim().Length == 0).Select(kv => kv.Key).ToList();
+        foreach (var k in bad) Console.WriteLine($"FAIL {lang}: {k}");
+        Console.WriteLine($"{(bad.Count == 0 ? "ok  " : "FAIL")} {lang}.json: {map.Count} texts, placeholders match");
+    }
     return 0;
 }
 

@@ -79,7 +79,7 @@ public static class ToolLocator
     }
 
     public static string InstallHint =>
-        OperatingSystem.IsWindows() ? "Install it with:  winget install Genymobile.scrcpy" :
-        OperatingSystem.IsMacOS() ? "Install it with:  brew install scrcpy android-platform-tools" :
-        "Install it with your package manager, e.g.  sudo apt install scrcpy adb  (or snap install scrcpy)";
+        OperatingSystem.IsWindows() ? Text.T("Install it with:  winget install Genymobile.scrcpy") :
+        OperatingSystem.IsMacOS() ? Text.T("Install it with:  brew install scrcpy android-platform-tools") :
+        Text.T("Install it with your package manager, e.g.  sudo apt install scrcpy adb  (or snap install scrcpy)");
 }

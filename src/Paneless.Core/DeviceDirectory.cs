@@ -68,7 +68,7 @@ public sealed class DeviceDirectory(AdbClient adb, DataStore data)
             var known = sn != null && data.Known.TryGetValue(sn, out var k) ? k : null;
             var isNet = d.Serial.Contains(':') || d.Serial.Contains("._adb-tls-connect");
             var address = AdbClient.IsIpPort(d.Serial) ? d.Serial
-                        : svc?.Connect ?? (isNet ? d.Serial : "USB cable");
+                        : svc?.Connect ?? (isNet ? d.Serial : Text.T("USB cable"));
             var state = d.State switch
             {
                 "device" => mirroringSerials.Contains(d.Serial) ? DeviceState.Mirroring : DeviceState.Connected,
@@ -77,7 +77,7 @@ public sealed class DeviceDirectory(AdbClient adb, DataStore data)
             };
             rows.Add(new DeviceRow(
                 $"dev:{d.Serial}", d.Serial, sn, isNet,
-                First(info?.Name, known?.Name, d.Model, "Android device"),
+                First(info?.Name, known?.Name, d.Model, Text.T("Android device")),
                 First(info?.Model, known?.Model, d.Model),
                 First(info?.Type, known?.Type),
                 address, state, svc?.Connect, svc?.Pair, UnlockStatusFor(sn)));
@@ -88,7 +88,7 @@ public sealed class DeviceDirectory(AdbClient adb, DataStore data)
             if ((s.Sn != null && seenSn.Contains(s.Sn)) || seenIp.Contains(s.Ip)) continue;
             var known = s.Sn != null && data.Known.TryGetValue(s.Sn, out var k) ? k : null;
             var state = s.Connect == null ? DeviceState.Pairing : known != null ? DeviceState.Available : DeviceState.Unpaired;
-            var name = known?.Name ?? (state == DeviceState.Pairing ? "Device in pairing mode" : "New device");
+            var name = known?.Name ?? (state == DeviceState.Pairing ? Text.T("Device in pairing mode") : Text.T("New device"));
             rows.Add(new DeviceRow(
                 $"net:{s.Ip}", null, s.Sn, true, name, known?.Model ?? "", known?.Type ?? "",
                 First(s.Connect, s.Pair), state, s.Connect, s.Pair, UnlockStatusFor(s.Sn)));

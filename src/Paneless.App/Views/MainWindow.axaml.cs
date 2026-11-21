@@ -1,7 +1,9 @@
+using Paneless.App.Localization;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Platform.Storage;
+using Paneless.App.Claude;
 using Paneless.App.Platform;
 using Paneless.App.ViewModels;
 using Paneless.Core;
@@ -110,7 +112,7 @@ public partial class MainWindow : Window
                 // When the camera reopens (the device was just turned), turn the picture for the new way it's held.
                 mm.CameraTurn = (serial, front) => _services.Adb?.GetCameraUprightTurnAsync(serial, front).GetAwaiter().GetResult();
                 mm.Reopened += (_, next) => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                    Vm?.Report($"{next.Name}: reopened, turned to match how the phone is held.", StatusKind.Info));
+                    Vm?.Report(Loc.F("{0}: reopened, turned to match how the phone is held.", next.Name), StatusKind.Info));
             }
             Vm.BringToFront = session =>
             {
@@ -128,8 +130,9 @@ public partial class MainWindow : Window
             Vm.ShowScripts = keys => ShowScripts(keys);
             Vm.MirrorStarted = (session, row) => AddToolbar(session, row);
             Vm.PromptAsync = (title, message, initial) => PromptWindow.AskAsync(this, title, message, initial);
-            Vm.ConfirmAsync = (title, message) => ConfirmWindow.AskAsync(this, title, message, null, "Delete");
+            Vm.ConfirmAsync = (title, message) => ConfirmWindow.AskAsync(this, title, message, null, Loc.T("Delete"));
             Vm.ListSynced += RestoreSelection;
+            SetUpPages(Vm);
             await Vm.StartAsync();
         };
     }
@@ -187,18 +190,93 @@ public partial class MainWindow : Window
             items.Add(new MenuItem { Header = g.Name, Command = vm.MoveToGroupCommand, CommandParameter = g });
         if (vm.Groups.Any)
         {
-            items.Add(new MenuItem { Header = "Take out of its group", Command = vm.MoveToGroupCommand, CommandParameter = null });
+            items.Add(new MenuItem { Header = Loc.T("Take out of its group"), Command = vm.MoveToGroupCommand, CommandParameter = null });
             items.Add(new Separator());
         }
-        items.Add(new MenuItem { Header = "New group with these devices…", Command = vm.NewGroupCommand });
-        items.Add(new MenuItem { Header = "Manage groups…", Command = vm.ManageGroupsCommand });
+        items.Add(new MenuItem { Header = Loc.T("New group with these devices…"), Command = vm.NewGroupCommand });
+        items.Add(new MenuItem { Header = Loc.T("Manage groups…"), Command = vm.ManageGroupsCommand });
+    }
+
+    // ---------------------------------------------------------------- pages
+
+    public WallViewModel? Wall { get; private set; }
+    public LogsViewModel? Logs { get; private set; }
+    public InventoryViewModel? Inventory { get; private set; }
+    public AutomationViewModel? Automation { get; private set; }
+    public ClaudeViewModel? Claude { get; private set; }
+    McpServer? _mcp;
+
+    void SetUpPages(MainViewModel vm)
+    {
+        var s = _services!;
+        var automation = new AutomationService(s, vm);
+        var tools = new ClaudeTools(s, vm)
+        {
+            AskAsync = (title, message) => Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => ClaudeConfirmWindow.AskAsync(title, message)),
+        };
+        _mcp = new McpServer(tools);
+
+        WallPage.DataContext = Wall = new WallViewModel(s, vm);
+        LogsPage.DataContext = Logs = new LogsViewModel(s, vm) { SaveAsAsync = SaveAsAsync };
+        InventoryPage.DataContext = Inventory = new InventoryViewModel(s, vm) { SaveAsAsync = SaveAsAsync };
+        Automation = new AutomationViewModel(s, vm, automation);
+        Automation.Recipes.PickFileAsync = PickOneFileAsync;
+        Automation.Recipes.ConfirmAsync = (t, m) => ConfirmWindow.AskAsync(this, t, m, null);
+        Automation.Schedules.ConfirmAsync = (t, m) => ConfirmWindow.AskAsync(this, t, m, null, Localization.Loc.T("Delete"));
+        AutomationPage.DataContext = Automation;
+        ClaudePage.DataContext = Claude = new ClaudeViewModel(s, vm, _mcp, tools)
+        {
+            CopyAsync = async text => { if (Clipboard is { } cb) await Avalonia.Input.Platform.ClipboardExtensions.SetTextAsync(cb, text); },
+            ConfirmAsync = (t, m) => ConfirmWindow.AskAsync(this, t, m, null, Localization.Loc.T("Add")),
+        };
+        automation.Start();
+
+        // The wall takes pictures only while it's on screen; the inventory shows what it knows when opened.
+        void UpdateActive() => Wall?.SetActive(vm.IsWallPage && IsVisible && WindowState != WindowState.Minimized);
+        vm.PropertyChanged += async (_, e) =>
+        {
+            if (e.PropertyName != nameof(MainViewModel.Page)) return;
+            UpdateActive();
+            if (vm.IsInventoryPage && Inventory is { } inv)
+            {
+                inv.ShowCached();
+                if (inv.IsEmpty) await inv.Refresh();
+            }
+        };
+        PropertyChanged += (_, e) => { if (e.Property == IsVisibleProperty || e.Property == WindowStateProperty) UpdateActive(); };
+        Closed += (_, _) => { Wall?.SetActive(false); Logs?.Dispose(); _mcp?.Stop(); };
+    }
+
+    /// <summary>Testing aid (demo mode): starts the Claude server even though demo mode normally keeps it off.</summary>
+    public void StartClaudeServerForTest() => _mcp?.Start();
+
+    async Task<string?> SaveAsAsync(string suggestedName, string ext)
+    {
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            SuggestedFileName = suggestedName + "." + ext,
+            DefaultExtension = ext,
+            FileTypeChoices = [new FilePickerFileType(ext.ToUpperInvariant()) { Patterns = ["*." + ext] }],
+        });
+        return file?.TryGetLocalPath();
+    }
+
+    async Task<string?> PickOneFileAsync(string title, string[] patterns)
+    {
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = title,
+            AllowMultiple = false,
+            FileTypeFilter = patterns.Contains("*") ? null : [new FilePickerFileType(title) { Patterns = patterns }],
+        });
+        return files.FirstOrDefault()?.TryGetLocalPath();
     }
 
     async Task<IReadOnlyList<string>> PickFilesAsync()
     {
         var files = await StorageProvider.OpenFilePickerAsync(new Avalonia.Platform.Storage.FilePickerOpenOptions
         {
-            Title = "Files or apps (APK) to send",
+            Title = Loc.T("Files or apps (APK) to send"),
             AllowMultiple = true,
         });
         return files.Select(f => f.TryGetLocalPath()).OfType<string>().ToList();
@@ -211,7 +289,7 @@ public partial class MainWindow : Window
         if (_settings != null) { _settings.Activate(); return _settings; }
         var vm = new SettingsViewModel(_services!);
         vm.Saved += () => Vm?.SettingsChanged();
-        vm.CheckUpdatesAsync = () => Updates.CheckAsync(_services!, interactive: true);
+        vm.CheckUpdatesAsync = async () => (await Updates.CheckAsync(_services!, interactive: true)).Message;
         _settings = new SettingsWindow { DataContext = vm };
         _settings.Closed += (_, _) => _settings = null;
         _settings.Show(this);
@@ -296,7 +374,7 @@ public partial class MainWindow : Window
         vm.OpenCamera = () =>
         {
             _ = Vm?.OpenCameraAsync(Vm.NetworkRows.FirstOrDefault(r => r.GroupId == row.GroupId) ?? row, front: false);
-            vm.Hint = "Opening the back camera (Alt+← / Alt+→ in its window turn the picture)…";
+            vm.Hint = Loc.T("Opening the back camera (Alt+← / Alt+→ in its window turn the picture)…");
         };
         vm.GroupPeers = () =>
         {

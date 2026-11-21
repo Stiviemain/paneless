@@ -13,9 +13,17 @@ public static class BuiltInScripts
     const string Power = "Restart and advanced";
 
     static AdbScript S(string category, string name, string description, string commands, bool confirm = false, string? warning = null) =>
-        new() { Id = "builtin:" + name, BuiltIn = true, Category = category, Name = name, Description = description, Commands = commands, Confirm = confirm, Warning = warning };
+        new()
+        {
+            Id = "builtin:" + name, BuiltIn = true, Category = Text.T(category), Name = Text.T(name), Description = Text.T(description),
+            Commands = commands, Confirm = confirm, Warning = warning == null ? null : Text.T(warning),
+        };
 
-    public static readonly IReadOnlyList<AdbScript> All =
+    /// <summary>Built on first use, so names and descriptions come out in the app's language.</summary>
+    public static IReadOnlyList<AdbScript> All => _all ??= Build();
+    static IReadOnlyList<AdbScript>? _all;
+
+    static IReadOnlyList<AdbScript> Build() =>
     [
         // ---------------------------------------------------------------- battery and power
         S(Battery, "Battery status",

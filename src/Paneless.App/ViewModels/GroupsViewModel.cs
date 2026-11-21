@@ -1,3 +1,4 @@
+using Paneless.App.Localization;
 using System.Collections.ObjectModel;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -11,7 +12,7 @@ public sealed partial class GroupListItem(DeviceGroup group) : ObservableObject
 {
     public DeviceGroup Group { get; } = group;
     public string Name => Group.Name;
-    public string CountText => Group.Members.Count == 1 ? "1 device" : $"{Group.Members.Count} devices";
+    public string CountText => Loc.Count(Group.Members.Count, "{0} device", "{0} devices");
     public void Refresh() => OnPropertyChanged(string.Empty);
 }
 
@@ -74,9 +75,9 @@ public sealed partial class GroupsViewModel : ObservableObject
 
     public bool HasGroup => SelectedGroup != null;
     public bool NoGroups => Groups.Count == 0;
-    public string DevicesTitle => SelectedGroup is { } g ? $"Devices in {g.Name}" : "Devices";
+    public string DevicesTitle => SelectedGroup is { } g ? Loc.F("Devices in {0}", g.Name) : Loc.T("Devices");
     public string AddSelectedLabel => _main.SelectedRows.Count is var n and > 0
-        ? $"Add the {n} device{(n == 1 ? "" : "s")} selected in the main window" : "Add the devices selected in the main window";
+        ? Loc.Count(n, "Add the {0} device selected in the main window", "Add the {0} devices selected in the main window") : Loc.T("Add the devices selected in the main window");
 
     partial void OnSelectedGroupChanged(GroupListItem? value)
     {
@@ -195,8 +196,8 @@ public sealed partial class GroupsViewModel : ObservableObject
         var from = _s.Groups.GroupOf(d.Id);
         _s.Groups.Assign([d.Id], member ? g : null);
         Say(member
-            ? from != null && from != g ? $"Moved {d.Name} from {from.Name} to {g.Name}." : $"Added {d.Name} to {g.Name}."
-            : $"Took {d.Name} out of {g.Name}.", StatusKind.Ok);
+            ? from != null && from != g ? Loc.F("Moved {0} from {1} to {2}.", d.Name, from.Name, g.Name) : Loc.F("Added {0} to {1}.", d.Name, g.Name)
+            : Loc.F("Took {0} out of {1}.", d.Name, g.Name), StatusKind.Ok);
     }
 
     bool CanAddSelected() => SelectedGroup != null && _main.SelectedRows.Count > 0;
@@ -207,7 +208,7 @@ public sealed partial class GroupsViewModel : ObservableObject
         if (SelectedGroup?.Group is not { } g) return;
         var rows = _main.SelectedRows;
         _s.Groups.Assign(rows.Select(r => r.GroupId), g);
-        Say($"Added {(rows.Count == 1 ? rows[0].Name : $"{rows.Count} devices")} to {g.Name}.", StatusKind.Ok);
+        Say(Loc.F("Added {0} to {1}.", (rows.Count == 1 ? rows[0].Name : Loc.Count(rows.Count, "{0} device", "{0} devices")), g.Name), StatusKind.Ok);
     }
 
     [RelayCommand]
@@ -215,7 +216,7 @@ public sealed partial class GroupsViewModel : ObservableObject
     {
         if (SelectedGroup?.Group is not { } g) return;
         var ids = Devices.Select(d => d.Id).ToList();
-        if (ids.Count > 0) { _s.Groups.Assign(ids, g); Say($"Added {ids.Count} devices to {g.Name}.", StatusKind.Ok); }
+        if (ids.Count > 0) { _s.Groups.Assign(ids, g); Say(Loc.F("Added {0} to {1}.", Loc.Count(ids.Count, "{0} device", "{0} devices"), g.Name), StatusKind.Ok); }
     }
 
     [RelayCommand]
@@ -223,7 +224,7 @@ public sealed partial class GroupsViewModel : ObservableObject
     {
         if (SelectedGroup?.Group is not { } g) return;
         var ids = Devices.Where(d => d.IsMember).Select(d => d.Id).ToList();
-        if (ids.Count > 0) { _s.Groups.Assign(ids, null); Say($"Took {ids.Count} devices out of {g.Name}.", StatusKind.Ok); }
+        if (ids.Count > 0) { _s.Groups.Assign(ids, null); Say(Loc.F("Took {0} out of {1}.", Loc.Count(ids.Count, "{0} device", "{0} devices"), g.Name), StatusKind.Ok); }
     }
 
     // ---------------------------------------------------------------- groups
@@ -232,23 +233,23 @@ public sealed partial class GroupsViewModel : ObservableObject
     async Task NewGroup()
     {
         if (PromptAsync == null) return;
-        var name = await PromptAsync("New group", "A name for the group, e.g. Test lab or Family tablets.", "");
+        var name = await PromptAsync(Loc.T("New group"), Loc.T("A name for the group, e.g. Test lab or Family tablets."), "");
         if (name == null) return;
-        if (GroupStore.Clean(name) is not { } clean) { Say("A group needs a name (up to 60 characters).", StatusKind.Warn); return; }
-        if (_s.Groups.Find(clean) is { } existing) { SelectedGroup = Groups.FirstOrDefault(i => i.Group == existing); Say($"There's already a group called {existing.Name}.", StatusKind.Warn); return; }
+        if (GroupStore.Clean(name) is not { } clean) { Say(Loc.T("A group needs a name (up to 60 characters)."), StatusKind.Warn); return; }
+        if (_s.Groups.Find(clean) is { } existing) { SelectedGroup = Groups.FirstOrDefault(i => i.Group == existing); Say(Loc.F("There's already a group called {0}.", existing.Name), StatusKind.Warn); return; }
         var g = _s.Groups.Create(clean);
         SelectedGroup = Groups.FirstOrDefault(i => i.Group == g);
-        Say($"Created {g.Name}. Tick the devices that belong in it.", StatusKind.Ok);
+        Say(Loc.F("Created {0}. Tick the devices that belong in it.", g.Name), StatusKind.Ok);
     }
 
     [RelayCommand(CanExecute = nameof(HasGroup))]
     async Task Rename()
     {
         if (SelectedGroup?.Group is not { } g || PromptAsync == null) return;
-        var name = await PromptAsync("Rename group", "A new name for the group.", g.Name);
+        var name = await PromptAsync(Loc.T("Rename group"), Loc.T("A new name for the group."), g.Name);
         if (name == null || GroupStore.Clean(name) == g.Name) return;
-        if (_s.Groups.Rename(g, name)) Say($"Renamed to {g.Name}.", StatusKind.Ok);
-        else Say(GroupStore.Clean(name) == null ? "A group needs a name (up to 60 characters)." : $"There's already a group called {GroupStore.Clean(name)}.", StatusKind.Warn);
+        if (_s.Groups.Rename(g, name)) Say(Loc.F("Renamed to {0}.", g.Name), StatusKind.Ok);
+        else Say(GroupStore.Clean(name) == null ? Loc.T("A group needs a name (up to 60 characters).") : Loc.F("There's already a group called {0}.", GroupStore.Clean(name)), StatusKind.Warn);
     }
 
     [RelayCommand(CanExecute = nameof(HasGroup))]
@@ -256,10 +257,10 @@ public sealed partial class GroupsViewModel : ObservableObject
     {
         if (SelectedGroup?.Group is not { } g) return;
         if (g.Members.Count > 0 && ConfirmAsync != null
-            && !await ConfirmAsync("Delete group", $"Delete the group \"{g.Name}\"? Its {g.Members.Count} device{(g.Members.Count == 1 ? "" : "s")} move to Other devices; nothing changes on the devices themselves."))
+            && !await ConfirmAsync(Loc.T("Delete group"), Loc.F("Delete the group \"{0}\"? Its {1} move to Other devices; nothing changes on the devices themselves.", g.Name, Loc.Count(g.Members.Count, "{0} device", "{0} devices"))))
             return;
         _s.Groups.Delete(g);
-        Say($"Deleted {g.Name}.");
+        Say(Loc.F("Deleted {0}.", g.Name));
     }
 
     bool CanMoveUp() => SelectedGroup != null && Groups.IndexOf(SelectedGroup) > 0;

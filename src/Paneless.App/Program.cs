@@ -6,12 +6,15 @@ namespace Paneless.App;
 internal static class Program
 {
     [STAThread]
-    public static void Main(string[] args)
+    public static int Main(string[] args)
     {
         // Must run first: handles the installer's install/update/uninstall hooks, then returns.
         VelopackApp.Build().Run();
 
-        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        // Started by Claude Desktop / Claude Code: forward its messages to the running Paneless, no window.
+        if (args.Contains("--mcp")) return Claude.McpBridge.Run();
+
+        return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }
 
     public static AppBuilder BuildAvaloniaApp() =>

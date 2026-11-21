@@ -26,8 +26,22 @@ public sealed class AppSettings
     public bool AutoConnect { get; set; } = true;
     /// <summary>Closing the window keeps Paneless running in the notification area.</summary>
     public bool CloseToTray { get; set; }
-    /// <summary>Velopack update feed: a web address or a folder. Empty = no update checks.</summary>
+    /// <summary>Extra Velopack update feed (a web address or folder). Empty = the GitHub releases of Paneless.</summary>
     public string UpdateSource { get; set; } = "";
+    /// <summary>Look for a new version at start-up and every few hours.</summary>
+    public bool AutoUpdate { get; set; } = true;
+    /// <summary>Also offer beta versions.</summary>
+    public bool BetaUpdates { get; set; } = true;
+    /// <summary>"" = Windows' language, or "en", "de", "fr".</summary>
+    public string Language { get; set; } = "";
+    /// <summary>Let Claude (Claude Desktop / Claude Code) use Paneless through MCP.</summary>
+    public bool ClaudeEnabled { get; set; }
+    /// <summary>What Claude may do on devices without a setting of their own.</summary>
+    public ClaudeAccess ClaudeDefaultAccess { get; set; } = ClaudeAccess.Read;
+    /// <summary>Ask in Paneless before Claude changes anything (taps, installs, commands).</summary>
+    public bool ClaudeConfirm { get; set; } = true;
+    /// <summary>Live wall: seconds between pictures.</summary>
+    public int WallSeconds { get; set; } = 5;
 }
 
 public sealed class UnlockEntry

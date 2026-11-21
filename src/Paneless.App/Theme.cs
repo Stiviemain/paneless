@@ -27,14 +27,14 @@ public static class Theme
 
     public static (string Text, IBrush Brush) Look(DeviceState s) => s switch
     {
-        DeviceState.Mirroring => ("● Mirroring", Accent),
-        DeviceState.Connected => ("● Connected", Green),
-        DeviceState.Available => ("○ Available", Blue),
-        DeviceState.Unpaired => ("○ Not paired yet", Amber),
-        DeviceState.Pairing => ("◌ Ready to pair", Amber),
-        DeviceState.Unauthorized => ("! Allow on device", Amber),
-        DeviceState.NotFound => ("– Not around", Dim),
-        _ => ("× Offline", Red),
+        DeviceState.Mirroring => ("● " + Localization.Loc.T("Mirroring"), Accent),
+        DeviceState.Connected => ("● " + Localization.Loc.T("Connected"), Green),
+        DeviceState.Available => ("○ " + Localization.Loc.T("Available"), Blue),
+        DeviceState.Unpaired => ("○ " + Localization.Loc.T("Not paired yet"), Amber),
+        DeviceState.Pairing => ("◌ " + Localization.Loc.T("Ready to pair"), Amber),
+        DeviceState.Unauthorized => ("! " + Localization.Loc.T("Allow on device"), Amber),
+        DeviceState.NotFound => ("– " + Localization.Loc.T("Not around"), Dim),
+        _ => ("× " + Localization.Loc.T("Offline"), Red),
     };
 }
 

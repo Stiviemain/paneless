@@ -30,7 +30,7 @@ public static class SecretVault
 [SupportedOSPlatform("windows")]
 public sealed class WindowsDpapiVault : ISecretVault
 {
-    public string Description => "Windows data protection (DPAPI), readable only by your Windows account on this PC";
+    public string Description => Text.T("Windows data protection (DPAPI), readable only by your Windows account on this PC");
     public bool IsAvailable => true;
 
     public Task<string> ProtectAsync(string sn, string code)
@@ -68,7 +68,7 @@ public sealed class MacKeychainVault : ISecretVault
     [DllImport(Security)] static extern int SecKeychainItemDelete(IntPtr itemRef);
     [DllImport(CoreFoundation)] static extern void CFRelease(IntPtr cf);
 
-    public string Description => "the macOS keychain";
+    public string Description => Text.T("the macOS keychain");
     public bool IsAvailable => OperatingSystem.IsMacOS();
 
     public Task<string> ProtectAsync(string sn, string code)
@@ -88,7 +88,7 @@ public sealed class MacKeychainVault : ISecretVault
             {
                 rc = SecKeychainAddGenericPassword(IntPtr.Zero, (uint)Service.Length, Service, (uint)account.Length, account, (uint)pw.Length, pw, IntPtr.Zero);
             }
-            if (rc != 0) throw new InvalidOperationException($"The keychain refused to save the code (error {rc}).");
+            if (rc != 0) throw new InvalidOperationException(Text.F("The keychain refused to save the code (error {0}).", rc));
             return Task.FromResult("keychain");
         }
         finally { CryptographicOperations.ZeroMemory(pw); }
@@ -128,15 +128,15 @@ public sealed class LinuxSecretServiceVault : ISecretVault
 {
     readonly string? _tool = new[] { "/usr/bin/secret-tool", "/usr/local/bin/secret-tool", "/bin/secret-tool" }.FirstOrDefault(File.Exists);
 
-    public string Description => "your desktop's keyring (Secret Service)";
+    public string Description => Text.T("your desktop's keyring (Secret Service)");
     public bool IsAvailable => _tool != null;
 
     public async Task<string> ProtectAsync(string sn, string code)
     {
-        if (_tool == null) throw new InvalidOperationException("secret-tool isn't installed (package libsecret-tools).");
+        if (_tool == null) throw new InvalidOperationException(Text.T("secret-tool isn't installed (package libsecret-tools)."));
         var r = await ProcessRunner.RunAsync(_tool, ["store", "--label=Paneless unlock code", "service", "paneless", "account", sn],
             TimeSpan.FromSeconds(30), stdin: code);
-        if (!r.Ok) throw new InvalidOperationException("The keyring refused to save the code: " + r.LastLine);
+        if (!r.Ok) throw new InvalidOperationException(Text.T("The keyring refused to save the code: ") + r.LastLine);
         return "secret-service";
     }
 

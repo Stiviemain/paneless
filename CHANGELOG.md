@@ -2,6 +2,34 @@
 
 All notable changes to Paneless. Versions follow [Semantic Versioning](https://semver.org).
 
+## 1.0.0-beta.2 (2026-11-21)
+
+A new layout with a navigation bar on the left, automation, overview pages, Claude, automatic updates and two more languages.
+
+**New layout**
+- Pages for **Devices**, **Wall**, **Logs**, **Automation**, **Inventory** and **Claude**, with Settings at the bottom of the bar.
+
+**Automation**
+- **Recipes:** apps, files, scripts, commands and a restart that set up a device in one go, run on selected devices or a group.
+- **Scheduled tasks:** scripts, recipes, restarts or commands daily, weekly or every few hours.
+- **Alerts:** low battery, storage almost full, device too hot, device gone from the network, app crashed, as Windows notifications.
+
+**Overviews**
+- **Wall:** a live picture of every connected device; click one to mirror it.
+- **Logs:** a device's live log with filters by importance, text and app, crashes in red, and saving to a file.
+- **Inventory:** model, Android version, security patch, battery, storage, RAM, address and uptime of every device, exported as CSV or an HTML report.
+
+**Claude**
+- Paneless works as a tool (MCP server) for Claude Desktop and Claude Code: one click adds it to Claude Desktop.
+- Claude can read device facts, apps and logs, take screenshots, tap, swipe and type, install apps, copy files, and run scripts, recipes and commands.
+- You choose what Claude may do per device, per group or for all, and Paneless asks before Claude changes anything. A pause switch and an activity list are on the Claude page.
+
+**Around the app**
+- **Automatic updates** from GitHub Releases, installed when you close Paneless (betas optional).
+- **Script sharing:** export scripts to a file or the clipboard, import them from a file, the clipboard or a link such as a GitHub Gist.
+- **German and French**, following Windows' language or chosen in Settings.
+- Starting Paneless a second time brings the open window to the front.
+
 ## 1.0.0-beta.1 (2026-11-21)
 
 The first beta of Paneless: screen mirroring and device management for Android, for one device or a whole fleet. Built on [scrcpy](https://github.com/Genymobile/scrcpy), with an [Avalonia](https://avaloniaui.net/) interface.

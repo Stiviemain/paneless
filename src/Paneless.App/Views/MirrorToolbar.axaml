@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="using:Paneless.App.Localization"
         xmlns:vm="using:Paneless.App.ViewModels"
         x:Class="Paneless.App.Views.MirrorToolbar"
         x:DataType="vm:ToolbarViewModel"
@@ -54,71 +55,71 @@
     </Popup>
     <ScrollViewer VerticalScrollBarVisibility="Hidden">
       <StackPanel Margin="4,6" Spacing="2" HorizontalAlignment="Center">
-        <Button Classes="tool" Command="{Binding RotateCommand}" IsVisible="{Binding IsPrimary}" ToolTip.Tip="Rotate the device (portrait ↔ landscape). Locks it there until you close the mirror.">
+        <Button Classes="tool" Command="{Binding RotateCommand}" IsVisible="{Binding IsPrimary}" ToolTip.Tip="{l:T 'Rotate the device (portrait ↔ landscape). Locks it there until you close the mirror.'}">
           <Path Classes="icon" Data="M18.5 8.5 A7 7 0 1 0 19 13.5 M18.5 3.5 V8.5 H13.5" />
         </Button>
         <Button Classes="tool" Command="{Binding SecondScreenCommand}" IsVisible="{Binding IsPrimary}"
-                ToolTip.Tip="Open a second screen of this device: a separate, resizable screen next to its own (with a toolbar of its own)">
+                ToolTip.Tip="{l:T 'Open a second screen of this device: a separate, resizable screen next to its own (with a toolbar of its own)'}">
           <Path Classes="icon" Data="M2.5 6.5 H13.5 V15.5 H2.5 Z M15.5 9 H21.5 V18 H10.5 V17.5 M6 18.5 H10" />
         </Button>
         <Border Classes="sep" IsVisible="{Binding IsPrimary}" />
-        <Button Classes="tool" Command="{Binding BackCommand}" ToolTip.Tip="Back">
+        <Button Classes="tool" Command="{Binding BackCommand}" ToolTip.Tip="{l:T 'Back'}">
           <Path Classes="icon" Data="M16 5 L7 12 L16 19 Z" />
         </Button>
-        <Button Classes="tool" Command="{Binding HomeCommand}" ToolTip.Tip="Home">
+        <Button Classes="tool" Command="{Binding HomeCommand}" ToolTip.Tip="{l:T 'Home'}">
           <Path Classes="icon" Data="M12 5 A7 7 0 1 1 11.99 5 Z" />
         </Button>
-        <Button Classes="tool" Command="{Binding RecentsCommand}" ToolTip.Tip="Recent apps">
+        <Button Classes="tool" Command="{Binding RecentsCommand}" ToolTip.Tip="{l:T 'Recent apps'}">
           <Path Classes="icon" Data="M6.5 6.5 H17.5 V17.5 H6.5 Z" />
         </Button>
         <Border Classes="sep" />
-        <Button Classes="tool" Command="{Binding VolumeUpCommand}" ToolTip.Tip="Volume up">
+        <Button Classes="tool" Command="{Binding VolumeUpCommand}" ToolTip.Tip="{l:T 'Volume up'}">
           <Path Classes="icon" Data="M3 9.5 H7 L12 5.5 V18.5 L7 14.5 H3 Z M16 12 H21 M18.5 9.5 V14.5" />
         </Button>
-        <Button Classes="tool" Command="{Binding VolumeDownCommand}" ToolTip.Tip="Volume down">
+        <Button Classes="tool" Command="{Binding VolumeDownCommand}" ToolTip.Tip="{l:T 'Volume down'}">
           <Path Classes="icon" Data="M3 9.5 H7 L12 5.5 V18.5 L7 14.5 H3 Z M16 12 H21" />
         </Button>
-        <Button Classes="tool" Command="{Binding PowerCommand}" IsVisible="{Binding IsPrimary}" ToolTip.Tip="Power button (screen on/off, locks the device)">
+        <Button Classes="tool" Command="{Binding PowerCommand}" IsVisible="{Binding IsPrimary}" ToolTip.Tip="{l:T 'Power button (screen on/off, locks the device)'}">
           <Path Classes="icon" Data="M7.8 7 A7 7 0 1 0 16.2 7 M12 3.5 V11" />
         </Button>
         <Button Classes="tool" Classes.on="{Binding IsScreenOff}" IsVisible="{Binding IsPrimary}" Command="{Binding ToggleScreenOffCommand}"
-                ToolTip.Tip="Device screen off while mirroring (click again to turn it on)">
+                ToolTip.Tip="{l:T 'Device screen off while mirroring (click again to turn it on)'}">
           <Path Classes="icon" Data="M7.5 3.5 H16.5 V20.5 H7.5 Z M4.5 4.5 L19.5 19.5" />
         </Button>
         <Border Classes="sep" />
-        <Button Classes="tool" Command="{Binding NotificationsCommand}" IsVisible="{Binding IsPrimary}" ToolTip.Tip="Open notifications">
+        <Button Classes="tool" Command="{Binding NotificationsCommand}" IsVisible="{Binding IsPrimary}" ToolTip.Tip="{l:T 'Open notifications'}">
           <Path Classes="icon" Data="M4 4.5 H20 M8 10 L12 14 L16 10 M8 18.5 H16" />
         </Button>
-        <Button Classes="tool" Command="{Binding QuickSettingsCommand}" IsVisible="{Binding IsPrimary}" ToolTip.Tip="Open quick settings">
+        <Button Classes="tool" Command="{Binding QuickSettingsCommand}" IsVisible="{Binding IsPrimary}" ToolTip.Tip="{l:T 'Open quick settings'}">
           <Path Classes="icon" Data="M4.5 5.5 H10.5 V11.5 H4.5 Z M13.5 5.5 H19.5 V11.5 H13.5 Z M4.5 13.5 H10.5 V19.5 H4.5 Z M13.5 13.5 H19.5 V19.5 H13.5 Z" />
         </Button>
-        <Button Classes="tool" Command="{Binding ScreenshotCommand}" IsVisible="{Binding IsPrimary}" ToolTip.Tip="Screenshot to this computer (saved in Documents\Paneless and shown in Explorer)">
+        <Button Classes="tool" Command="{Binding ScreenshotCommand}" IsVisible="{Binding IsPrimary}" ToolTip.Tip="{l:T 'Screenshot to this computer (saved in Documents\Paneless and shown in Explorer)'}">
           <Path Classes="icon" Data="M4 8 H8 L9.5 5.5 H14.5 L16 8 H20 V18.5 H4 Z M12 10 A3 3 0 1 1 11.99 10 Z" />
         </Button>
         <Button Classes="tool" Classes.rec="{Binding IsRecording}" Command="{Binding RecordCommand}"
-                ToolTip.Tip="Record the screen to a video file (Documents\Paneless). Click again to stop.">
+                ToolTip.Tip="{l:T 'Record the screen to a video file (Documents\Paneless). Click again to stop.'}">
           <Path Classes="icon" Data="M12 6 A6 6 0 1 1 11.99 6 Z M12 9.5 A2.5 2.5 0 1 1 11.99 9.5 Z" />
         </Button>
-        <Button Classes="tool" Command="{Binding CameraCommand}" IsVisible="{Binding IsPrimary}" ToolTip.Tip="Show the device's back camera in a window (Ctrl+T torch, Ctrl+↑/↓ zoom)">
+        <Button Classes="tool" Command="{Binding CameraCommand}" IsVisible="{Binding IsPrimary}" ToolTip.Tip="{l:T 'Show the device’s back camera in a window (Ctrl+T torch, Ctrl+↑/↓ zoom)'}">
           <Path Classes="icon" Data="M3.5 7.5 H15.5 V16.5 H3.5 Z M15.5 10.5 L20.5 7.5 V16.5 L15.5 13.5" />
         </Button>
         <Button Classes="tool" Command="{Binding TypeClipboardCommand}"
-                ToolTip.Tip="Type the text on this computer's clipboard into the device (for apps that block pasting)">
+                ToolTip.Tip="{l:T 'Type the text on this computer’s clipboard into the device (for apps that block pasting)'}">
           <Path Classes="icon" Data="M8 5 H6.5 V20.5 H17.5 V5 H16 M9 3.5 H15 V6.5 H9 Z M9.5 11 H14.5 M12 11 V17" />
         </Button>
         <Border Classes="sep" />
         <Button Classes="tool" Classes.on="{Binding IsGroupControl}" Command="{Binding ToggleGroupControlCommand}" IsVisible="{Binding GroupControlAvailable}"
-                ToolTip.Tip="Group control: taps, swipes, scrolling, typing and these buttons also happen on the other connected devices of this device's group">
+                ToolTip.Tip="{l:T 'Group control: taps, swipes, scrolling, typing and these buttons also happen on the other connected devices of this device’s group'}">
           <Path Classes="icon" Data="M4 5.5 H11 V16.5 H4 Z M13 7.5 H20 V18.5 H13 Z M11 11 H13" />
         </Button>
         <Button Classes="tool" Classes.on="{Binding IsKeymapOn}" IsVisible="{Binding IsPrimary}" Command="{Binding ToggleKeymapCommand}"
-                ToolTip.Tip="Key mapping on/off: use your keyboard as touches (for games)">
+                ToolTip.Tip="{l:T 'Key mapping on/off: use your keyboard as touches (for games)'}">
           <Path Classes="icon" Data="M3 7 H21 V17 H3 Z M6.5 10.5 H7.5 M10 10.5 H11 M13 10.5 H14 M16.5 10.5 H17.5 M7.5 14 H16.5" />
         </Button>
-        <Button Classes="tool" Command="{Binding EditKeymapCommand}" IsVisible="{Binding IsPrimary}" ToolTip.Tip="Set up key mapping">
+        <Button Classes="tool" Command="{Binding EditKeymapCommand}" IsVisible="{Binding IsPrimary}" ToolTip.Tip="{l:T 'Set up key mapping'}">
           <Path Classes="icon" Data="M5 19 L6 15 L15.5 5.5 L18.5 8.5 L9 18 Z M13.5 7.5 L16.5 10.5" />
         </Button>
-        <Button Classes="tool" Command="{Binding ScriptsCommand}" ToolTip.Tip="Run a script on this device">
+        <Button Classes="tool" Command="{Binding ScriptsCommand}" ToolTip.Tip="{l:T 'Run a script on this device'}">
           <Path Classes="icon" Data="M5 7 L10 12 L5 17 M12.5 17 H19" />
         </Button>
       </StackPanel>

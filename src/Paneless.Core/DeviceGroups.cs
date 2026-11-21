@@ -57,7 +57,7 @@ public sealed class GroupStore
     /// <summary>Returns the group with this name, creating it if needed.</summary>
     public DeviceGroup Create(string name)
     {
-        var clean = Clean(name) ?? throw new ArgumentException("A group needs a name.");
+        var clean = Clean(name) ?? throw new ArgumentException(Text.T("A group needs a name."));
         if (Find(clean) is { } existing) return existing;
         var g = new DeviceGroup { Name = clean };
         Data.Groups.Add(g);

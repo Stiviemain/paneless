@@ -1,3 +1,4 @@
+using Paneless.App.Localization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Paneless.App.Platform;
@@ -40,7 +41,7 @@ public sealed partial class ToolbarViewModel : ObservableObject, IAsyncDisposabl
     void SecondScreen()
     {
         OpenSecondScreen?.Invoke();
-        Hint = "Opening a second screen (it gets a toolbar of its own).";
+        Hint = Loc.T("Opening a second screen (it gets a toolbar of its own).");
     }
 
     /// <summary>The virtual display of a second screen or app window, once scrcpy has created it.</summary>
@@ -71,11 +72,11 @@ public sealed partial class ToolbarViewModel : ObservableObject, IAsyncDisposabl
         try
         {
             var server = await ScrcpyServerLocator.FindAsync(_s.Tools);
-            if (server == null) { _controlError = "scrcpy-server wasn't found next to scrcpy."; return null; }
+            if (server == null) { _controlError = Loc.T("scrcpy-server wasn't found next to scrcpy."); return null; }
             var display = 0;
             if (IsSecondary)
             {
-                if (await DisplayIdAsync() is not { } id) { _controlError = "the second screen's number didn't show up in scrcpy's log."; return null; }
+                if (await DisplayIdAsync() is not { } id) { _controlError = Loc.T("the second screen's number didn't show up in scrcpy's log."); return null; }
                 display = id;
             }
             return await DeviceControl.StartAsync(_s.Adb, server, _session.Serial, display);
@@ -133,7 +134,7 @@ public sealed partial class ToolbarViewModel : ObservableObject, IAsyncDisposabl
             MirrorManager.Stop(rec);
             IsRecording = false;
             _recording = null;
-            Hint = $"Recording saved: {rec.OutputFile}";
+            Hint = Loc.F("Recording saved: {0}", rec.OutputFile);
             if (rec.OutputFile != null) Reveal(rec.OutputFile);
             return;
         }
@@ -143,12 +144,12 @@ public sealed partial class ToolbarViewModel : ObservableObject, IAsyncDisposabl
         int? display = null;
         if (IsSecondary)
         {
-            if (_session.DisplayId is not { } id) { Hint = "This screen isn't ready yet."; return; }
+            if (_session.DisplayId is not { } id) { Hint = Loc.T("This screen isn't ready yet."); return; }
             display = id;
         }
         _recording = _s.Mirrors.StartRecording(_session.Serial, _row.Name, file, _s.EffectiveFor(_row.GroupId).ToMirrorOptions(), display);
         IsRecording = true;
-        Hint = "Recording the screen (with sound if device audio is on). Click again to stop.";
+        Hint = Loc.T("Recording the screen (with sound if device audio is on). Click again to stop.");
         _ = WatchRecordingAsync(_recording);
     }
 
@@ -161,7 +162,7 @@ public sealed partial class ToolbarViewModel : ObservableObject, IAsyncDisposabl
         {
             IsRecording = false;
             var size = rec.OutputFile != null && File.Exists(rec.OutputFile) ? new FileInfo(rec.OutputFile).Length : 0;
-            Hint = size > 0 ? $"Recording stopped: {rec.OutputFile}" : "The recording couldn't start: " + LastLogLine(rec.LogPath);
+            Hint = size > 0 ? Loc.F("Recording stopped: {0}", rec.OutputFile) : Loc.T("The recording couldn't start: ") + LastLogLine(rec.LogPath);
         });
     }
 
@@ -175,10 +176,10 @@ public sealed partial class ToolbarViewModel : ObservableObject, IAsyncDisposabl
     async Task TypeClipboard()
     {
         var text = ReadClipboardAsync != null ? await ReadClipboardAsync() : null;
-        if (string.IsNullOrEmpty(text)) { Hint = "The clipboard has no text."; return; }
-        if (await ControlAsync() is not { } c) { Hint = "Typing needs the control connection: " + (_controlError ?? "still starting"); return; }
+        if (string.IsNullOrEmpty(text)) { Hint = Loc.T("The clipboard has no text."); return; }
+        if (await ControlAsync() is not { } c) { Hint = Loc.T("Typing needs the control connection: ") + (_controlError ?? Loc.T("still starting")); return; }
         await c.TypeTextAsync(text);
-        Hint = $"Typed {text.Length} character{(text.Length == 1 ? "" : "s")} from the clipboard.";
+        Hint = Loc.Count(text.Length, "Typed {0} character from the clipboard.", "Typed {0} characters from the clipboard.");
     }
 
     [RelayCommand]
@@ -187,26 +188,26 @@ public sealed partial class ToolbarViewModel : ObservableObject, IAsyncDisposabl
     [RelayCommand]
     async Task ToggleGroupControl()
     {
-        if (!OperatingSystem.IsWindows()) { Hint = "Group control works on Windows for now."; return; }
+        if (!OperatingSystem.IsWindows()) { Hint = Loc.T("Group control works on Windows for now."); return; }
         if (_group is GroupControl running)
         {
             _group = null;
             IsGroupControl = false;
             await running.DisposeAsync();
-            Hint = "Group control off.";
+            Hint = Loc.T("Group control off.");
             return;
         }
         var (groupName, others) = GroupPeers?.Invoke() ?? (null, []);
-        if (groupName == null) { Hint = "Put this device in a group first (Groups… in the main window)."; return; }
-        if (others.Count == 0) { Hint = $"No other device of {groupName} is connected."; return; }
+        if (groupName == null) { Hint = Loc.T("Put this device in a group first (Groups… in the main window)."); return; }
+        if (others.Count == 0) { Hint = Loc.F("No other device of {0} is connected.", groupName); return; }
         var window = MirrorWindow?.Invoke() ?? 0;
-        if (window == 0) { Hint = "The mirror window isn't open yet."; return; }
-        Hint = $"Connecting to {others.Count} device{(others.Count == 1 ? "" : "s")} of {groupName}…";
+        if (window == 0) { Hint = Loc.T("The mirror window isn't open yet."); return; }
+        Hint = Loc.F("Connecting to {0} of {1}…", Loc.Count(others.Count, "{0} device", "{0} devices"), groupName);
         var (gc, failed) = await GroupControl.StartAsync(_s, window, () => _size, others);
-        if (gc == null) { Hint = "Couldn't connect to the other devices" + (failed.Count > 0 ? ": " + string.Join(", ", failed) : "."); return; }
+        if (gc == null) { Hint = Loc.T("Couldn't connect to the other devices") + (failed.Count > 0 ? ": " + string.Join(", ", failed) : "."); return; }
         _group = gc;
         IsGroupControl = true;
-        Hint = $"Group control on: what you do here also happens on {string.Join(", ", gc.Names)}." + (failed.Count > 0 ? $" Not reached: {string.Join(", ", failed)}." : "");
+        Hint = Loc.F("Group control on: what you do here also happens on {0}.", string.Join(", ", gc.Names)) + (failed.Count > 0 ? Loc.F(" Not reached: {0}.", string.Join(", ", failed)) : "");
     }
 
     // ---------------------------------------------------------------- buttons
@@ -232,8 +233,8 @@ public sealed partial class ToolbarViewModel : ObservableObject, IAsyncDisposabl
         if (await _s.Adb.GetDisplaySizeAsync(_session.Serial) is { } s) _size = s;
         var turned = (_size.W > _size.H) == toLandscape;
         Hint = turned
-            ? $"Turned to {(toLandscape ? "landscape" : "portrait")} and locked there. Auto-rotate comes back when you close this mirror."
-            : $"Locked to {(toLandscape ? "landscape" : "portrait")}, but the app in front only supports {(toLandscape ? "portrait" : "landscape")} (e.g. the Pixel home screen). Open an app that rotates.";
+            ? Loc.F("Turned to {0} and locked there. Auto-rotate comes back when you close this mirror.", (toLandscape ? Loc.T("landscape") : Loc.T("portrait")))
+            : Loc.F("Locked to {0}, but the app in front only supports {1} (e.g. the Pixel home screen). Open an app that rotates.", (toLandscape ? Loc.T("landscape") : Loc.T("portrait")), (toLandscape ? Loc.T("portrait") : Loc.T("landscape")));
         CheckOrientation();
     }
 
@@ -256,10 +257,10 @@ public sealed partial class ToolbarViewModel : ObservableObject, IAsyncDisposabl
     [RelayCommand]
     async Task ToggleScreenOff()
     {
-        if (await ControlAsync() is not { } c) { Hint = "Needs the control connection: " + (_controlError ?? "still starting"); return; }
+        if (await ControlAsync() is not { } c) { Hint = Loc.T("Needs the control connection: ") + (_controlError ?? Loc.T("still starting")); return; }
         IsScreenOff = !IsScreenOff;
         await c.SetDisplayPowerAsync(!IsScreenOff);
-        Hint = IsScreenOff ? "Device screen is off; mirroring continues." : "Device screen is on.";
+        Hint = IsScreenOff ? Loc.T("Device screen is off; mirroring continues.") : Loc.T("Device screen is on.");
     }
 
     [RelayCommand]
@@ -278,19 +279,19 @@ public sealed partial class ToolbarViewModel : ObservableObject, IAsyncDisposabl
     async Task Screenshot()
     {
         if (_s.Adb == null) return;
-        Hint = "Taking a screenshot…";
+        Hint = Loc.T("Taking a screenshot…");
         var png = await _s.Adb.ScreencapAsync(_session.Serial);
-        if (png == null) { Hint = "Screenshot failed: the device didn't send an image."; return; }
+        if (png == null) { Hint = Loc.T("Screenshot failed: the device didn't send an image."); return; }
         try
         {
             Directory.CreateDirectory(ScriptRunner.OutputDir);
             var name = string.Concat(_row.Name.Select(ch => char.IsLetterOrDigit(ch) ? ch : '-')) + "-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".png";
             var file = Path.Combine(ScriptRunner.OutputDir, name);
             await File.WriteAllBytesAsync(file, png);
-            Hint = $"Screenshot saved: {file}";
+            Hint = Loc.F("Screenshot saved: {0}", file);
             Reveal(file);
         }
-        catch (Exception ex) { Hint = "Couldn't save the screenshot: " + ex.Message; }
+        catch (Exception ex) { Hint = Loc.T("Couldn't save the screenshot: ") + ex.Message; }
     }
 
     /// <summary>Shows the saved file in the file manager.</summary>
@@ -314,25 +315,25 @@ public sealed partial class ToolbarViewModel : ObservableObject, IAsyncDisposabl
     [RelayCommand]
     async Task ToggleKeymap()
     {
-        if (!OperatingSystem.IsWindows()) { Hint = "Key mapping works on Windows for now."; return; }
-        if (IsKeymapOn) { StopKeymap(); Hint = "Key mapping off."; return; }
+        if (!OperatingSystem.IsWindows()) { Hint = Loc.T("Key mapping works on Windows for now."); return; }
+        if (IsKeymapOn) { StopKeymap(); Hint = Loc.T("Key mapping off."); return; }
 
         var profile = _s.Keymaps.ProfileFor(_row.Sn);
         if (profile == null || profile.Mappings.Count == 0)
         {
-            Hint = "Set up keys for this device first.";
+            Hint = Loc.T("Set up keys for this device first.");
             OpenKeymapEditor?.Invoke();
             return;
         }
-        if (await ControlAsync() is not { } c) { Hint = "Key mapping needs the control connection: " + (_controlError ?? "still starting"); return; }
+        if (await ControlAsync() is not { } c) { Hint = Loc.T("Key mapping needs the control connection: ") + (_controlError ?? Loc.T("still starting")); return; }
         var window = MirrorWindow?.Invoke() ?? 0;
-        if (window == 0) { Hint = "The mirror window isn't open yet."; return; }
+        if (window == 0) { Hint = Loc.T("The mirror window isn't open yet."); return; }
 
         _engine = new KeymapEngine(c, profile, () => _size);
         _engineWindow = window;
         KeymapRouter.Register(window, _engine);
         IsKeymapOn = true;
-        Hint = $"Key mapping on ({profile.Name}). Click the mirror window and use your keys.";
+        Hint = Loc.F("Key mapping on ({0}). Click the mirror window and use your keys.", profile.Name);
         CheckOrientation();
     }
 
@@ -362,7 +363,7 @@ public sealed partial class ToolbarViewModel : ObservableObject, IAsyncDisposabl
         if (_engine == null || _size.W == 0) return;
         var landscape = _size.W > _size.H;
         if (landscape != _engine.Profile.Landscape)
-            Hint = $"This key layout was made in {(_engine.Profile.Landscape ? "landscape" : "portrait")}; the device is in {(landscape ? "landscape" : "portrait")}. Rotate it for the keys to line up.";
+            Hint = Loc.F("This key layout was made in {0}; the device is in {1}. Rotate it for the keys to line up.", (_engine.Profile.Landscape ? Loc.T("landscape") : Loc.T("portrait")), (landscape ? Loc.T("landscape") : Loc.T("portrait")));
     }
 
     public async ValueTask DisposeAsync()

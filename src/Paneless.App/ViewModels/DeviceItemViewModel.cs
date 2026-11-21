@@ -1,3 +1,4 @@
+using Paneless.App.Localization;
 using Avalonia;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -41,14 +42,14 @@ public sealed partial class DeviceItemViewModel(DeviceRow row) : ObservableObjec
     public string Key => _row.Key;
     public string Name => _row.Name;
     public string Model => _row.Model;
-    public string Type => _row.Type;
+    public string Type => Localization.Loc.T(_row.Type);
     public string Address => _row.Address;
     public bool IsMissing => _row.State == DeviceState.NotFound;
     public IBrush NameBrush => IsMissing ? Theme.Dim : Theme.Text;
     public Thickness NameMargin => new(InGroup ? 34 : 12, 0, 8, 0);
     public string StatusText => Theme.Look(_row.State).Text;
     public IBrush StatusBrush => Theme.Look(_row.State).Brush;
-    public string UnlockText => _row.Unlock switch { UnlockStatus.On => "On", UnlockStatus.Paused => "Paused", _ => "" };
+    public string UnlockText => _row.Unlock switch { UnlockStatus.On => Loc.T("On"), UnlockStatus.Paused => Loc.T("Paused"), _ => "" };
     public IBrush UnlockBrush => _row.Unlock == UnlockStatus.Paused ? Theme.Amber : Theme.Green;
 
     public bool Matches(string q) =>

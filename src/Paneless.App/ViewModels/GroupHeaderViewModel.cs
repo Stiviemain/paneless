@@ -1,3 +1,4 @@
+using Paneless.App.Localization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Paneless.Core;
@@ -10,7 +11,7 @@ public sealed partial class GroupHeaderViewModel(MainViewModel main, DeviceGroup
 {
     public DeviceGroup? Group { get; } = group;
     public bool IsUserGroup => Group != null;
-    public string Name => Group?.Name ?? "Other devices";
+    public string Name => Group?.Name ?? Loc.T("Other devices");
 
     [ObservableProperty] public partial bool IsCollapsed { get; set; }
     [ObservableProperty] public partial string CountText { get; set; } = "";

@@ -155,7 +155,7 @@ public sealed partial class MirrorManager(ToolPaths tools)
         try { newTurn = CameraTurn?.Invoke(s.Serial, IsFrontCamera(s)) ?? TurnOf(s); } catch { newTurn = TurnOf(s); }
         LastWindow.TryGetValue(s, out var w);
         try { Reopened?.Invoke(s, ReopenCamera(s, newTurn, s.Restarts + 1, w)); }
-        catch (Exception ex) { Failed?.Invoke(s, "Couldn't reopen the camera: " + ex.Message); }
+        catch (Exception ex) { Failed?.Invoke(s, Text.T("Couldn't reopen the camera: ") + ex.Message); }
     }
 
     /// <summary>The clockwise turn a camera window was started with.</summary>
@@ -176,7 +176,7 @@ public sealed partial class MirrorManager(ToolPaths tools)
             Reopened?.Invoke(s, next);
             return next;
         }
-        catch (Exception ex) { Failed?.Invoke(s, "Couldn't reopen the camera: " + ex.Message); return null; }
+        catch (Exception ex) { Failed?.Invoke(s, Text.T("Couldn't reopen the camera: ") + ex.Message); return null; }
     }
 
     MirrorSession ReopenCamera(MirrorSession s, int newTurn, int restarts, (int X, int Y, int W, int H) w)

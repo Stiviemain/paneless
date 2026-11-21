@@ -1,9 +1,10 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="using:Paneless.App.Localization"
         xmlns:vm="using:Paneless.App.ViewModels"
         x:Class="Paneless.App.Views.UnlockWindow"
         x:DataType="vm:UnlockViewModel"
-        Title="Auto-unlock" Icon="/Assets/Paneless.ico"
+        Title="{l:T 'Auto-unlock'}" Icon="/Assets/Paneless.ico"
         Width="520" SizeToContent="Height" CanResize="False"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
 
@@ -12,9 +13,9 @@
     <TextBlock Classes="dim" TextWrapping="Wrap" Text="{Binding Intro}" />
 
     <StackPanel Spacing="6">
-      <TextBlock Classes="dim" FontSize="12" Text="PIN or password" />
+      <TextBlock Classes="dim" FontSize="12" Text="{l:T 'PIN or password'}" />
       <TextBox x:Name="CodeBox" Text="{Binding Code}" PasswordChar="•" />
-      <TextBlock Classes="dim" FontSize="12" Text="Type it again" Margin="0,6,0,0" />
+      <TextBlock Classes="dim" FontSize="12" Text="{l:T 'Type it again'}" Margin="0,6,0,0" />
       <TextBox Text="{Binding Confirm}" PasswordChar="•" />
     </StackPanel>
 
@@ -22,10 +23,10 @@
     <TextBlock Text="{Binding Status}" Foreground="{Binding StatusBrush}" TextWrapping="Wrap" MinHeight="20" />
 
     <Grid ColumnDefinitions="Auto,*,Auto">
-      <Button Content="Remove code" Command="{Binding RemoveCommand}" IsVisible="{Binding HasCode}" />
+      <Button Content="{l:T 'Remove code'}" Command="{Binding RemoveCommand}" IsVisible="{Binding HasCode}" />
       <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
-        <Button Content="Cancel" Command="{Binding CancelCommand}" IsCancel="True" />
-        <Button Classes="accent" Content="Save" MinWidth="90" Command="{Binding SaveCommand}" IsDefault="True" FontWeight="SemiBold" />
+        <Button Content="{l:T 'Cancel'}" Command="{Binding CancelCommand}" IsCancel="True" />
+        <Button Classes="accent" Content="{l:T 'Save'}" MinWidth="90" Command="{Binding SaveCommand}" IsDefault="True" FontWeight="SemiBold" />
       </StackPanel>
     </Grid>
   </StackPanel>

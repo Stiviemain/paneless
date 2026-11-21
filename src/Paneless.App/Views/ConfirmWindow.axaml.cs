@@ -18,7 +18,7 @@ public partial class ConfirmWindow : Window
         w.MessageText.Text = message;
         w.WarningText.Text = warning ?? "";
         w.WarningText.IsVisible = !string.IsNullOrEmpty(warning);
-        w.YesButton.Content = yes;
+        w.YesButton.Content = Localization.Loc.T(yes);
         return w.ShowDialog<bool>(owner);
     }
 }

@@ -52,16 +52,16 @@ public static partial class ScriptText
         if (text.StartsWith("shell", StringComparison.OrdinalIgnoreCase) && (text.Length == 5 || char.IsWhiteSpace(text[5])))
         {
             var remote = text[5..].Trim();
-            if (remote.Length == 0) return (null, "\"adb shell\" needs a command after it (an interactive shell isn't possible here).");
+            if (remote.Length == 0) return (null, Text.T("\"adb shell\" needs a command after it (an interactive shell isn't possible here)."));
             return (["shell", Fill(remote, values, forShell: true)], null);
         }
         var tokens = Tokenize(text);
-        if (tokens.Count == 0) return (null, "Empty command.");
+        if (tokens.Count == 0) return (null, Text.T("Empty command."));
         var first = tokens[0].ToLowerInvariant();
         if (first is "-s" or "-t" or "-d" or "-e" or "-h" or "-p" or "-l")
-            return (null, "Leave out device options like -s: Paneless runs the script on the devices you tick.");
+            return (null, Text.T("Leave out device options like -s: Paneless runs the script on the devices you tick."));
         if (first is "kill-server" or "start-server" or "connect" or "disconnect" or "pair" or "devices" or "wait-for-device")
-            return (null, $"\"adb {first}\" manages Paneless's own connections and can't be used in a script.");
+            return (null, Text.F("\"adb {0}\" manages Paneless's own connections and can't be used in a script.", first));
         return (tokens.Select(t => Fill(t, values, forShell: false)).ToArray(), null);
     }
 
@@ -131,7 +131,7 @@ public sealed class ScriptRunner(AdbClient adb)
             if (args == null) { steps.Add(new StepResult(line, new ProcessResult(false, false, -1, ""), error)); break; }
             var full = new[] { "-s", serial }.Concat(args);
             var r = await ProcessRunner.RunAsync(adb.AdbPath, full, TimeSpan.FromSeconds(45), workingDirectory: OutputDir, ct: ct);
-            steps.Add(new StepResult(line, r, r.TimedOut ? "Stopped after 45 seconds." : null));
+            steps.Add(new StepResult(line, r, r.TimedOut ? Text.T("Stopped after 45 seconds.") : null));
             if (r.TimedOut) break;
         }
         return new DeviceRunResult(deviceName, steps, sw.Elapsed);

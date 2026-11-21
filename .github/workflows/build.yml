@@ -27,5 +27,7 @@ jobs:
         run: |
           $out = dotnet run --project tests/Paneless.Smoke -c Release --no-build -- --groups | Out-String
           $out += dotnet run --project tests/Paneless.Smoke -c Release --no-build -- --scripts-parse | Out-String
+          $out += dotnet run --project tests/Paneless.Smoke -c Release --no-build -- --automation | Out-String
+          $out += dotnet run --project tests/Paneless.Smoke -c Release --no-build -- --translations | Out-String
           Write-Output $out
           if ($out -match 'FAIL') { throw 'A test failed.' }

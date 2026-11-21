@@ -1,3 +1,4 @@
+using Paneless.App.Localization;
 using System.Collections.ObjectModel;
 using Avalonia.Media;
 using Avalonia.Threading;
@@ -25,7 +26,7 @@ public sealed partial class MainViewModel : ObservableObject
         _timer.Tick += async (_, _) => { if (!IsBusy) await RefreshListAsync(); };
         if (_s.Mirrors != null)
             _s.Mirrors.Failed += (session, why) => Dispatcher.UIThread.Post(() =>
-                SetStatus($"Mirroring {session.Name} stopped. {why}", StatusKind.Error));
+                SetStatus(Loc.F("Mirroring {0} stopped. {1}", session.Name, why), StatusKind.Error));
         _s.Groups.Changed += () => Dispatcher.UIThread.Post(Rebuild);
         _s.Profiles.Changed += () => Dispatcher.UIThread.Post(UpdateHotkeys);
         if (OperatingSystem.IsWindows())
@@ -57,6 +58,33 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Raised after every refresh (the Scripts window keeps its device list up to date with it).</summary>
     public event Action? DevicesChanged;
 
+    // ---------------------------------------------------------------- pages (navigation bar)
+
+    /// <summary>Devices, Wall, Logs, Automation, Inventory or Claude.</summary>
+    [ObservableProperty] public partial string Page { get; set; } = "Devices";
+    public bool IsDevicesPage => Page == "Devices";
+    public bool IsWallPage => Page == "Wall";
+    public bool IsLogsPage => Page == "Logs";
+    public bool IsAutomationPage => Page == "Automation";
+    public bool IsInventoryPage => Page == "Inventory";
+    public bool IsClaudePage => Page == "Claude";
+
+    partial void OnPageChanged(string value)
+    {
+        foreach (var p in new[] { nameof(IsDevicesPage), nameof(IsWallPage), nameof(IsLogsPage), nameof(IsAutomationPage), nameof(IsInventoryPage), nameof(IsClaudePage) })
+            OnPropertyChanged(p);
+    }
+
+    [RelayCommand]
+    void Go(string page) => Page = page;
+
+    /// <summary>Runs scripts, recipes, restarts and commands on devices (Recipes, Scheduled tasks, Claude).</summary>
+    public DeviceActions Actions => _actions ??= new DeviceActions(_s, () => _rows);
+    DeviceActions? _actions;
+
+    /// <summary>The battery reading of a device (by adb serial), if known.</summary>
+    public BatteryInfo? BatteryOf(string serial) => _battery.TryGetValue(serial, out var b) ? b.Info : null;
+
     /// <summary>Lets other windows (toolbars) show a message in the status line.</summary>
     public void Report(string text, StatusKind kind = StatusKind.Info) => SetStatus(text, kind);
 
@@ -71,18 +99,18 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Devices on the network (not missing group members), for the Scripts window.</summary>
     public IReadOnlyList<DeviceRow> NetworkRows => _rows;
 
-    public IReadOnlyList<string> MaxSizes { get; } = ["Full resolution", "1920 px", "1600 px", "1280 px", "1024 px"];
+    public IReadOnlyList<SizeChoice> MaxSizes { get; } = [new("Full resolution", Loc.T("Full resolution")), new("1920 px", "1920 px"), new("1600 px", "1600 px"), new("1280 px", "1280 px"), new("1024 px", "1024 px")];
     public string Tip => OperatingSystem.IsMacOS()
-        ? "⌘- or Shift-click to select several · double-click to mirror · right-click for more"
-        : "Ctrl- or Shift-click to select several · double-click to mirror · right-click for more";
+        ? Loc.T("⌘- or Shift-click to select several · double-click to mirror · right-click for more")
+        : Loc.T("Ctrl- or Shift-click to select several · double-click to mirror · right-click for more");
 
-    [ObservableProperty] public partial string StatusText { get; set; } = "Starting…";
+    [ObservableProperty] public partial string StatusText { get; set; } = Loc.T("Starting…");
     [ObservableProperty] public partial IBrush StatusBrush { get; set; } = Theme.Dim;
     [ObservableProperty] public partial bool IsEmpty { get; set; } = true;
-    [ObservableProperty] public partial string EmptyText { get; set; } = "Looking for devices…";
+    [ObservableProperty] public partial string EmptyText { get; set; } = Loc.T("Looking for devices…");
     [ObservableProperty] public partial string ManualAddress { get; set; } = "";
-    [ObservableProperty] public partial string MirrorLabel { get; set; } = "Mirror";
-    [ObservableProperty] public partial string Summary { get; set; } = "Phones and tablets on your network with Wireless debugging turned on";
+    [ObservableProperty] public partial string MirrorLabel { get; set; } = Loc.T("Mirror");
+    [ObservableProperty] public partial string Summary { get; set; } = Loc.T("Phones and tablets on your network with Wireless debugging turned on");
     [ObservableProperty] public partial string SelectionText { get; set; } = "";
     [ObservableProperty] public partial string Search { get; set; } = "";
 
@@ -126,10 +154,10 @@ public sealed partial class MainViewModel : ObservableObject
     public bool Audio { get => S.Audio; set { if (S.Audio == value) return; S.Audio = value; SaveSettings(); OnPropertyChanged(); } }
     public bool OnTop { get => S.OnTop; set { if (S.OnTop == value) return; S.OnTop = value; SaveSettings(); OnPropertyChanged(); } }
 
-    public string MaxSize
+    public SizeChoice MaxSize
     {
-        get => MaxSizes.Contains(S.MaxSize) ? S.MaxSize : "1920 px";
-        set { if (value == null || S.MaxSize == value) return; S.MaxSize = value; SaveSettings(); OnPropertyChanged(); }
+        get => MaxSizes.FirstOrDefault(c => c.Value == S.MaxSize) ?? MaxSizes[1];
+        set { if (value == null || S.MaxSize == value.Value) return; S.MaxSize = value.Value; SaveSettings(); OnPropertyChanged(); }
     }
 
     /// <summary>Re-reads the mirror options (after the Settings window changed them).</summary>
@@ -149,25 +177,25 @@ public sealed partial class MainViewModel : ObservableObject
     {
         if (!Ready)
         {
-            EmptyText = $"scrcpy wasn't found on this computer.\n\n{ToolLocator.InstallHint}\n\nThen restart Paneless.";
-            SetStatus("scrcpy and adb are needed to mirror devices.", StatusKind.Error);
+            EmptyText = Loc.F("scrcpy wasn't found on this computer.\n\n{0}\n\nThen restart Paneless.", ToolLocator.InstallHint);
+            SetStatus(Loc.T("scrcpy and adb are needed to mirror devices."), StatusKind.Error);
             return;
         }
         if (!_s.Demo)
         {
-            SetStatus("Starting…");
+            SetStatus(Loc.T("Starting…"));
             await _s.Adb!.StartServerAsync();
             var discovery = await _s.Adb.IsDiscoveryAvailableAsync();
             await RefreshListAsync();
             SetStatus(discovery
-                ? "Watching the network. The list updates every few seconds."
-                : "Automatic discovery isn't available here; use Add device › Connect by address.",
+                ? Loc.T("Watching the network. The list updates every few seconds.")
+                : Loc.T("Automatic discovery isn't available here; use Add device › Connect by address."),
                 discovery ? StatusKind.Info : StatusKind.Warn);
         }
         else
         {
             await RefreshListAsync();
-            SetStatus("Watching the network. The list updates every few seconds.");
+            SetStatus(Loc.T("Watching the network. The list updates every few seconds."));
         }
         UpdateHotkeys();
         _timer.Start();
@@ -184,7 +212,7 @@ public sealed partial class MainViewModel : ObservableObject
             Automate();
             UpdateBatteries();
         }
-        catch (Exception ex) { SetStatus("Refresh failed: " + ex.Message, StatusKind.Error); }
+        catch (Exception ex) { SetStatus(Loc.T("Refresh failed: ") + ex.Message, StatusKind.Error); }
         finally { _refreshing = false; }
     }
 
@@ -257,13 +285,13 @@ public sealed partial class MainViewModel : ObservableObject
 
         IsEmpty = Items.Count == 0;
         if (IsEmpty)
-            EmptyText = searching ? $"No devices match \"{q}\"."
-                : "No devices found yet.\n\nOn each phone or tablet, turn on\nSettings › System › Developer options › Wireless debugging.\n\nFirst time with a device? Click Add device › Pair with a code.";
+            EmptyText = searching ? Loc.F("No devices match \"{0}\".", q)
+                : Loc.T("No devices found yet.\n\nOn each phone or tablet, turn on\nSettings › System › Developer options › Wireless debugging.\n\nFirst time with a device? Click Add device › Pair with a code.");
         var mirroring = _rows.Count(r => r.State == DeviceState.Mirroring);
-        Summary = _rows.Count == 0 ? "Phones and tablets on your network with Wireless debugging turned on"
-            : $"{Plural(_rows.Count, "device")} on the network"
-              + (mirroring > 0 ? $" · {mirroring} mirroring" : "")
-              + (groups.Any ? $" · {Plural(groups.Groups.Count, "group")}" : "");
+        Summary = _rows.Count == 0 ? Loc.T("Phones and tablets on your network with Wireless debugging turned on")
+            : Loc.F("{0} on the network", Loc.Count(_rows.Count, "{0} device", "{0} devices"))
+              + (mirroring > 0 ? Loc.F(" · {0} mirroring", mirroring) : "")
+              + (groups.Any ? $" · {Loc.Count(groups.Groups.Count, "{0} group", "{0} groups")}" : "");
         UpdateSelectionState();
         DevicesChanged?.Invoke();
     }
@@ -348,7 +376,7 @@ public sealed partial class MainViewModel : ObservableObject
         {
             if (await _s.Directory!.ConnectAsync(r) != null)
             {
-                SetStatus($"Connected to {r.Name}.", StatusKind.Ok);
+                SetStatus(Loc.F("Connected to {0}.", r.Name), StatusKind.Ok);
                 await RefreshListAsync();
             }
         }
@@ -377,7 +405,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
         try { Directory.CreateDirectory(AppPaths.LogDir); await File.AppendAllTextAsync(Path.Combine(AppPaths.LogDir, "on-connect.log"), log.ToString()); } catch { }
         var ok = results.All(x => x.EndsWith('✓'));
-        Dispatcher.UIThread.Post(() => SetStatus($"{r.Name} connected: ran {string.Join(", ", results)}", ok ? StatusKind.Ok : StatusKind.Warn));
+        Dispatcher.UIThread.Post(() => SetStatus(Loc.F("{0} connected: ran {1}", r.Name, string.Join(", ", results)), ok ? StatusKind.Ok : StatusKind.Warn));
     }
 
     // ---------------------------------------------------------------- files
@@ -387,15 +415,15 @@ public sealed partial class MainViewModel : ObservableObject
     {
         var rows = targets.Where(t => t.CanMirror).ToList();
         if (files.Count == 0) return;
-        if (rows.Count == 0) { SetStatus("None of those devices is on the network.", StatusKind.Warn); return; }
-        if (_s.Demo) { SetStatus($"Demo mode: would send {Plural(files.Count, "file")} to {Plural(rows.Count, "device")}.", StatusKind.Ok); return; }
+        if (rows.Count == 0) { SetStatus(Loc.T("None of those devices is on the network."), StatusKind.Warn); return; }
+        if (_s.Demo) { SetStatus(Loc.F("Demo mode: would send {0} to {1}.", Loc.Count(files.Count, "{0} file", "{0} files"), Loc.Count(rows.Count, "{0} device", "{0} devices")), StatusKind.Ok); return; }
         var apks = files.Count(f => f.EndsWith(".apk", StringComparison.OrdinalIgnoreCase));
-        SetStatus($"Sending {Plural(files.Count, "file")} to {(rows.Count == 1 ? rows[0].Name : Plural(rows.Count, "device"))}…");
+        SetStatus(Loc.F("Sending {0} to {1}…", Loc.Count(files.Count, "{0} file", "{0} files"), (rows.Count == 1 ? rows[0].Name : Loc.Count(rows.Count, "{0} device", "{0} devices"))));
         var failures = new System.Collections.Concurrent.ConcurrentBag<string>();
         await Task.WhenAll(rows.Select(async r =>
         {
             var serial = await _s.Directory!.ConnectAsync(r);
-            if (serial == null) { failures.Add($"{r.Name}: couldn't connect"); return; }
+            if (serial == null) { failures.Add(Loc.F("{0}: couldn't connect", r.Name)); return; }
             var target = _s.EffectiveFor(r.GroupId).PushTarget;
             foreach (var f in files)
             {
@@ -405,9 +433,9 @@ public sealed partial class MainViewModel : ObservableObject
                 if (!res.Ok) failures.Add($"{r.Name}: {Path.GetFileName(f)} – {res.LastLine}");
             }
         }));
-        var what = apks == files.Count ? $"Installed {Plural(apks, "app")}" : apks == 0 ? $"Copied {Plural(files.Count, "file")}" : $"Installed {Plural(apks, "app")} and copied {Plural(files.Count - apks, "file")}";
-        if (failures.IsEmpty) SetStatus($"{what} on {(rows.Count == 1 ? rows[0].Name : Plural(rows.Count, "device"))}.", StatusKind.Ok);
-        else SetStatus($"Some didn't work: {string.Join("; ", failures.Take(3))}", StatusKind.Error);
+        var what = apks == files.Count ? Loc.F("Installed {0}", Loc.Count(apks, "{0} app", "{0} apps")) : apks == 0 ? Loc.F("Copied {0}", Loc.Count(files.Count, "{0} file", "{0} files")) : Loc.F("Installed {0} and copied {1}", Loc.Count(apks, "{0} app", "{0} apps"), Loc.Count(files.Count - apks, "{0} file", "{0} files"));
+        if (failures.IsEmpty) SetStatus(Loc.F("{0} on {1}.", what, (rows.Count == 1 ? rows[0].Name : Loc.Count(rows.Count, "{0} device", "{0} devices"))), StatusKind.Ok);
+        else SetStatus(Loc.F("Some didn't work: {0}", string.Join("; ", failures.Take(3))), StatusKind.Error);
     }
 
     /// <summary>The devices a drop on this list item means: a group's devices, or the selection if the item is part of it.</summary>
@@ -424,14 +452,13 @@ public sealed partial class MainViewModel : ObservableObject
 
     static string CountText(List<DeviceItemViewModel> members)
     {
-        if (members.Count == 0) return "empty: right-click a device › Move to group";
+        if (members.Count == 0) return Loc.T("empty: right-click a device › Move to group");
         var online = members.Count(m => !m.IsMissing);
         var mirroring = members.Count(m => m.Row.State == DeviceState.Mirroring);
-        var text = online == members.Count ? Plural(members.Count, "device") : $"{online} of {members.Count} on the network";
-        return mirroring > 0 ? $"{text} · {mirroring} mirroring" : text;
+        var text = online == members.Count ? Loc.Count(members.Count, "{0} device", "{0} devices") : Loc.F("{0} of {1} on the network", online, members.Count);
+        return mirroring > 0 ? Loc.F("{0} · {1} mirroring", text, mirroring) : text;
     }
 
-    static string Plural(int n, string word) => $"{n} {word}{(n == 1 ? "" : "s")}";
 
     /// <summary>Makes <paramref name="target"/> equal to <paramref name="want"/> with as few changes as possible,
     /// so the list keeps its scroll position.</summary>
@@ -482,7 +509,7 @@ public sealed partial class MainViewModel : ObservableObject
     void UpdateSelectionState()
     {
         var sel = Selected;
-        MirrorLabel = sel is [{ Row.NeedsPairing: true }] ? "Pair…" : sel.Count > 1 ? $"Mirror {sel.Count}" : "Mirror";
+        MirrorLabel = sel is [{ Row.NeedsPairing: true }] ? Loc.T("Pair…") : sel.Count > 1 ? Loc.F("Mirror {0}", sel.Count) : Loc.T("Mirror");
         SelectionText = sel.Count > 1 ? $"{sel.Count} selected" : "";
         MirrorCommand.NotifyCanExecuteChanged();
         AutoUnlockCommand.NotifyCanExecuteChanged();
@@ -516,9 +543,9 @@ public sealed partial class MainViewModel : ObservableObject
         {
             var r = targets[0];
             if (r.NeedsPairing) { if (ShowPairDialog != null) await ShowPairDialog(r.PairAddr); await RefreshListAsync(); }
-            else if (r.State == DeviceState.Unauthorized) SetStatus($"Unlock {r.Name} and tap Allow on the debugging prompt.", StatusKind.Warn);
-            else if (r.State == DeviceState.NotFound) SetStatus($"{r.Name} isn't on the network. Turn on Wireless debugging on it (same Wi-Fi as this computer).", StatusKind.Warn);
-            else SetStatus($"{r.Name} is offline. Turn Wireless debugging off and on again on the device.", StatusKind.Warn);
+            else if (r.State == DeviceState.Unauthorized) SetStatus(Loc.F("Unlock {0} and tap Allow on the debugging prompt.", r.Name), StatusKind.Warn);
+            else if (r.State == DeviceState.NotFound) SetStatus(Loc.F("{0} isn't on the network. Turn on Wireless debugging on it (same Wi-Fi as this computer).", r.Name), StatusKind.Warn);
+            else SetStatus(Loc.F("{0} is offline. Turn Wireless debugging off and on again on the device.", r.Name), StatusKind.Warn);
             return;
         }
         await MirrorRowsAsync(mirrorable);
@@ -528,33 +555,33 @@ public sealed partial class MainViewModel : ObservableObject
     {
         IsBusy = true;
         try { foreach (var r in rows) await MirrorOneAsync(r); }
-        catch (Exception ex) { SetStatus("Couldn't start mirroring: " + ex.Message, StatusKind.Error); }
+        catch (Exception ex) { SetStatus(Loc.T("Couldn't start mirroring: ") + ex.Message, StatusKind.Error); }
         finally { IsBusy = false; }
         await RefreshListAsync();
     }
 
     async Task MirrorOneAsync(DeviceRow r)
     {
-        if (r.State == DeviceState.Mirroring) { SetStatus($"{r.Name} is already being mirrored.", StatusKind.Warn); return; }
-        if (_s.Demo) { SetStatus($"Demo mode: would mirror {r.Name}.", StatusKind.Ok); return; }
-        if (r.State == DeviceState.Available) SetStatus($"Connecting to {r.Name}…");
+        if (r.State == DeviceState.Mirroring) { SetStatus(Loc.F("{0} is already being mirrored.", r.Name), StatusKind.Warn); return; }
+        if (_s.Demo) { SetStatus(Loc.F("Demo mode: would mirror {0}.", r.Name), StatusKind.Ok); return; }
+        if (r.State == DeviceState.Available) SetStatus(Loc.F("Connecting to {0}…", r.Name));
         var serial = await _s.Directory!.ConnectAsync(r);
         if (serial == null)
         {
-            SetStatus($"Couldn't connect to {r.Name}. If Wireless debugging was reset on it, pair it again.", StatusKind.Error);
+            SetStatus(Loc.F("Couldn't connect to {0}. If Wireless debugging was reset on it, pair it again.", r.Name), StatusKind.Error);
             return;
         }
         string? note = null;
         if (_s.Unlock!.IsReady(r.Sn))
         {
-            SetStatus($"Unlocking {r.Name}…");
+            SetStatus(Loc.F("Unlocking {0}…", r.Name));
             var res = await _s.Unlock.UnlockAsync(serial, r.Sn!, r.Name);
             if (!res.Ok) note = res.Message;
         }
         var session = _s.Mirrors!.Start(serial, r.Name, Options(r));
         MirrorStarted?.Invoke(session, r);
-        if (note != null) SetStatus($"Mirroring {r.Name}, but: {note}", StatusKind.Warn);
-        else SetStatus($"Mirroring {r.Name}. Close its window to stop.", StatusKind.Ok);
+        if (note != null) SetStatus(Loc.F("Mirroring {0}, but: {1}", r.Name, note), StatusKind.Warn);
+        else SetStatus(Loc.F("Mirroring {0}. Close its window to stop.", r.Name), StatusKind.Ok);
     }
 
     // ---------------------------------------------------------------- other device actions
@@ -593,10 +620,10 @@ public sealed partial class MainViewModel : ObservableObject
         IsBusy = true;
         try
         {
-            if (row.State == DeviceState.Available) SetStatus($"Connecting to {row.Name}…");
+            if (row.State == DeviceState.Available) SetStatus(Loc.F("Connecting to {0}…", row.Name));
             var serial = await _s.Directory!.ConnectAsync(row);
-            if (serial == null) { SetStatus($"Couldn't connect to {row.Name}.", StatusKind.Error); return; }
-            SetStatus($"Unlocking {row.Name}…");
+            if (serial == null) { SetStatus(Loc.F("Couldn't connect to {0}.", row.Name), StatusKind.Error); return; }
+            SetStatus(Loc.F("Unlocking {0}…", row.Name));
             var res = await _s.Unlock!.UnlockAsync(serial, row.Sn!, row.Name);
             SetStatus(res.Message, res.Ok ? StatusKind.Ok : StatusKind.Warn);
         }
@@ -608,7 +635,7 @@ public sealed partial class MainViewModel : ObservableObject
     async Task RefreshAsync()
     {
         await RefreshListAsync();
-        SetStatus("List refreshed.");
+        SetStatus(Loc.T("List refreshed."));
     }
 
     [RelayCommand(CanExecute = nameof(CanAct))]
@@ -618,24 +645,24 @@ public sealed partial class MainViewModel : ObservableObject
         if (System.Text.RegularExpressions.Regex.IsMatch(addr, @"^\d{1,3}(\.\d{1,3}){3}$")) addr += ":5555";
         if (!AdbClient.IsIpPort(addr))
         {
-            SetStatus("Type the IP address and port shown under Wireless debugging, e.g. 192.168.2.40:37123.", StatusKind.Warn);
+            SetStatus(Loc.T("Type the IP address and port shown under Wireless debugging, e.g. 192.168.2.40:37123."), StatusKind.Warn);
             return;
         }
-        if (_s.Demo) { SetStatus($"Demo mode: would connect to {addr}.", StatusKind.Ok); return; }
+        if (_s.Demo) { SetStatus(Loc.F("Demo mode: would connect to {0}.", addr), StatusKind.Ok); return; }
         IsBusy = true;
         try
         {
-            SetStatus($"Connecting to {addr}…");
+            SetStatus(Loc.F("Connecting to {0}…", addr));
             var r = await _s.Adb!.ConnectAsync(addr);
             if (await _s.Adb.WaitReadyAsync(addr, TimeSpan.FromSeconds(4)))
             {
-                SetStatus($"Connected to {addr}.", StatusKind.Ok);
+                SetStatus(Loc.F("Connected to {0}.", addr), StatusKind.Ok);
                 ManualAddress = "";
             }
             else
             {
-                var why = r.TimedOut ? "no answer (same Wi-Fi? a VPN blocking the local network?)" : r.LastLine;
-                SetStatus($"Couldn't connect to {addr}: {why}", StatusKind.Error);
+                var why = r.TimedOut ? Loc.T("no answer (same Wi-Fi? a VPN blocking the local network?)") : r.LastLine;
+                SetStatus(Loc.F("Couldn't connect to {0}: {1}", addr, why), StatusKind.Error);
             }
         }
         finally { IsBusy = false; }
@@ -661,8 +688,8 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     void DeviceSettings()
     {
-        if (One is not { } r) { SetStatus("Select one device first.", StatusKind.Warn); return; }
-        if (r.Sn == null) { SetStatus($"{r.Name} needs to be paired first.", StatusKind.Warn); return; }
+        if (One is not { } r) { SetStatus(Loc.T("Select one device first."), StatusKind.Warn); return; }
+        if (r.Sn == null) { SetStatus(Loc.F("{0} needs to be paired first.", r.Name), StatusKind.Warn); return; }
         ShowDeviceSettings?.Invoke(r.GroupId, r.Name, null);
     }
 
@@ -674,22 +701,22 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     void Apps()
     {
-        if (One is not { CanMirror: true } r) { SetStatus("Select one device that's on the network.", StatusKind.Warn); return; }
+        if (One is not { CanMirror: true } r) { SetStatus(Loc.T("Select one device that's on the network."), StatusKind.Warn); return; }
         ShowApps?.Invoke(r);
     }
 
     /// <summary>Starts a scrcpy window of another kind (app, second screen, camera) for one device.</summary>
     async Task StartWindowAsync(DeviceRow? r, string what, Func<string, MirrorSession> start, Func<string, Task>? prepare = null)
     {
-        if (r is not { CanMirror: true }) { SetStatus("Select one device that's on the network.", StatusKind.Warn); return; }
-        if (_s.Demo) { SetStatus($"Demo mode: would open {what} of {r.Name}.", StatusKind.Ok); return; }
+        if (r is not { CanMirror: true }) { SetStatus(Loc.T("Select one device that's on the network."), StatusKind.Warn); return; }
+        if (_s.Demo) { SetStatus(Loc.F("Demo mode: would open {0} of {1}.", what, r.Name), StatusKind.Ok); return; }
         var serial = await _s.Directory!.ConnectAsync(r);
-        if (serial == null) { SetStatus($"Couldn't connect to {r.Name}.", StatusKind.Error); return; }
+        if (serial == null) { SetStatus(Loc.F("Couldn't connect to {0}.", r.Name), StatusKind.Error); return; }
         if (prepare != null) await prepare(serial);
         var session = start(serial);
         // Second screens and app windows get a toolbar of their own.
         if (session.Kind is SessionKind.Screen or SessionKind.App) MirrorStarted?.Invoke(session, r);
-        SetStatus($"Opening {what} of {r.Name}…", StatusKind.Ok);
+        SetStatus(Loc.F("Opening {0} of {1}…", what, r.Name), StatusKind.Ok);
     }
 
     [RelayCommand]
@@ -697,7 +724,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Opens a second screen of a device (also from its mirror's toolbar).</summary>
     public Task OpenSecondScreenAsync(DeviceRow? r) =>
-        StartWindowAsync(r, "a second screen", serial => _s.Mirrors!.StartScreen(serial, r!.Name, Options(r!)));
+        StartWindowAsync(r, Loc.T("a second screen"), serial => _s.Mirrors!.StartScreen(serial, r!.Name, Options(r!)));
 
     [RelayCommand]
     Task CameraBack() => OpenCameraAsync(One, false);
@@ -709,7 +736,7 @@ public sealed partial class MainViewModel : ObservableObject
     public Task OpenCameraAsync(DeviceRow? r, bool front)
     {
         int? turn = null;
-        return StartWindowAsync(r, front ? "the front camera" : "the back camera",
+        return StartWindowAsync(r, front ? Loc.T("the front camera") : Loc.T("the back camera"),
             serial => _s.Mirrors!.StartCamera(serial, r!.Name, front, Options(r!), turn),
             async serial => { try { turn = await _s.Adb!.GetCameraUprightTurnAsync(serial, front); } catch { } });
     }
@@ -722,7 +749,7 @@ public sealed partial class MainViewModel : ObservableObject
     async Task SendFiles()
     {
         var targets = Targets;
-        if (targets.Count == 0) { SetStatus("Select the devices to send files to.", StatusKind.Warn); return; }
+        if (targets.Count == 0) { SetStatus(Loc.T("Select the devices to send files to."), StatusKind.Warn); return; }
         if (PickFilesAsync == null) return;
         var files = await PickFilesAsync();
         await SendFilesAsync(files, targets);
@@ -742,12 +769,12 @@ public sealed partial class MainViewModel : ObservableObject
 
     void Arrange(ISet<string>? serials)
     {
-        if (!OperatingSystem.IsWindows()) { SetStatus("Arranging windows works on Windows for now.", StatusKind.Warn); return; }
+        if (!OperatingSystem.IsWindows()) { SetStatus(Loc.T("Arranging windows works on Windows for now."), StatusKind.Warn); return; }
         var sessions = (_s.Mirrors?.Sessions ?? []).Where(x => x.Kind != SessionKind.Recording && (serials == null || serials.Contains(x.Serial)))
             .OrderBy(x => x.Name, NaturalComparer.Instance).ToList();
-        if (sessions.Count == 0) { SetStatus("No mirror windows are open.", StatusKind.Warn); return; }
+        if (sessions.Count == 0) { SetStatus(Loc.T("No mirror windows are open."), StatusKind.Warn); return; }
         ArrangeWindows?.Invoke(sessions);
-        SetStatus($"Arranged {Plural(sessions.Count, "window")}.", StatusKind.Ok);
+        SetStatus(Loc.F("Arranged {0}.", Loc.Count(sessions.Count, "{0} window", "{0} windows")), StatusKind.Ok);
     }
 
     // ---------------------------------------------------------------- shortcuts
@@ -761,20 +788,20 @@ public sealed partial class MainViewModel : ObservableObject
             if (p.Hotkey is { Length: > 0 } hk) map.TryAdd(hk, id);
         GlobalHotkeys.Set(map);
         if (GlobalHotkeys.Failed.Count > 0)
-            SetStatus($"Shortcut {string.Join(", ", GlobalHotkeys.Failed)} is already used by another program.", StatusKind.Warn);
+            SetStatus(Loc.F("Shortcut {0} is already used by another program.", string.Join(", ", GlobalHotkeys.Failed)), StatusKind.Warn);
     }
 
     /// <summary>A device's shortcut was pressed: mirror it, or bring its mirror to the front.</summary>
     public async Task MirrorByIdAsync(string id)
     {
         var r = _rows.FirstOrDefault(x => x.GroupId == id);
-        if (r == null) { SetStatus($"{_s.KnownFor(id)?.Name ?? id} isn't on the network.", StatusKind.Warn); return; }
+        if (r == null) { SetStatus(Loc.F("{0} isn't on the network.", _s.KnownFor(id)?.Name ?? id), StatusKind.Warn); return; }
         if (r.State == DeviceState.Mirroring && _s.Mirrors?.Sessions.FirstOrDefault(x => x.Serial == r.Serial && x.Kind == SessionKind.Mirror) is { } session)
         {
             BringToFront?.Invoke(session);
             return;
         }
-        if (!r.CanMirror) { SetStatus($"{r.Name} can't be mirrored right now.", StatusKind.Warn); return; }
+        if (!r.CanMirror) { SetStatus(Loc.F("{0} can't be mirrored right now.", r.Name), StatusKind.Warn); return; }
         await MirrorRowsAsync([r]);
     }
 
@@ -790,7 +817,7 @@ public sealed partial class MainViewModel : ObservableObject
         if (rows.Count == 0) return;
         _s.Groups.Assign(rows.Select(r => r.GroupId), group);
         var who = rows.Count == 1 ? rows[0].Name : $"{rows.Count} devices";
-        SetStatus(group == null ? $"Took {who} out of {(rows.Count == 1 ? "its group" : "their groups")}." : $"Moved {who} to {group.Name}.", StatusKind.Ok);
+        SetStatus(group == null ? Loc.F(rows.Count == 1 ? "Took {0} out of its group." : "Took {0} out of their groups.", who) : Loc.F("Moved {0} to {1}.", who, group.Name), StatusKind.Ok);
     }
 
     /// <summary>Creates a group, with the selected devices in it.</summary>
@@ -799,14 +826,14 @@ public sealed partial class MainViewModel : ObservableObject
     {
         if (PromptAsync == null) return;
         var rows = SelectedRows;
-        var name = await PromptAsync("New group",
-            rows.Count > 0 ? $"A name for the group. The {Plural(rows.Count, "selected device")} go into it." : "A name for the group, e.g. Test lab or Family tablets.",
+        var name = await PromptAsync(Loc.T("New group"),
+            rows.Count > 0 ? Loc.F("A name for the group. The {0} go into it.", Loc.Count(rows.Count, "{0} selected device", "{0} selected devices")) : Loc.T("A name for the group, e.g. Test lab or Family tablets."),
             "");
         if (GroupStore.Clean(name) is not { } clean) return;
         var existed = _s.Groups.Find(clean) != null;
         var group = _s.Groups.Create(clean);
         if (rows.Count > 0) _s.Groups.Assign(rows.Select(r => r.GroupId), group);
-        SetStatus(existed ? $"Moved the selected devices to {group.Name}." : $"Created the group {group.Name}.", StatusKind.Ok);
+        SetStatus(existed ? Loc.F("Moved the selected devices to {0}.", group.Name) : Loc.F("Created the group {0}.", group.Name), StatusKind.Ok);
     }
 
     [RelayCommand]
@@ -840,7 +867,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         var rows = Members(h).Select(m => m.Row).Where(r => r.CanMirror && r.State != DeviceState.Mirroring)
             .OrderBy(r => r.Name, NaturalComparer.Instance).ToList();
-        if (rows.Count == 0) { SetStatus($"Nothing in {h.Name} to mirror right now.", StatusKind.Warn); return Task.CompletedTask; }
+        if (rows.Count == 0) { SetStatus(Loc.F("Nothing in {0} to mirror right now.", h.Name), StatusKind.Warn); return Task.CompletedTask; }
         return MirrorRowsAsync(rows);
     }
 
@@ -850,20 +877,20 @@ public sealed partial class MainViewModel : ObservableObject
     public async Task RenameGroupAsync(GroupHeaderViewModel h)
     {
         if (h.Group is not { } g || PromptAsync == null) return;
-        var name = await PromptAsync("Rename group", "A new name for the group.", g.Name);
+        var name = await PromptAsync(Loc.T("Rename group"), Loc.T("A new name for the group."), g.Name);
         if (name == null || GroupStore.Clean(name) == g.Name) return;
         if (!_s.Groups.Rename(g, name))
-            SetStatus(GroupStore.Clean(name) == null ? "A group needs a name." : $"There's already a group called {GroupStore.Clean(name)}.", StatusKind.Warn);
+            SetStatus(GroupStore.Clean(name) == null ? Loc.T("A group needs a name.") : Loc.F("There's already a group called {0}.", GroupStore.Clean(name)), StatusKind.Warn);
     }
 
     public async Task DeleteGroupAsync(GroupHeaderViewModel h)
     {
         if (h.Group is not { } g) return;
         if (g.Members.Count > 0 && ConfirmAsync != null
-            && !await ConfirmAsync("Delete group", $"Delete the group \"{g.Name}\"? Its {Plural(g.Members.Count, "device")} move to Other devices; nothing changes on the devices themselves."))
+            && !await ConfirmAsync(Loc.T("Delete group"), Loc.F("Delete the group \"{0}\"? Its {1} move to Other devices; nothing changes on the devices themselves.", g.Name, Loc.Count(g.Members.Count, "{0} device", "{0} devices"))))
             return;
         _s.Groups.Delete(g);
-        SetStatus($"Deleted the group {g.Name}.");
+        SetStatus(Loc.F("Deleted the group {0}.", g.Name));
     }
 
     public void MoveGroup(GroupHeaderViewModel h, int delta)
@@ -901,4 +928,10 @@ public sealed class NaturalComparer : IComparer<string>
         }
         return (a.Length - i).CompareTo(b.Length - j);
     }
+}
+
+/// <summary>A maximum mirror size: the stored value and what the list shows.</summary>
+public sealed record SizeChoice(string Value, string Label)
+{
+    public override string ToString() => Label;
 }

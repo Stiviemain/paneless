@@ -8,7 +8,7 @@
     <AssemblyName>Paneless</AssemblyName>
     <RootNamespace>Paneless.App</RootNamespace>
     <!-- The single version number: the window title, the installer and updates all read it. -->
-    <Version>1.0.0-beta.1</Version>
+    <Version>1.0.0-beta.2</Version>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Product>Paneless</Product>
     <Authors>Stiviemain</Authors>
@@ -25,6 +25,12 @@
     <!-- One copy of the artwork: tools/make-icon.ps1 writes these at the repo root. -->
     <AvaloniaResource Include="..\..\Paneless.ico" Link="Assets\Paneless.ico" />
     <AvaloniaResource Include="..\..\Paneless.png" Link="Assets\Paneless.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- German and French texts (English is built in). -->
+    <EmbeddedResource Include="Localization/de.json" LogicalName="Paneless.App.Localization.de.json" />
+    <EmbeddedResource Include="Localization/fr.json" LogicalName="Paneless.App.Localization.fr.json" />
   </ItemGroup>
 
   <ItemGroup>

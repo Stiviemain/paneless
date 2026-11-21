@@ -33,6 +33,10 @@ jobs:
           New-Item -ItemType Directory dist | Out-Null
           Copy-Item releases/PanelessApp-win-Setup.exe "dist/Paneless-$version-Setup.exe"
           Copy-Item releases/PanelessApp-win-Portable.zip "dist/Paneless-$version-Portable.zip"
+          # Files for automatic updates (Paneless reads them from the newest release); keep their names.
+          Copy-Item releases/releases.win.json dist/
+          Copy-Item "releases/PanelessApp-$version-full.nupkg" dist/
+          if (Test-Path releases/RELEASES) { Copy-Item releases/RELEASES dist/ }
           Get-ChildItem dist | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name } |
             Set-Content dist/SHA256SUMS.txt -Encoding ascii
           # Release notes: this version's section of CHANGELOG.md

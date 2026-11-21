@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="using:Paneless.App.Localization"
         x:Class="Paneless.App.Views.ConfirmWindow"
         Title="Paneless" Icon="/Assets/Paneless.ico"
         Width="460" SizeToContent="Height" CanResize="False"
@@ -9,8 +10,8 @@
     <TextBlock x:Name="MessageText" TextWrapping="Wrap" />
     <TextBlock x:Name="WarningText" TextWrapping="Wrap" Foreground="{StaticResource AmberBrush}" />
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,6,0,0">
-      <Button x:Name="NoButton" Content="Cancel" IsCancel="True" />
-      <Button x:Name="YesButton" Classes="accent" Content="Go ahead" MinWidth="100" IsDefault="True" FontWeight="SemiBold" />
+      <Button x:Name="NoButton" Content="{l:T 'Cancel'}" IsCancel="True" />
+      <Button x:Name="YesButton" Classes="accent" Content="{l:T 'Go ahead'}" MinWidth="100" IsDefault="True" FontWeight="SemiBold" />
     </StackPanel>
   </StackPanel>
 </Window>

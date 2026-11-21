@@ -1,3 +1,4 @@
+using Paneless.App.Localization;
 using System.Collections.ObjectModel;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -35,10 +36,10 @@ public sealed partial class AppsViewModel : ObservableObject
     public Func<string, string, Task<bool>>? ConfirmAsync { get; set; }
     public Func<Task<IReadOnlyList<string>>>? PickApksAsync { get; set; }
 
-    public string Title => $"Apps on {_row.Name}";
+    public string Title => Loc.F("Apps on {0}", _row.Name);
     public string? GroupName { get; }
     public bool InGroup => GroupName != null;
-    public string AlsoOnGroupText => $"Also install on the other devices in {GroupName}";
+    public string AlsoOnGroupText => Loc.F("Also install on the other devices in {0}", GroupName);
     public ObservableCollection<AppItem> Apps { get; } = new();
 
     [ObservableProperty] public partial string Filter { get; set; } = "";
@@ -53,7 +54,7 @@ public sealed partial class AppsViewModel : ObservableObject
                                 nameof(ToggleEnabledCommand), nameof(UninstallCommand))]
     public partial AppItem? Selected { get; set; }
 
-    public string ToggleLabel => Selected?.Disabled == true ? "Enable" : "Disable";
+    public string ToggleLabel => Selected?.Disabled == true ? Loc.T("Enable") : Loc.T("Disable");
     partial void OnSelectedChanged(AppItem? value) => OnPropertyChanged(nameof(ToggleLabel));
     partial void OnFilterChanged(string value) => Show();
     partial void OnShowSystemChanged(bool value) => _ = LoadAsync();
@@ -63,7 +64,7 @@ public sealed partial class AppsViewModel : ObservableObject
     public async Task LoadAsync()
     {
         IsLoading = true;
-        Say("Loading the app list…");
+        Say(Loc.T("Loading the app list…"));
         try
         {
             if (_s.Demo)
@@ -74,13 +75,13 @@ public sealed partial class AppsViewModel : ObservableObject
             else
             {
                 _serial ??= await _s.Directory!.ConnectAsync(_row);
-                if (_serial == null) { Say($"Couldn't connect to {_row.Name}.", StatusKind.Error); return; }
+                if (_serial == null) { Say(Loc.F("Couldn't connect to {0}.", _row.Name), StatusKind.Error); return; }
                 _all = (await _s.Adb!.GetPackagesAsync(_serial, ShowSystem)).Select(p => new AppItem(p)).ToList();
             }
             Show();
-            Say($"{_all.Count} {(ShowSystem ? "apps including system apps" : "apps you installed")}. Double-click to open one.");
+            Say(Loc.F(ShowSystem ? "{0} apps including system apps. Double-click to open one." : "{0} apps you installed. Double-click to open one.", _all.Count));
         }
-        catch (Exception ex) { Say("Couldn't read the app list: " + ex.Message, StatusKind.Error); }
+        catch (Exception ex) { Say(Loc.T("Couldn't read the app list: ") + ex.Message, StatusKind.Error); }
         finally { IsLoading = false; }
     }
 
@@ -97,11 +98,11 @@ public sealed partial class AppsViewModel : ObservableObject
 
     async Task<bool> Shell(string command, string done)
     {
-        if (_s.Demo) { Say($"Demo mode: {done}", StatusKind.Ok); return true; }
+        if (_s.Demo) { Say(Loc.F("Demo mode: {0}", done), StatusKind.Ok); return true; }
         if (_serial == null) return false;
         var r = await _s.Adb!.ShellAsync(_serial, command, TimeSpan.FromSeconds(30));
         var failed = !r.Ok || r.Output.Contains("Failure", StringComparison.OrdinalIgnoreCase) || r.Output.Contains("Exception");
-        Say(failed ? $"Didn't work: {r.LastLine}" : done, failed ? StatusKind.Error : StatusKind.Ok);
+        Say(failed ? Loc.F("Didn't work: {0}", r.LastLine) : done, failed ? StatusKind.Error : StatusKind.Ok);
         return !failed;
     }
 
@@ -111,7 +112,7 @@ public sealed partial class AppsViewModel : ObservableObject
     async Task Open()
     {
         var p = Selected!.Package;
-        if (_s.Demo) { Say($"Demo mode: would open {p}.", StatusKind.Ok); return; }
+        if (_s.Demo) { Say(Loc.F("Demo mode: would open {0}.", p), StatusKind.Ok); return; }
         if (_serial == null) return;
         var r = await _s.Adb!.LaunchAsync(_serial, p);
         Say(r.Output.Contains("No activities found") ? $"{p} has no screen to open." : $"Opened {p} on {_row.Name}.",
@@ -122,18 +123,18 @@ public sealed partial class AppsViewModel : ObservableObject
     async Task OpenInWindow()
     {
         await _main.OpenAppWindowAsync(_row, Selected!.Package);
-        Say($"Opening {Selected!.Package} in a window of its own (a separate screen of the device, so its own screen stays as it is).", StatusKind.Ok);
+        Say(Loc.F("Opening {0} in a window of its own (a separate screen of the device, so its own screen stays as it is).", Selected!.Package), StatusKind.Ok);
     }
 
     [RelayCommand(CanExecute = nameof(HasSelected))]
-    Task ForceStop() => Shell($"am force-stop {Q(Selected!.Package)}", $"Stopped {Selected!.Package}.");
+    Task ForceStop() => Shell($"am force-stop {Q(Selected!.Package)}", Loc.F("Stopped {0}.", Selected!.Package));
 
     [RelayCommand(CanExecute = nameof(HasSelected))]
     async Task ClearData()
     {
         var p = Selected!.Package;
-        if (ConfirmAsync != null && !await ConfirmAsync("Clear app data", $"Delete all data of {p} on {_row.Name} (logins, settings, downloads in the app)? This can't be undone.")) return;
-        await Shell($"pm clear {Q(p)}", $"Cleared the data of {p}.");
+        if (ConfirmAsync != null && !await ConfirmAsync(Loc.T("Clear app data"), Loc.F("Delete all data of {0} on {1} (logins, settings, downloads in the app)? This can't be undone.", p, _row.Name))) return;
+        await Shell($"pm clear {Q(p)}", Loc.F("Cleared the data of {0}.", p));
     }
 
     [RelayCommand(CanExecute = nameof(HasSelected))]
@@ -141,8 +142,8 @@ public sealed partial class AppsViewModel : ObservableObject
     {
         var a = Selected!;
         var enable = a.Disabled;
-        if (!enable && ConfirmAsync != null && !await ConfirmAsync("Disable app", $"Disable {a.Package}? It disappears from the launcher and doesn't run until you enable it again here.")) return;
-        if (await Shell(enable ? $"pm enable {Q(a.Package)}" : $"pm disable-user --user 0 {Q(a.Package)}", enable ? $"Enabled {a.Package}." : $"Disabled {a.Package}."))
+        if (!enable && ConfirmAsync != null && !await ConfirmAsync(Loc.T("Disable app"), Loc.F("Disable {0}? It disappears from the launcher and doesn't run until you enable it again here.", a.Package))) return;
+        if (await Shell(enable ? $"pm enable {Q(a.Package)}" : $"pm disable-user --user 0 {Q(a.Package)}", enable ? Loc.F("Enabled {0}.", a.Package) : Loc.F("Disabled {0}.", a.Package)))
         {
             a.Disabled = !enable;
             OnPropertyChanged(nameof(ToggleLabel));
@@ -155,10 +156,10 @@ public sealed partial class AppsViewModel : ObservableObject
         var a = Selected!;
         var system = ShowSystem;
         var text = system
-            ? $"Remove {a.Package} for your user on {_row.Name}? System apps stay on the device and can be brought back with the built-in script \"Restore a removed system app\"."
-            : $"Uninstall {a.Package} from {_row.Name}? Its data is deleted.";
-        if (ConfirmAsync != null && !await ConfirmAsync("Uninstall", text)) return;
-        if (await Shell($"pm uninstall --user 0 {Q(a.Package)}", $"Uninstalled {a.Package}."))
+            ? Loc.F("Remove {0} for your user on {1}? System apps stay on the device and can be brought back with the built-in script \"Restore a removed system app\".", a.Package, _row.Name)
+            : Loc.F("Uninstall {0} from {1}? Its data is deleted.", a.Package, _row.Name);
+        if (ConfirmAsync != null && !await ConfirmAsync(Loc.T("Uninstall"), text)) return;
+        if (await Shell($"pm uninstall --user 0 {Q(a.Package)}", Loc.F("Uninstalled {0}.", a.Package)))
         {
             _all.Remove(a);
             Apps.Remove(a);
@@ -174,9 +175,9 @@ public sealed partial class AppsViewModel : ObservableObject
         var targets = new List<DeviceRow> { _row };
         if (AlsoOnGroup && _s.Groups.GroupOf(_row.GroupId) is { } g)
             targets.AddRange(_main.NetworkRows.Where(r => r.Key != _row.Key && g.Members.Contains(r.GroupId)));
-        Say($"Installing on {targets.Count} device{(targets.Count == 1 ? "" : "s")}…");
+        Say(Loc.F("Installing on {0}…", Loc.Count(targets.Count, "{0} device", "{0} devices")));
         await _main.SendFilesAsync(files, targets);
-        Say($"Done. See the main window's status line for the result.", StatusKind.Ok);
+        Say(Loc.T("Done. See the main window's status line for the result."), StatusKind.Ok);
         await LoadAsync();
     }
 
