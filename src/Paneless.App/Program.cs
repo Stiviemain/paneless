@@ -12,7 +12,7 @@ internal static class Program
         VelopackApp.Build().Run();
 
         // Started by Claude Desktop / Claude Code: forward its messages to the running Paneless, no window.
-        if (args.Contains("--mcp")) return Claude.McpBridge.Run();
+        if (args.Contains("--mcp")) return Assistants.McpBridge.Run();
 
         return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }

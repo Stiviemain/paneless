@@ -3,7 +3,7 @@
 using Paneless.Core;
 
 // --groups and --scripts-parse need no device and no scrcpy (they also run in CI).
-var offline = args.Contains("--groups") || args.Contains("--scripts-parse") || args.Contains("--automation") || args.Contains("--translations");
+var offline = args.Contains("--groups") || args.Contains("--scripts-parse") || args.Contains("--automation") || args.Contains("--translations") || args.Contains("--assistants");
 var tools = ToolLocator.Find() ?? (offline ? new ToolPaths("adb", "scrcpy") : null);
 if (tools == null) { Console.WriteLine("scrcpy/adb not found"); return 1; }
 Console.WriteLine($"adb:    {tools.Adb}\nscrcpy: {tools.Scrcpy}\ndata:   {AppPaths.DataDir}");
@@ -326,6 +326,39 @@ if (args.Contains("--automation"))
     var csv = InventoryExport.Csv([(inv, "Test \"lab\"")]);
     Check(csv.Contains("\"Lab, 1\"") && csv.Contains("\"Test \"\"lab\"\"\"") && inv.StorageFreePercent is > 9.9 and < 10.1, "inventory CSV quotes commas and quotes");
     Check(InventoryExport.Html([(inv, "<b>")], "Report").Contains("&lt;b&gt;"), "inventory report escapes HTML");
+    return 0;
+}
+
+if (args.Contains("--assistants"))
+{
+    // Adding Paneless to AI apps' settings: text in, text out, no real settings touched.
+    void Check(bool ok, string what) => Console.WriteLine($"{(ok ? "ok  " : "FAIL")} {what}");
+    const string exe = @"C:\Users\x\AppData\Local\PanelessApp\current\Paneless.exe";
+    var json = McpConfig.WithJsonServer("""
+        {
+          // a comment
+          "theme": "dark",
+          "mcpServers": { "other": { "command": "other.exe" } },
+        }
+        """, exe);
+    var j = System.Text.Json.Nodes.JsonNode.Parse(json)!;
+    Check((string?)j["theme"] == "dark" && j["mcpServers"]?["other"] != null, "JSON settings: everything else is kept");
+    Check((string?)j["mcpServers"]?["paneless"]?["command"] == exe && (string?)j["mcpServers"]?["paneless"]?["args"]?[0] == "--mcp", "JSON settings: Paneless added with --mcp");
+    Check(McpConfig.WithJsonServer(json, exe) == json, "JSON settings: adding twice changes nothing");
+    Check(System.Text.Json.Nodes.JsonNode.Parse(McpConfig.WithJsonServer("", exe))?["mcpServers"]?["paneless"] != null, "JSON settings: a new file works");
+    var refused = false;
+    try { McpConfig.WithJsonServer("[1,2]", exe); } catch (FormatException) { refused = true; }
+    Check(refused, "JSON settings: a file that isn't an object is left alone");
+
+    var toml = McpConfig.WithCodexServer("model = \"gpt-5\"\n\n[mcp_servers.paneless]\ncommand = 'old.exe'\n\n[mcp_servers.paneless.env]\nX = \"1\"\n\n[mcp_servers.other]\ncommand = \"o\"\n", exe);
+    Check(toml.Contains("model = \"gpt-5\"") && toml.Contains("[mcp_servers.other]") && !toml.Contains("old.exe") && !toml.Contains("paneless.env"), "Codex TOML: old Paneless entry replaced, others kept");
+    Check(toml.Contains($"command = '{exe}'") && toml.Contains("args = [\"--mcp\"]") && toml.Split("[mcp_servers.paneless]").Length == 2, "Codex TOML: one entry, path needs no escaping");
+    Check(McpConfig.WithCodexServer(toml, exe) == toml, "Codex TOML: adding twice changes nothing");
+    Check(McpConfig.WithCodexServer("", @"C:\it's\Paneless.exe").Contains("command = \"C:\\\\it's\\\\Paneless.exe\""), "Codex TOML: a path with ' is escaped");
+
+    Check(McpConfig.Friendly("claude-ai", null) == "Claude" && McpConfig.Friendly("claude-code", null) == "Claude Code"
+          && McpConfig.Friendly("codex-mcp-client", null) == "Codex" && McpConfig.Friendly("gemini-cli-mcp-client", null) == "Gemini"
+          && McpConfig.Friendly("my-tool", "My Tool") == "My Tool" && McpConfig.Friendly(null, null).Length > 0, "assistants get readable names");
     return 0;
 }
 

@@ -143,10 +143,10 @@
               <TextBlock Classes="navlabel" Text="{l:T 'Inventory'}" />
             </StackPanel>
           </Button>
-          <Button Classes="nav" Classes.on="{Binding IsClaudePage}" Command="{Binding GoCommand}" CommandParameter="Claude">
+          <Button Classes="nav" Classes.on="{Binding IsAssistantsPage}" Command="{Binding GoCommand}" CommandParameter="Assistants" ToolTip.Tip="{l:T 'AI assistants: Claude, Codex, Gemini and other MCP apps'}">
             <StackPanel Spacing="3">
               <Path Classes="navicon" Data="M12 3 L13.6 9.2 L20 10.8 L13.6 12.4 L12 18.8 L10.4 12.4 L4 10.8 L10.4 9.2 Z M18.5 16 L19.2 18.3 L21.5 19 L19.2 19.7 L18.5 22 L17.8 19.7 L15.5 19 L17.8 18.3 Z" />
-              <TextBlock Classes="navlabel" Text="{l:T 'Claude'}" />
+              <TextBlock Classes="navlabel" Text="{l:T 'AI'}" />
             </StackPanel>
           </Button>
         </StackPanel>
@@ -410,7 +410,7 @@
     <Panel IsVisible="{Binding IsLogsPage}"><views:LogsPage x:Name="LogsPage" /></Panel>
     <Panel IsVisible="{Binding IsAutomationPage}"><views:AutomationPage x:Name="AutomationPage" /></Panel>
     <Panel IsVisible="{Binding IsInventoryPage}"><views:InventoryPage x:Name="InventoryPage" /></Panel>
-    <Panel IsVisible="{Binding IsClaudePage}"><views:ClaudePage x:Name="ClaudePage" /></Panel>
+    <Panel IsVisible="{Binding IsAssistantsPage}"><views:AssistantsPage x:Name="AssistantsPage" /></Panel>
     </Panel>
   </DockPanel>
   </Grid>

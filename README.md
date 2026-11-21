@@ -39,7 +39,7 @@
 - [Install](#install)
 - [First use](#first-use)
 - [Using Paneless](#using-paneless)
-- [Claude](#claude)
+- [AI assistants](#ai-assistants)
 - [Privacy and security](#privacy-and-security)
 - [Troubleshooting](#troubleshooting)
 - [Building from source](#building-from-source)
@@ -58,7 +58,7 @@
   - Apply settings.
 - **Control:** use your keyboard and mouse on a device, map keys for games, or do something once and have it happen on every device of a group.
 - **Automate:** set devices up with recipes, run tasks on a schedule, get alerts when a battery runs low or an app crashes, and run scripts every time a device connects (e.g. turn off Doze).
-- **Ask Claude:** let [Claude](https://claude.ai) answer questions about your devices or work on them for you, within the limits you set per device.
+- **Ask an AI assistant:** let Claude, Codex, Gemini CLI or another MCP app answer questions about your devices or work on them for you, within the limits you set per device.
 
 That makes it handy at home with a phone and a tablet, and just as useful with a shelf of test devices, kiosk tablets or a family's phones.
 
@@ -120,8 +120,8 @@ The interface is built with [Avalonia](https://avaloniaui.net/), a cross-platfor
 <p align="center"><img src="docs/images/automation.png" width="760" alt="Automation page with a provisioning recipe"></p>
 <p align="center"><img src="docs/images/inventory.png" width="760" alt="Inventory page"></p>
 
-**Claude**
-- Paneless can be a tool for Claude Desktop and Claude Code (an [MCP](https://modelcontextprotocol.io) server). Ask Claude about your devices, or let it install apps, run scripts or operate a screen. See [Claude](#claude).
+**AI assistants**
+- Paneless can be a tool for Claude, Codex, Gemini CLI and other AI apps that support [MCP](https://modelcontextprotocol.io). Ask about your devices, or let the assistant install apps, run scripts or operate a screen. See [AI assistants](#ai-assistants).
 
 **Around the app**
 - Notification-area icon, optional start with Windows.
@@ -184,19 +184,29 @@ From then on, the device appears whenever Wireless debugging is on and it's on t
 - `recipes.json`, `schedules.json`, `alerts.json`
 - `unlock-codes.json`, encrypted (see below)
 
-Screenshots and recordings go to `Documents\Paneless`. Logs, including what Claude did, are in `%TEMP%\paneless`.
+Screenshots and recordings go to `Documents\Paneless`. Logs, including what AI assistants did, are in `%TEMP%\paneless`.
 
-## Claude
+## AI assistants
 
-Paneless can work as a tool for [Claude Desktop](https://claude.ai/download) and [Claude Code](https://claude.com/claude-code). Claude can then answer questions like *"Which of my devices have less than 20 % battery?"* or do things like *"Install this APK on the Test lab group"*.
+Paneless can be a tool for AI assistants through [MCP](https://modelcontextprotocol.io), the open standard many AI apps use. Your assistant can then answer questions like *"Which of my devices have less than 20 % battery?"* or do things like *"Install this APK on the Test lab group"*.
 
-1. In Paneless, open the **Claude** page and switch on **Claude may use Paneless**.
-2. Connect Claude:
-   - **Claude Desktop:** click **Add to Claude Desktop**, then restart Claude Desktop.
-   - **Claude Code:** copy the command shown and run it once in a terminal.
-3. Decide what Claude may do, for all devices or per group and device:
+Works with:
 
-| Level | Claude may… |
+| App | How to connect |
+|---|---|
+| [Claude Desktop](https://claude.ai/download) | **Add to Claude Desktop**, then restart it |
+| [Claude Code](https://claude.com/claude-code) | run the command shown once in a terminal |
+| [Codex](https://developers.openai.com/codex) (CLI, editor extension, Codex in the ChatGPT desktop app) | **Add to Codex**, or run the command shown |
+| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | **Add to Gemini CLI**, then start a new session |
+| Other MCP apps (Cursor, VS Code, LM Studio, …) | copy the settings shown into the app's MCP settings |
+
+ChatGPT and Gemini in a web browser can't reach programs on your PC, so they can't use Paneless.
+
+1. In Paneless, open the **AI** page and switch on **AI assistants may use Paneless**.
+2. Pick your app under **Connect an assistant** and follow the step shown.
+3. Decide what assistants may do, for all devices or per group and device:
+
+| Level | Assistants may… |
 |---|---|
 | Nothing | not see the device at all |
 | Read | see status, battery, apps and the log |
@@ -204,17 +214,17 @@ Paneless can work as a tool for [Claude Desktop](https://claude.ai/download) and
 | Control | also tap, swipe, type and open apps |
 | Manage | also install and remove apps, copy files, run scripts, recipes and commands, restart |
 
-By default Claude may only **read**, and Paneless asks you before Claude changes anything (*Allow once*, *Allow for 15 minutes* or *Don't allow*). **Pause** refuses everything until you resume, and the page lists everything Claude did. Paneless never gives Claude unlock codes.
+By default assistants may only **read**, and Paneless asks you before one changes anything, naming the app that asks (*Allow once*, *Allow for 15 minutes* or *Don't allow*). **Pause** refuses everything until you resume, and the page lists what each assistant did. Paneless never gives an assistant your unlock codes.
 
-<p align="center"><img src="docs/images/claude.png" width="760" alt="Claude page"></p>
+<p align="center"><img src="docs/images/ai.png" width="760" alt="AI assistants page"></p>
 
-Paneless has to be running (it starts in the notification area by itself when Claude needs it). The connection stays on your PC: Claude's app talks to Paneless through a local pipe only your Windows account can open.
+Paneless has to be running (it starts in the notification area by itself when an assistant needs it). The connection stays on your PC: the AI app talks to Paneless through a local pipe only your Windows account can open.
 
 ## Privacy and security
 
 - **Local only.** Paneless talks to your devices over your own network with adb and scrcpy. It sends nothing anywhere else, with two exceptions:
   - Update checks ask GitHub for the newest release (switch off in **Settings › Updates**).
-  - If you connect Claude, what Claude reads through Paneless (device facts, logs, screenshots) becomes part of your Claude conversation. Only the devices and levels you allow are visible to it.
+  - If you connect an AI assistant, what it reads through Paneless (device facts, logs, screenshots) becomes part of your conversation with that AI service. Only the devices and levels you allow are visible to it.
 - **Unlock codes** are encrypted with Windows DPAPI, the protection Credential Manager and browsers use. Only your Windows account on this PC can read them (on macOS the keychain, on Linux the Secret Service).
   - A code is typed only after Paneless confirms the device is locked and its lock screen is in front.
   - One failed try pauses auto-unlock for that device.

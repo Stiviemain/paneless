@@ -67,11 +67,11 @@ public sealed partial class MainViewModel : ObservableObject
     public bool IsLogsPage => Page == "Logs";
     public bool IsAutomationPage => Page == "Automation";
     public bool IsInventoryPage => Page == "Inventory";
-    public bool IsClaudePage => Page == "Claude";
+    public bool IsAssistantsPage => Page == "Assistants";
 
     partial void OnPageChanged(string value)
     {
-        foreach (var p in new[] { nameof(IsDevicesPage), nameof(IsWallPage), nameof(IsLogsPage), nameof(IsAutomationPage), nameof(IsInventoryPage), nameof(IsClaudePage) })
+        foreach (var p in new[] { nameof(IsDevicesPage), nameof(IsWallPage), nameof(IsLogsPage), nameof(IsAutomationPage), nameof(IsInventoryPage), nameof(IsAssistantsPage) })
             OnPropertyChanged(p);
     }
 

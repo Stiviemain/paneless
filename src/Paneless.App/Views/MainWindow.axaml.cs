@@ -3,7 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Platform.Storage;
-using Paneless.App.Claude;
+using Paneless.App.Assistants;
 using Paneless.App.Platform;
 using Paneless.App.ViewModels;
 using Paneless.Core;
@@ -203,16 +203,16 @@ public partial class MainWindow : Window
     public LogsViewModel? Logs { get; private set; }
     public InventoryViewModel? Inventory { get; private set; }
     public AutomationViewModel? Automation { get; private set; }
-    public ClaudeViewModel? Claude { get; private set; }
+    public AssistantsViewModel? Assistants { get; private set; }
     McpServer? _mcp;
 
     void SetUpPages(MainViewModel vm)
     {
         var s = _services!;
         var automation = new AutomationService(s, vm);
-        var tools = new ClaudeTools(s, vm)
+        var tools = new AssistantTools(s, vm)
         {
-            AskAsync = (title, message) => Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => ClaudeConfirmWindow.AskAsync(title, message)),
+            AskAsync = (title, message) => Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => AssistantConfirmWindow.AskAsync(title, message)),
         };
         _mcp = new McpServer(tools);
 
@@ -224,7 +224,7 @@ public partial class MainWindow : Window
         Automation.Recipes.ConfirmAsync = (t, m) => ConfirmWindow.AskAsync(this, t, m, null);
         Automation.Schedules.ConfirmAsync = (t, m) => ConfirmWindow.AskAsync(this, t, m, null, Localization.Loc.T("Delete"));
         AutomationPage.DataContext = Automation;
-        ClaudePage.DataContext = Claude = new ClaudeViewModel(s, vm, _mcp, tools)
+        AssistantsPage.DataContext = Assistants = new AssistantsViewModel(s, vm, _mcp, tools)
         {
             CopyAsync = async text => { if (Clipboard is { } cb) await Avalonia.Input.Platform.ClipboardExtensions.SetTextAsync(cb, text); },
             ConfirmAsync = (t, m) => ConfirmWindow.AskAsync(this, t, m, null, Localization.Loc.T("Add")),
@@ -247,8 +247,8 @@ public partial class MainWindow : Window
         Closed += (_, _) => { Wall?.SetActive(false); Logs?.Dispose(); _mcp?.Stop(); };
     }
 
-    /// <summary>Testing aid (demo mode): starts the Claude server even though demo mode normally keeps it off.</summary>
-    public void StartClaudeServerForTest() => _mcp?.Start();
+    /// <summary>Testing aid (demo mode): starts the AI server even though demo mode normally keeps it off.</summary>
+    public void StartAssistantServerForTest() => _mcp?.Start();
 
     async Task<string?> SaveAsAsync(string suggestedName, string ext)
     {

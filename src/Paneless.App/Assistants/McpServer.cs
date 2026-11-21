@@ -3,21 +3,26 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-namespace Paneless.App.Claude;
+namespace Paneless.App.Assistants;
 
-/// <summary>The part of Paneless Claude talks to: a Model Context Protocol (MCP) server on a local named pipe
-/// that only this Windows user can open. Claude Desktop / Claude Code reach it through "Paneless.exe --mcp"
+/// <summary>The part of Paneless AI assistants talk to: a Model Context Protocol (MCP) server on a local named pipe
+/// that only this Windows user can open. Claude, Codex, Gemini CLI and other MCP apps reach it through "Paneless.exe --mcp"
 /// (<see cref="McpBridge"/>), which forwards their stdio messages here. Messages are JSON-RPC, one per line.</summary>
-public sealed class McpServer(ClaudeTools tools) : IDisposable
+public sealed class McpServer(AssistantTools tools) : IDisposable
 {
     public static string PipeName => "paneless-mcp-" + Sanitize(Environment.UserName);
     const string ProtocolVersion = "2025-06-18";
 
     CancellationTokenSource? _cts;
-    int _clients;
+    readonly System.Collections.Concurrent.ConcurrentDictionary<Session, byte> _sessions = new();
+
+    /// <summary>One connected assistant; its name comes with "initialize".</summary>
+    sealed class Session { public string? Name; }
 
     public bool IsRunning => _cts != null;
-    public int Clients => _clients;
+    public int Clients => _sessions.Count;
+    /// <summary>The assistants connected now, by name (e.g. "Claude", "Codex").</summary>
+    public IReadOnlyList<string> ClientNames => _sessions.Keys.Select(x => x.Name ?? AssistantApps.Friendly(null, null)).Distinct().Order().ToList();
     /// <summary>Raised when a client connects or disconnects.</summary>
     public event Action? ClientsChanged;
 
@@ -53,7 +58,8 @@ public sealed class McpServer(ClaudeTools tools) : IDisposable
 
     async Task ServeAsync(NamedPipeServerStream pipe, CancellationToken ct)
     {
-        Interlocked.Increment(ref _clients);
+        var session = new Session();
+        _sessions[session] = 0;
         ClientsChanged?.Invoke();
         var writeGate = new SemaphoreSlim(1, 1);
         try
@@ -66,7 +72,7 @@ public sealed class McpServer(ClaudeTools tools) : IDisposable
                 // Requests run concurrently (a confirmation dialog mustn't block a "ping").
                 _ = Task.Run(async () =>
                 {
-                    var reply = await HandleAsync(line);
+                    var reply = await HandleAsync(line, session);
                     if (reply == null) return;
                     await writeGate.WaitAsync();
                     try { await writer.WriteLineAsync(reply.ToJsonString()); }
@@ -79,12 +85,12 @@ public sealed class McpServer(ClaudeTools tools) : IDisposable
         finally
         {
             try { pipe.Dispose(); } catch { }
-            Interlocked.Decrement(ref _clients);
+            _sessions.TryRemove(session, out _);
             ClientsChanged?.Invoke();
         }
     }
 
-    async Task<JsonObject?> HandleAsync(string line)
+    async Task<JsonObject?> HandleAsync(string line, Session session)
     {
         JsonNode? msg;
         try { msg = JsonNode.Parse(line); }
@@ -101,12 +107,15 @@ public sealed class McpServer(ClaudeTools tools) : IDisposable
             {
                 case "initialize":
                     var requested = req["params"]?["protocolVersion"]?.GetValue<string>();
+                    var client = req["params"]?["clientInfo"];
+                    session.Name = AssistantApps.Friendly(client?["name"]?.ToString(), client?["title"]?.ToString());
+                    ClientsChanged?.Invoke();
                     return Result(id, new JsonObject
                     {
                         ["protocolVersion"] = requested ?? ProtocolVersion,
                         ["capabilities"] = new JsonObject { ["tools"] = new JsonObject { ["listChanged"] = false } },
                         ["serverInfo"] = new JsonObject { ["name"] = "paneless", ["title"] = "Paneless", ["version"] = AppServices.Version },
-                        ["instructions"] = ClaudeTools.Instructions,
+                        ["instructions"] = AssistantTools.Instructions,
                     });
                 case "ping":
                     return Result(id, new JsonObject());
@@ -115,7 +124,7 @@ public sealed class McpServer(ClaudeTools tools) : IDisposable
                 case "tools/call":
                     var name = req["params"]?["name"]?.GetValue<string>() ?? "";
                     var args = req["params"]?["arguments"] as JsonObject ?? new JsonObject();
-                    var result = await tools.CallAsync(name, args);
+                    var result = await tools.CallAsync(name, args, session.Name ?? AssistantApps.Friendly(null, null));
                     return Result(id, result.ToJson());
                 default:
                     return Error(id, -32601, "Method not found: " + method);
@@ -133,7 +142,7 @@ public sealed class McpServer(ClaudeTools tools) : IDisposable
     public void Dispose() => Stop();
 }
 
-/// <summary>"Paneless.exe --mcp": started by Claude Desktop / Claude Code. Forwards their stdio messages to the running
+/// <summary>"Paneless.exe --mcp": started by an AI app (Claude, Codex, Gemini CLI …). Forwards its stdio messages to the running
 /// Paneless (starting it in the notification area if needed). Runs without any window.</summary>
 public static class McpBridge
 {
@@ -151,11 +160,11 @@ public static class McpBridge
                 try { await stdin.CopyToAsync(pipe); } catch { }
                 try { pipe.Close(); } catch { }
             });
-            var toClaude = Task.Run(async () =>
+            var toAssistant = Task.Run(async () =>
             {
                 try { await pipe.CopyToAsync(stdout); await stdout.FlushAsync(); } catch { }
             });
-            Task.WaitAny(toPaneless, toClaude);
+            Task.WaitAny(toPaneless, toAssistant);
         }
         return 0;
     }
@@ -181,7 +190,7 @@ public static class McpBridge
         return null;
     }
 
-    /// <summary>Paneless isn't reachable (Claude access is off): answer every request with an explanation.</summary>
+    /// <summary>Paneless isn't reachable (AI access is off): answer every request with an explanation.</summary>
     static int ServeUnavailable(Stream stdin, Stream stdout)
     {
         using var reader = new StreamReader(stdin);
@@ -194,7 +203,7 @@ public static class McpBridge
                 var err = new JsonObject
                 {
                     ["jsonrpc"] = "2.0", ["id"] = id.DeepClone(),
-                    ["error"] = new JsonObject { ["code"] = -32000, ["message"] = "Paneless isn't letting Claude in: open Paneless, go to the Claude page and turn on \"Let Claude use Paneless\"." },
+                    ["error"] = new JsonObject { ["code"] = -32000, ["message"] = "Paneless isn't letting AI assistants in: open Paneless, go to the AI page and turn on \"AI assistants may use Paneless\"." },
                 };
                 writer.WriteLine(err.ToJsonString());
             }

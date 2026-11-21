@@ -4,7 +4,7 @@ using Avalonia.Media.Imaging;
 using Paneless.App.ViewModels;
 using Paneless.Core;
 
-namespace Paneless.App.Claude;
+namespace Paneless.App.Assistants;
 
 /// <summary>What a tool call returns: text and/or an image.</summary>
 public sealed class ToolResult
@@ -26,21 +26,21 @@ public sealed class ToolResult
 
 public enum ConfirmChoice { Deny, Once, For15Minutes }
 
-/// <summary>One line in the Claude page's activity list.</summary>
-public sealed record ClaudeActivity(DateTime Time, string Tool, string Target, bool Ok, string Detail);
+/// <summary>One line in the AI page's activity list; <paramref name="Client"/> is the assistant that asked.</summary>
+public sealed record AssistantActivity(DateTime Time, string Client, string Tool, string Target, bool Ok, string Detail);
 
-/// <summary>The tools Claude can use, each needing a permission level on the device it touches.
+/// <summary>The tools AI assistants can use, each needing a permission level on the device it touches.
 /// Changes (Control and Manage) can ask in Paneless first.</summary>
-public sealed class ClaudeTools
+public sealed class AssistantTools
 {
     public const string Instructions =
         "Paneless manages the user's Android devices (phones, tablets, watches) over Wi-Fi with adb and scrcpy. " +
         "Start with list_devices. Devices are named by their name or id. Some actions need the user's approval in Paneless, " +
         "and each device has a permission level the user set (read, screen, control, manage): if a tool is refused, tell the user " +
-        "they can change it on the Claude page in Paneless. To operate a screen: take a screenshot, then tap or swipe using the " +
+        "they can change it on the AI page in Paneless. To operate a screen: take a screenshot, then tap or swipe using the " +
         "pixel coordinates of that screenshot. Never guess coordinates without a recent screenshot.";
 
-    sealed record Tool(string Name, string Description, ClaudeAccess Level, JsonObject Schema, Func<JsonObject, Task<ToolResult>> Run, bool Changes = false);
+    sealed record Tool(string Name, string Description, AssistantAccess Level, JsonObject Schema, Func<JsonObject, Task<ToolResult>> Run, bool Changes = false);
 
     readonly AppServices _s;
     readonly MainViewModel _main;
@@ -49,7 +49,7 @@ public sealed class ClaudeTools
     readonly ConcurrentDictionary<string, (double Sx, double Sy)> _shotScale = new();  // deviceId -> screenshot px to device px
     readonly ConcurrentDictionary<string, (DeviceControl Control, DateTime Used)> _controls = new();
 
-    public ClaudeTools(AppServices s, MainViewModel main)
+    public AssistantTools(AppServices s, MainViewModel main)
     {
         _s = s; _main = main;
         Register();
@@ -57,9 +57,9 @@ public sealed class ClaudeTools
 
     /// <summary>Set by the app: asks the user (title, message).</summary>
     public Func<string, string, Task<ConfirmChoice>>? AskAsync { get; set; }
-    /// <summary>The user paused Claude on the Claude page.</summary>
+    /// <summary>The user paused AI access on the AI page.</summary>
     public bool Paused { get; set; }
-    public event Action<ClaudeActivity>? Activity;
+    public event Action<AssistantActivity>? Activity;
 
     // ---------------------------------------------------------------- protocol glue
 
@@ -70,29 +70,33 @@ public sealed class ClaudeTools
         ["inputSchema"] = t.Schema.DeepClone(),
     }).ToArray());
 
-    public async Task<ToolResult> CallAsync(string name, JsonObject args)
+    /// <summary>The assistant whose call is running (for the confirmation and the activity list).</summary>
+    static readonly AsyncLocal<string> Client = new();
+
+    public async Task<ToolResult> CallAsync(string name, JsonObject args, string client)
     {
+        Client.Value = client;
         var tool = _tools.FirstOrDefault(t => t.Name == name);
         if (tool == null) return ToolResult.Text("Unknown tool: " + name, true);
-        if (Paused) return ToolResult.Text("The user paused Claude in Paneless. Ask them to resume it on the Claude page.", true);
+        if (Paused) return ToolResult.Text("The user paused AI access in Paneless. Ask them to resume it on the AI page.", true);
         ToolResult result;
         try { result = await tool.Run(args); }
         catch (RefusedException ex) { result = ToolResult.Text(ex.Message, true); }
         catch (Exception ex) { result = ToolResult.Text("Failed: " + ex.Message, true); }
         var target = args["device"]?.ToString() ?? args["group"]?.ToString() ?? "";
         var detail = result.Content.FirstOrDefault(c => (string?)c["type"] == "text")?["text"]?.ToString() ?? "(image)";
-        Log(new ClaudeActivity(DateTime.Now, name, target, !result.IsError, detail.Length > 160 ? detail[..160] + "…" : detail));
+        Log(new AssistantActivity(DateTime.Now, client, name, target, !result.IsError, detail.Length > 160 ? detail[..160] + "…" : detail));
         return result;
     }
 
-    void Log(ClaudeActivity a)
+    void Log(AssistantActivity a)
     {
         Activity?.Invoke(a);
         try
         {
             Directory.CreateDirectory(AppPaths.LogDir);
-            File.AppendAllText(Path.Combine(AppPaths.LogDir, "claude-activity.log"),
-                $"[{a.Time:yyyy-MM-dd HH:mm:ss}] {(a.Ok ? "ok " : "ERR")} {a.Tool} {a.Target}: {a.Detail.Replace('\n', ' ')}{Environment.NewLine}");
+            File.AppendAllText(Path.Combine(AppPaths.LogDir, "assistant-activity.log"),
+                $"[{a.Time:yyyy-MM-dd HH:mm:ss}] {(a.Ok ? "ok " : "ERR")} {a.Client}: {a.Tool} {a.Target}: {a.Detail.Replace('\n', ' ')}{Environment.NewLine}");
         }
         catch { }
     }
@@ -101,17 +105,17 @@ public sealed class ClaudeTools
 
     // ---------------------------------------------------------------- devices and permissions
 
-    ClaudeAccess AccessOf(string id) => _s.EffectiveFor(id).Claude;
+    AssistantAccess AccessOf(string id) => _s.EffectiveFor(id).Assistant;
 
     IReadOnlyList<DeviceRow> Visible() =>
-        _main.NetworkRows.Where(r => r.Sn != null && AccessOf(r.GroupId) != ClaudeAccess.Off).ToList();
+        _main.NetworkRows.Where(r => r.Sn != null && AccessOf(r.GroupId) != AssistantAccess.Off).ToList();
 
     DeviceRow FindDevice(JsonObject args)
     {
         var q = args["device"]?.ToString()?.Trim() ?? throw new RefusedException("Say which device (its name or id from list_devices).");
         var row = Visible().FirstOrDefault(r => r.GroupId == q || r.Serial == q || string.Equals(r.Name, q, StringComparison.OrdinalIgnoreCase))
                   ?? Visible().FirstOrDefault(r => r.Name.Contains(q, StringComparison.OrdinalIgnoreCase));
-        return row ?? throw new RefusedException($"No device \"{q}\" that Claude may use is on the network. Use list_devices.");
+        return row ?? throw new RefusedException($"No device \"{q}\" that you may use is on the network. Use list_devices.");
     }
 
     /// <summary>The devices of "device" or "group".</summary>
@@ -121,7 +125,7 @@ public sealed class ClaudeTools
         {
             var group = _s.Groups.Find(g) ?? throw new RefusedException($"No group \"{g}\". Use list_groups.");
             var rows = Visible().Where(r => group.Members.Contains(r.GroupId) && r.CanMirror).ToList();
-            return rows.Count > 0 ? rows : throw new RefusedException($"No device of \"{group.Name}\" that Claude may use is on the network.");
+            return rows.Count > 0 ? rows : throw new RefusedException($"No device of \"{group.Name}\" that you may use is on the network.");
         }
         return [FindDevice(args)];
     }
@@ -131,14 +135,15 @@ public sealed class ClaudeTools
     {
         foreach (var r in rows)
             if (AccessOf(r.GroupId) < tool.Level)
-                throw new RefusedException($"The user allows only \"{AccessOf(r.GroupId)}\" on {r.Name}; {tool.Name} needs \"{tool.Level}\". They can change it on the Claude page in Paneless.");
-        if (!tool.Changes || !_s.Data.Settings.ClaudeConfirm) return;
+                throw new RefusedException($"The user allows only \"{AccessOf(r.GroupId)}\" on {r.Name}; {tool.Name} needs \"{tool.Level}\". They can change it on the AI page in Paneless.");
+        if (!tool.Changes || !_s.Data.Settings.AssistantConfirm) return;
         var now = DateTime.Now;
         var missing = rows.Where(r => !(_grants.TryGetValue(r.GroupId + "|" + tool.Level, out var until) && until > now)).ToList();
         if (missing.Count == 0) return;
         if (AskAsync == null) throw new RefusedException("Paneless couldn't ask the user.");
         var names = string.Join(", ", rows.Select(r => r.Name));
-        var choice = await AskAsync(Localization.Loc.T("Claude wants to do something"), Localization.Loc.F("Claude wants to: {0}\nOn: {1}", what, names));
+        var who = Client.Value ?? AssistantApps.Friendly(null, null);
+        var choice = await AskAsync(Localization.Loc.F("{0} wants to do something", who), Localization.Loc.F("{0} wants to: {1}\nOn: {2}", who, what, names));
         if (choice == ConfirmChoice.Deny) throw new RefusedException("The user said no in Paneless.");
         if (choice == ConfirmChoice.For15Minutes)
             foreach (var r in rows) _grants[r.GroupId + "|" + tool.Level] = now.AddMinutes(15);
@@ -187,7 +192,7 @@ public sealed class ClaudeTools
     static ToolResult Results(IReadOnlyList<DeviceActions.DeviceResult> results) =>
         ToolResult.Json(new JsonArray(results.Select(r => (JsonNode)new JsonObject { ["device"] = r.Device, ["ok"] = r.Ok, ["output"] = r.Detail }).ToArray()));
 
-    void Add(string name, string description, ClaudeAccess level, JsonObject schema, Func<Tool, JsonObject, Task<ToolResult>> run, bool changes = false)
+    void Add(string name, string description, AssistantAccess level, JsonObject schema, Func<Tool, JsonObject, Task<ToolResult>> run, bool changes = false)
     {
         Tool? self = null;
         self = new Tool(name, description, level, schema, a => run(self!, a), changes);
@@ -198,21 +203,21 @@ public sealed class ClaudeTools
 
     void Register()
     {
-        Add("list_devices", "Lists the user's Android devices that Claude may see: name, id, model, status, battery, group, and what Claude may do on each.",
-            ClaudeAccess.Read, Schema(), (_, _) =>
+        Add("list_devices", "Lists the user's Android devices you may see: name, id, model, status, battery, group, and what you may do on each (allowed).",
+            AssistantAccess.Read, Schema(), (_, _) =>
             {
                 var arr = new JsonArray();
-                foreach (var r in _main.NetworkRows.Where(r => r.Sn != null && AccessOf(r.GroupId) != ClaudeAccess.Off).OrderBy(r => r.Name, NaturalComparer.Instance))
+                foreach (var r in _main.NetworkRows.Where(r => r.Sn != null && AccessOf(r.GroupId) != AssistantAccess.Off).OrderBy(r => r.Name, NaturalComparer.Instance))
                     arr.Add(new JsonObject
                     {
                         ["name"] = r.Name, ["id"] = r.GroupId, ["model"] = r.Model, ["type"] = r.Type,
                         ["status"] = r.State.ToString(), ["battery"] = r.Serial != null ? _main.BatteryOf(r.Serial)?.Text : null,
-                        ["group"] = _s.Groups.GroupOf(r.GroupId)?.Name, ["claude_may"] = AccessOf(r.GroupId).ToString(),
+                        ["group"] = _s.Groups.GroupOf(r.GroupId)?.Name, ["allowed"] = AccessOf(r.GroupId).ToString(),
                     });
                 return Task.FromResult(ToolResult.Json(arr));
             });
 
-        Add("list_groups", "Lists the device groups and their devices.", ClaudeAccess.Read, Schema(), (_, _) =>
+        Add("list_groups", "Lists the device groups and their devices.", AssistantAccess.Read, Schema(), (_, _) =>
             Task.FromResult(ToolResult.Json(new JsonArray(_s.Groups.Groups.Select(g => (JsonNode)new JsonObject
             {
                 ["name"] = g.Name,
@@ -220,7 +225,7 @@ public sealed class ClaudeTools
             }).ToArray()))));
 
         Add("device_info", "Facts about a device: manufacturer, model, Android version, security patch, battery (level, health, temperature), storage, RAM, screen size, IP address, uptime.",
-            ClaudeAccess.Read, Schema(DeviceArg), async (t, a) =>
+            AssistantAccess.Read, Schema(DeviceArg), async (t, a) =>
             {
                 var r = FindDevice(a);
                 await Allow(t, [r], Localization.Loc.T("read device facts"));
@@ -231,7 +236,7 @@ public sealed class ClaudeTools
             });
 
         Add("list_apps", "Lists the installed app packages of a device (only apps the user installed, unless include_system is true).",
-            ClaudeAccess.Read, Schema(DeviceArg, ("include_system", "boolean", "Also list system apps.", false)), async (t, a) =>
+            AssistantAccess.Read, Schema(DeviceArg, ("include_system", "boolean", "Also list system apps.", false)), async (t, a) =>
             {
                 var r = FindDevice(a);
                 await Allow(t, [r], Localization.Loc.T("list apps"));
@@ -241,7 +246,7 @@ public sealed class ClaudeTools
             });
 
         Add("read_log", "Reads the recent log (logcat) of a device. Optionally only lines containing a text, of a minimum level (V, D, I, W, E), or of one app package.",
-            ClaudeAccess.Read, Schema(DeviceArg, ("lines", "integer", "How many recent lines (default 200, max 2000).", false),
+            AssistantAccess.Read, Schema(DeviceArg, ("lines", "integer", "How many recent lines (default 200, max 2000).", false),
                 ("contains", "string", "Only lines containing this text.", false), ("min_level", "string", "V, D, I, W or E.", false),
                 ("package", "string", "Only lines of this app's process.", false), ("crashes_only", "boolean", "Only the crash buffer (app crashes).", false)), async (t, a) =>
             {
@@ -265,7 +270,7 @@ public sealed class ClaudeTools
             });
 
         Add("screenshot", "Takes a screenshot of a device's screen. Use its pixel coordinates for tap and swipe.",
-            ClaudeAccess.Screen, Schema(DeviceArg), async (t, a) =>
+            AssistantAccess.Screen, Schema(DeviceArg), async (t, a) =>
             {
                 var r = FindDevice(a);
                 await Allow(t, [r], Localization.Loc.T("see the screen"));
@@ -293,7 +298,7 @@ public sealed class ClaudeTools
             });
 
         Add("tap", "Taps the screen at x,y (pixel coordinates of the latest screenshot of this device).",
-            ClaudeAccess.Control, Schema(DeviceArg, ("x", "number", "X in screenshot pixels.", true), ("y", "number", "Y in screenshot pixels.", true)), async (t, a) =>
+            AssistantAccess.Control, Schema(DeviceArg, ("x", "number", "X in screenshot pixels.", true), ("y", "number", "Y in screenshot pixels.", true)), async (t, a) =>
             {
                 var r = FindDevice(a);
                 await Allow(t, [r], Localization.Loc.T("tap the screen"));
@@ -306,7 +311,7 @@ public sealed class ClaudeTools
             }, changes: true);
 
         Add("swipe", "Swipes from x1,y1 to x2,y2 (screenshot pixels), e.g. to scroll. duration_ms default 300.",
-            ClaudeAccess.Control, Schema(DeviceArg, ("x1", "number", "Start X.", true), ("y1", "number", "Start Y.", true), ("x2", "number", "End X.", true),
+            AssistantAccess.Control, Schema(DeviceArg, ("x1", "number", "Start X.", true), ("y1", "number", "Start Y.", true), ("x2", "number", "End X.", true),
                 ("y2", "number", "End Y.", true), ("duration_ms", "integer", "How long the swipe takes.", false)), async (t, a) =>
             {
                 var r = FindDevice(a);
@@ -327,7 +332,7 @@ public sealed class ClaudeTools
             }, changes: true);
 
         Add("type_text", "Types text into the focused field of a device, like a keyboard.",
-            ClaudeAccess.Control, Schema(DeviceArg, ("text", "string", "The text to type.", true)), async (t, a) =>
+            AssistantAccess.Control, Schema(DeviceArg, ("text", "string", "The text to type.", true)), async (t, a) =>
             {
                 var r = FindDevice(a);
                 var text = Str(a, "text");
@@ -337,7 +342,7 @@ public sealed class ClaudeTools
             }, changes: true);
 
         Add("press_key", "Presses a button: back, home, recents, enter, delete, tab, escape, up, down, left, right, volume_up, volume_down, power.",
-            ClaudeAccess.Control, Schema(DeviceArg, ("key", "string", "The button.", true)), async (t, a) =>
+            AssistantAccess.Control, Schema(DeviceArg, ("key", "string", "The button.", true)), async (t, a) =>
             {
                 var r = FindDevice(a);
                 var key = Str(a, "key").ToLowerInvariant();
@@ -353,7 +358,7 @@ public sealed class ClaudeTools
             }, changes: true);
 
         Add("open_app", "Opens an app on a device by its package name (see list_apps).",
-            ClaudeAccess.Control, Schema(DeviceArg, ("package", "string", "e.g. com.android.settings", true)), async (t, a) =>
+            AssistantAccess.Control, Schema(DeviceArg, ("package", "string", "e.g. com.android.settings", true)), async (t, a) =>
             {
                 var r = FindDevice(a);
                 var pkg = Str(a, "package");
@@ -363,7 +368,7 @@ public sealed class ClaudeTools
             }, changes: true);
 
         Add("mirror_device", "Opens the device's screen in a mirror window on the user's PC.",
-            ClaudeAccess.Control, Schema(DeviceArg), async (t, a) =>
+            AssistantAccess.Control, Schema(DeviceArg), async (t, a) =>
             {
                 var r = FindDevice(a);
                 await Allow(t, [r], Localization.Loc.T("open a mirror window"));
@@ -372,7 +377,7 @@ public sealed class ClaudeTools
             }, changes: true);
 
         Add("install_app", "Installs (or updates) an APK file from the user's PC on a device or a whole group.",
-            ClaudeAccess.Manage, Schema(DeviceOpt, GroupOpt, ("apk_path", "string", "Full path of the .apk file on the PC.", true)), async (t, a) =>
+            AssistantAccess.Manage, Schema(DeviceOpt, GroupOpt, ("apk_path", "string", "Full path of the .apk file on the PC.", true)), async (t, a) =>
             {
                 var path = Str(a, "apk_path");
                 if (!File.Exists(path)) return ToolResult.Text("That file doesn't exist on the PC.", true);
@@ -386,7 +391,7 @@ public sealed class ClaudeTools
             }, changes: true);
 
         Add("uninstall_app", "Uninstalls an app (by package name) from a device or a whole group.",
-            ClaudeAccess.Manage, Schema(DeviceOpt, GroupOpt, ("package", "string", "Package name.", true)), async (t, a) =>
+            AssistantAccess.Manage, Schema(DeviceOpt, GroupOpt, ("package", "string", "Package name.", true)), async (t, a) =>
             {
                 var pkg = Str(a, "package");
                 var rows = FindTargets(a);
@@ -395,7 +400,7 @@ public sealed class ClaudeTools
             }, changes: true);
 
         Add("copy_file", "Copies a file from the user's PC to a device or group (default folder: the device's drop folder, usually /sdcard/Download/).",
-            ClaudeAccess.Manage, Schema(DeviceOpt, GroupOpt, ("path", "string", "Full path of the file on the PC.", true), ("folder", "string", "Folder on the device.", false)), async (t, a) =>
+            AssistantAccess.Manage, Schema(DeviceOpt, GroupOpt, ("path", "string", "Full path of the file on the PC.", true), ("folder", "string", "Folder on the device.", false)), async (t, a) =>
             {
                 var path = Str(a, "path");
                 if (!File.Exists(path)) return ToolResult.Text("That file doesn't exist on the PC.", true);
@@ -409,7 +414,7 @@ public sealed class ClaudeTools
             }, changes: true);
 
         Add("run_command", "Runs a shell command on a device or group (like \"adb shell <command>\") and returns its output.",
-            ClaudeAccess.Manage, Schema(DeviceOpt, GroupOpt, ("command", "string", "The command, without \"adb shell\".", true)), async (t, a) =>
+            AssistantAccess.Manage, Schema(DeviceOpt, GroupOpt, ("command", "string", "The command, without \"adb shell\".", true)), async (t, a) =>
             {
                 var cmd = Str(a, "command");
                 var rows = FindTargets(a);
@@ -418,14 +423,14 @@ public sealed class ClaudeTools
             }, changes: true);
 
         Add("list_scripts", "Lists the saved scripts (the user's and the built-in ones) with their descriptions and fields.",
-            ClaudeAccess.Read, Schema(), (_, _) => Task.FromResult(ToolResult.Json(new JsonArray(_s.AllScripts().Select(sc => (JsonNode)new JsonObject
+            AssistantAccess.Read, Schema(), (_, _) => Task.FromResult(ToolResult.Json(new JsonArray(_s.AllScripts().Select(sc => (JsonNode)new JsonObject
             {
                 ["name"] = sc.Name, ["category"] = sc.Category, ["description"] = sc.Description,
                 ["fields"] = new JsonArray(ScriptText.Placeholders(sc.Commands).Select(p => (JsonNode)p.Name).ToArray()),
             }).ToArray()))));
 
         Add("run_script", "Runs a saved script (by name, see list_scripts) on a device or group. values: the script's fields.",
-            ClaudeAccess.Manage, Schema(DeviceOpt, GroupOpt, ("script", "string", "Script name.", true), ("values", "object", "Values for the script's fields.", false)), async (t, a) =>
+            AssistantAccess.Manage, Schema(DeviceOpt, GroupOpt, ("script", "string", "Script name.", true), ("values", "object", "Values for the script's fields.", false)), async (t, a) =>
             {
                 var name = Str(a, "script");
                 var script = _s.AllScripts().FirstOrDefault(sc => string.Equals(sc.Name, name, StringComparison.OrdinalIgnoreCase))
@@ -436,7 +441,7 @@ public sealed class ClaudeTools
                 return Results(await _main.Actions.RunScriptAsync(script, rows, values));
             }, changes: true);
 
-        Add("list_recipes", "Lists the provisioning recipes (sets of apps, files, scripts and commands).", ClaudeAccess.Read, Schema(), (_, _) =>
+        Add("list_recipes", "Lists the provisioning recipes (sets of apps, files, scripts and commands).", AssistantAccess.Read, Schema(), (_, _) =>
             Task.FromResult(ToolResult.Json(new JsonArray(_s.Recipes.All.Select(r => (JsonNode)new JsonObject
             {
                 ["name"] = r.Name, ["description"] = r.Description,
@@ -444,7 +449,7 @@ public sealed class ClaudeTools
             }).ToArray()))));
 
         Add("run_recipe", "Runs a provisioning recipe (by name) on a device or group.",
-            ClaudeAccess.Manage, Schema(DeviceOpt, GroupOpt, ("recipe", "string", "Recipe name.", true)), async (t, a) =>
+            AssistantAccess.Manage, Schema(DeviceOpt, GroupOpt, ("recipe", "string", "Recipe name.", true)), async (t, a) =>
             {
                 var recipe = _s.Recipes.Find(Str(a, "recipe")) ?? throw new RefusedException("No such recipe. Use list_recipes.");
                 var rows = FindTargets(a);
@@ -453,7 +458,7 @@ public sealed class ClaudeTools
             }, changes: true);
 
         Add("reboot", "Restarts a device or every device of a group.",
-            ClaudeAccess.Manage, Schema(DeviceOpt, GroupOpt), async (t, a) =>
+            AssistantAccess.Manage, Schema(DeviceOpt, GroupOpt), async (t, a) =>
             {
                 var rows = FindTargets(a);
                 await Allow(t, rows, Localization.Loc.T("restart the device"));

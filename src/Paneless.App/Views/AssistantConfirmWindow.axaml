@@ -1,7 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:l="using:Paneless.App.Localization"
-        x:Class="Paneless.App.Views.ClaudeConfirmWindow"
+        x:Class="Paneless.App.Views.AssistantConfirmWindow"
         Title="Paneless" Icon="/Assets/Paneless.ico"
         Width="480" SizeToContent="Height" CanResize="False" Topmost="True"
         WindowStartupLocation="CenterScreen">
@@ -11,7 +11,7 @@
       <TextBlock x:Name="TitleText" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
     </StackPanel>
     <TextBlock x:Name="MessageText" TextWrapping="Wrap" />
-    <TextBlock Classes="small" TextWrapping="Wrap" Text="{l:T 'You can change what Claude may do, or pause it, on the Claude page.'}" />
+    <TextBlock Classes="small" TextWrapping="Wrap" Text="{l:T 'You can change what AI assistants may do, or pause them, on the AI page.'}" />
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,6,0,0">
       <Button x:Name="DenyButton" Content="{l:T 'Don’t allow'}" IsCancel="True" />
       <Button x:Name="For15Button" Content="{l:T 'Allow for 15 minutes'}" />

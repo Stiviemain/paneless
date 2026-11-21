@@ -227,7 +227,7 @@ public partial class App : Application
     static async Task McpSelfTestAsync(MainWindow main, string path)
     {
         var log = new System.Text.StringBuilder();
-        main.StartClaudeServerForTest();
+        main.StartAssistantServerForTest();
         var psi = new System.Diagnostics.ProcessStartInfo(Environment.ProcessPath!, "--mcp")
         {
             UseShellExecute = false, RedirectStandardInput = true, RedirectStandardOutput = true, CreateNoWindow = true,

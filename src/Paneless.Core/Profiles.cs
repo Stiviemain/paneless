@@ -1,7 +1,7 @@
 namespace Paneless.Core;
 
 /// <summary>What Claude may do on a device, each level including the ones before it.</summary>
-public enum ClaudeAccess
+public enum AssistantAccess
 {
     /// <summary>Claude doesn't see the device.</summary>
     Off,
@@ -37,20 +37,20 @@ public sealed class DeviceProfile
     /// <summary>Scripts (by id) that run every time the device connects.</summary>
     public List<string> OnConnectScripts { get; set; } = new();
     /// <summary>What Claude may do on this device (null = the group's or the default in Settings).</summary>
-    public ClaudeAccess? Claude { get; set; }
+    public AssistantAccess? Assistant { get; set; }
     /// <summary>Global shortcut that mirrors this device, e.g. "Ctrl+Alt+P" (devices only, not groups).</summary>
     public string? Hotkey { get; set; }
 
     public bool IsEmpty =>
         ScreenOff == null && Audio == null && OnTop == null && KeepAwake == null && MaxSize == null && VideoCodec == null
         && BitrateMbps == null && MaxFps == null && AutoMirror == null && PushTarget == null && OnConnectScripts.Count == 0
-        && string.IsNullOrEmpty(Hotkey) && Claude == null;
+        && string.IsNullOrEmpty(Hotkey) && Assistant == null;
 }
 
 /// <summary>What actually applies to a device after combining device, group and global settings.</summary>
 public sealed record EffectiveProfile(
     bool ScreenOff, bool Audio, bool OnTop, bool KeepAwake, string MaxSize, string VideoCodec, int BitrateMbps, int MaxFps,
-    bool AutoMirror, string PushTarget, IReadOnlyList<string> OnConnectScripts, string? Hotkey, ClaudeAccess Claude)
+    bool AutoMirror, string PushTarget, IReadOnlyList<string> OnConnectScripts, string? Hotkey, AssistantAccess Assistant)
 {
     public int? MaxSizePixels => int.TryParse(MaxSize.Split(' ')[0], out var px) ? px : null;
 
@@ -79,7 +79,7 @@ public sealed record EffectiveProfile(
             PickS(p => p.PushTarget, global.PushTarget),
             scripts,
             device?.Hotkey is { Length: > 0 } h ? h : null,
-            device?.Claude ?? group?.Claude ?? global.ClaudeDefaultAccess);
+            device?.Assistant ?? group?.Assistant ?? global.AssistantDefaultAccess);
     }
 }
 

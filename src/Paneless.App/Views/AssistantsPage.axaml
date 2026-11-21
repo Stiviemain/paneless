@@ -2,8 +2,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Paneless.App.ViewModels"
              xmlns:l="using:Paneless.App.Localization"
-             x:Class="Paneless.App.Views.ClaudePage"
-             x:DataType="vm:ClaudeViewModel">
+             x:Class="Paneless.App.Views.AssistantsPage"
+             x:DataType="vm:AssistantsViewModel">
   <UserControl.Styles>
     <Style Selector="TextBox.code">
       <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, Menlo, monospace" />
@@ -15,12 +15,12 @@
   <DockPanel>
     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
       <StackPanel Spacing="3">
-        <TextBlock Classes="pagetitle" Text="{l:T 'Claude'}" />
-        <TextBlock Classes="pagehint" Text="{l:T 'Let Claude (Claude Desktop or Claude Code) look after your devices: answer questions about them, install apps, run scripts, or operate a screen. You decide what it may do on each device.'}" />
+        <TextBlock Classes="pagetitle" Text="{l:T 'AI assistants'}" />
+        <TextBlock Classes="pagehint" Text="{l:T 'Let an AI assistant such as Claude, Codex or Gemini look after your devices: answer questions about them, install apps, run scripts, or operate a screen. You decide what it may do on each device.'}" />
       </StackPanel>
       <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Bottom" Margin="16,0,0,0">
-        <ToggleSwitch IsChecked="{Binding Enabled}" OnContent="{l:T 'Claude may use Paneless'}" OffContent="{l:T 'Claude may use Paneless'}" />
-        <ToggleButton Content="{l:T 'Pause'}" IsChecked="{Binding Paused}" IsEnabled="{Binding Enabled}" ToolTip.Tip="{l:T 'Refuse everything Claude asks until you resume'}" />
+        <ToggleSwitch IsChecked="{Binding Enabled}" OnContent="{l:T 'AI assistants may use Paneless'}" OffContent="{l:T 'AI assistants may use Paneless'}" />
+        <ToggleButton Content="{l:T 'Pause'}" IsChecked="{Binding Paused}" IsEnabled="{Binding Enabled}" ToolTip.Tip="{l:T 'Refuse everything AI assistants ask until you resume'}" />
       </StackPanel>
     </Grid>
 
@@ -36,28 +36,26 @@
       <ScrollViewer HorizontalScrollBarVisibility="Disabled">
         <StackPanel Spacing="14" Margin="0,0,16,0">
           <StackPanel Spacing="6">
-            <TextBlock Classes="heading" Text="{l:T '1. Connect Claude'}" />
-            <TextBlock Classes="small" TextWrapping="Wrap" Text="{l:T 'Claude Desktop: add Paneless with one click, then restart Claude Desktop.'}" />
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <Button Classes="accent" Content="{l:T 'Add to Claude Desktop'}" Command="{Binding AddToDesktopCommand}" />
-              <Button Content="{l:T 'Copy settings'}" Command="{Binding CopyDesktopCommand}" />
-            </StackPanel>
-            <TextBlock Classes="small" TextWrapping="Wrap" Margin="0,6,0,0" Text="{l:T 'Claude Code: run this once in a terminal.'}" />
+            <TextBlock Classes="heading" Text="{l:T '1. Connect an assistant'}" />
+            <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Apps}" SelectedItem="{Binding App}" />
+            <TextBlock Classes="small" TextWrapping="Wrap" Text="{Binding App.Hint}" />
+            <Button Classes="accent" Content="{Binding App.AddLabel}" Command="{Binding AddCommand}" IsVisible="{Binding App.CanAdd}" />
             <Grid ColumnDefinitions="*,8,Auto">
-              <TextBox Classes="code" Text="{Binding CodeCommand, Mode=OneWay}" />
-              <Button Grid.Column="2" Content="{l:T 'Copy'}" Command="{Binding CopyCodeCommand}" VerticalAlignment="Top" />
+              <TextBox Classes="code" Text="{Binding Snippet, Mode=OneWay}" MaxHeight="150" />
+              <Button Grid.Column="2" Content="{l:T 'Copy'}" Command="{Binding CopyCommand}" VerticalAlignment="Top" />
             </Grid>
-            <TextBlock Classes="small" Foreground="{StaticResource AmberBrush}" Text="{Binding Message}" TextWrapping="Wrap" />
+            <TextBlock Classes="small" Foreground="{StaticResource AmberBrush}" Text="{Binding Message}" TextWrapping="Wrap" IsVisible="{Binding Message, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <TextBlock Classes="small" TextWrapping="Wrap" Text="{l:T 'ChatGPT and Gemini in a web browser can’t reach programs on your PC, so they can’t use Paneless.'}" />
           </StackPanel>
 
           <StackPanel Spacing="6">
-            <TextBlock Classes="heading" Text="{l:T '2. Decide what Claude may do'}" />
+            <TextBlock Classes="heading" Text="{l:T '2. Decide what assistants may do'}" />
             <Grid ColumnDefinitions="Auto,*">
               <TextBlock Classes="small" Text="{l:T 'On every device'}" VerticalAlignment="Center" Margin="0,0,10,0" />
               <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding DefaultChoices}" SelectedItem="{Binding DefaultAccess}" />
             </Grid>
             <CheckBox IsChecked="{Binding Confirm}">
-              <TextBlock TextWrapping="Wrap" Text="{l:T 'Ask me in Paneless before Claude changes anything (taps, typing, installs, commands)'}" />
+              <TextBlock TextWrapping="Wrap" Text="{l:T 'Ask me in Paneless before an assistant changes anything (taps, typing, installs, commands)'}" />
             </CheckBox>
 
             <TextBlock Classes="small" Text="{l:T 'Groups'}" Margin="0,6,0,0" IsVisible="{Binding !!GroupRows.Count}" />
@@ -96,14 +94,14 @@
       <!-- right: try it and what happened -->
       <DockPanel Grid.Column="2">
         <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,12">
-          <TextBlock Classes="heading" Text="{l:T '3. Ask Claude'}" />
+          <TextBlock Classes="heading" Text="{l:T '3. Ask your assistant'}" />
           <TextBlock Classes="small" Text="{l:T 'For example:'}" />
           <Border Classes="card" Padding="12,8">
             <TextBlock Text="{Binding ExamplePrompts}" TextWrapping="Wrap" FontStyle="Italic" LineHeight="22" />
           </Border>
         </StackPanel>
         <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,6">
-          <TextBlock Classes="heading" Text="{l:T 'What Claude did'}" />
+          <TextBlock Classes="heading" Text="{l:T 'What assistants did'}" />
           <Button Grid.Column="1" Classes="flat" Content="{l:T 'Clear'}" Command="{Binding ClearActivityCommand}" />
         </Grid>
         <Border Classes="card" ClipToBounds="True">
@@ -115,6 +113,7 @@
                     <TextBlock Text="{Binding Mark}" Foreground="{Binding Brush}" />
                     <StackPanel Grid.Column="1">
                       <TextBlock>
+                        <Run Text="{Binding Client}" Foreground="#4f8cff" />
                         <Run Text="{Binding Tool}" FontWeight="SemiBold" />
                         <Run Text="{Binding Target}" Foreground="{StaticResource DimBrush}" />
                       </TextBlock>
