@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>Paneless</AssemblyName>
+    <RootNamespace>Paneless.App</RootNamespace>
+    <!-- The single version number: the window title, the installer and updates all read it. -->
+    <Version>1.0.0-beta.1</Version>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <Product>Paneless</Product>
+    <Authors>Stiviemain</Authors>
+    <Copyright>Copyright (c) 2026 Stiviemain. MIT License.</Copyright>
+    <RepositoryUrl>https://github.com/Stiviemain/paneless</RepositoryUrl>
+    <Description>Painless screen mirroring and device management for your Android devices</Description>
+    <ApplicationIcon>..\..\Paneless.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- One copy of the artwork: tools/make-icon.ps1 writes these at the repo root. -->
+    <AvaloniaResource Include="..\..\Paneless.ico" Link="Assets\Paneless.ico" />
+    <AvaloniaResource Include="..\..\Paneless.png" Link="Assets\Paneless.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Paneless.Core\Paneless.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.6" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.6" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.6" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.6" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Velopack" Version="1.2.161" />
+  </ItemGroup>
+
+</Project>

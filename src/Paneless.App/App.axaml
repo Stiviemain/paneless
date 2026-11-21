@@ -1,0 +1,67 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Paneless.App.App"
+             RequestedThemeVariant="Dark">
+
+  <Application.Resources>
+    <SolidColorBrush x:Key="BgBrush" Color="#17181c" />
+    <SolidColorBrush x:Key="PanelBrush" Color="#212228" />
+    <SolidColorBrush x:Key="HeaderBrush" Color="#1b1c21" />
+    <SolidColorBrush x:Key="LineBrush" Color="#33353d" />
+    <SolidColorBrush x:Key="SelBrush" Color="#263a5e" />
+    <SolidColorBrush x:Key="HoverBrush" Color="#272830" />
+    <SolidColorBrush x:Key="TextBrush" Color="#eceef2" />
+    <SolidColorBrush x:Key="DimBrush" Color="#9a9ca6" />
+    <SolidColorBrush x:Key="AmberBrush" Color="#e8b75a" />
+  </Application.Resources>
+
+  <Application.Styles>
+    <FluentTheme>
+      <FluentTheme.Palettes>
+        <ColorPaletteResources x:Key="Dark" Accent="#4f8cff" RegionColor="#17181c" AltHigh="#17181c" BaseHigh="#eceef2" />
+      </FluentTheme.Palettes>
+    </FluentTheme>
+
+    <Style Selector="Window">
+      <Setter Property="Background" Value="{StaticResource BgBrush}" />
+      <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+      <Setter Property="FontSize" Value="14" />
+    </Style>
+    <Style Selector="TextBlock.dim">
+      <Setter Property="Foreground" Value="{StaticResource DimBrush}" />
+    </Style>
+    <Style Selector="TextBlock.colhead">
+      <Setter Property="Foreground" Value="{StaticResource DimBrush}" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Margin" Value="12,0" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.cell">
+      <Setter Property="Margin" Value="12,0" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+      <Setter Property="Foreground" Value="{StaticResource DimBrush}" />
+    </Style>
+    <Style Selector="Button">
+      <Setter Property="Padding" Value="14,7" />
+      <Setter Property="CornerRadius" Value="6" />
+    </Style>
+
+    <!-- Device list rows: thin separators, dark selection instead of Fluent's accent fill. -->
+    <Style Selector="ListBox#DeviceList ListBoxItem">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="BorderBrush" Value="{StaticResource LineBrush}" />
+      <Setter Property="BorderThickness" Value="0,0,0,1" />
+    </Style>
+    <Style Selector="ListBox#DeviceList ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource HoverBrush}" />
+    </Style>
+    <Style Selector="ListBox#DeviceList ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource SelBrush}" />
+    </Style>
+    <Style Selector="ListBox#DeviceList ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource SelBrush}" />
+    </Style>
+  </Application.Styles>
+</Application>

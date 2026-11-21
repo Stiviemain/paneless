@@ -1,0 +1,71 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Paneless.App.ViewModels"
+        x:Class="Paneless.App.Views.AppsWindow"
+        x:DataType="vm:AppsViewModel"
+        Title="{Binding Title}" Icon="/Assets/Paneless.ico"
+        Width="820" Height="620" MinWidth="680" MinHeight="420"
+        WindowStartupLocation="CenterOwner">
+
+  <Window.Styles>
+    <Style Selector="ListBox#AppList ListBoxItem">
+      <Setter Property="Padding" Value="12,7" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
+    <Style Selector="ListBox#AppList ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource SelBrush}" />
+    </Style>
+  </Window.Styles>
+
+  <DockPanel Margin="20,18">
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,12">
+      <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
+      <CheckBox Grid.Column="1" Content="Show system apps" IsChecked="{Binding ShowSystem}" Margin="0,0,12,0" />
+      <Button Grid.Column="2" Content="Refresh" Command="{Binding ReloadCommand}" />
+    </Grid>
+
+    <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto" Margin="0,12,0,0">
+      <TextBlock Text="{Binding Message}" Foreground="{Binding MessageBrush}" TextWrapping="Wrap" VerticalAlignment="Center" />
+      <Button Grid.Column="1" x:Name="CloseButton" Content="Close" MinWidth="90" IsCancel="True" Margin="12,0,0,0" />
+    </Grid>
+
+    <Grid ColumnDefinitions="*,16,230">
+      <DockPanel>
+        <TextBox DockPanel.Dock="Top" Text="{Binding Filter}" PlaceholderText="Filter by package name, e.g. whatsapp" Margin="0,0,0,8" />
+        <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
+          <Panel>
+            <ListBox x:Name="AppList" ItemsSource="{Binding Apps}" SelectedItem="{Binding Selected}" Background="Transparent">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:AppItem">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Text="{Binding Package}" TextTrimming="CharacterEllipsis" FontFamily="Cascadia Mono, Consolas, Menlo, monospace" FontSize="13" />
+                    <TextBlock Grid.Column="1" Text="{Binding Note}" Foreground="{StaticResource AmberBrush}" FontSize="12" Margin="8,0,0,0" />
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+            <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsLoading}" VerticalAlignment="Top" />
+          </Panel>
+        </Border>
+      </DockPanel>
+
+      <StackPanel Grid.Column="2" Spacing="8">
+        <TextBlock Text="Selected app" Classes="dim" FontSize="12" />
+        <Button Classes="accent" HorizontalAlignment="Stretch" Content="Open" Command="{Binding OpenCommand}" ToolTip.Tip="Opens it on the device" />
+        <Button HorizontalAlignment="Stretch" Content="Open in its own window" Command="{Binding OpenInWindowCommand}"
+                ToolTip.Tip="Runs the app on a separate, resizable screen of the device and shows it in a window here. The device's own screen stays as it is." />
+        <Button HorizontalAlignment="Stretch" Content="Force stop" Command="{Binding ForceStopCommand}" />
+        <Button HorizontalAlignment="Stretch" Content="{Binding ToggleLabel}" Command="{Binding ToggleEnabledCommand}" />
+        <Button HorizontalAlignment="Stretch" Content="Clear data…" Command="{Binding ClearDataCommand}" />
+        <Button HorizontalAlignment="Stretch" Content="Uninstall…" Command="{Binding UninstallCommand}" />
+        <Border Height="1" Background="{StaticResource LineBrush}" Margin="0,8" />
+        <Button HorizontalAlignment="Stretch" Content="Install an APK…" Command="{Binding InstallCommand}" />
+        <CheckBox IsChecked="{Binding AlsoOnGroup}" IsVisible="{Binding InGroup}">
+          <TextBlock Text="{Binding AlsoOnGroupText}" TextWrapping="Wrap" />
+        </CheckBox>
+        <TextBlock Classes="dim" FontSize="12" TextWrapping="Wrap"
+                   Text="Tip: you can also drop APKs on a device or group in the main window." />
+      </StackPanel>
+    </Grid>
+  </DockPanel>
+</Window>
