@@ -11,7 +11,7 @@ body:
     id: version
     attributes:
       label: Paneless version
-      description: Shown in the window title, e.g. 1.0.0-beta.1
+      description: Shown in the window title, e.g. 1.0.0-beta.2
     validations:
       required: true
   - type: input
@@ -44,5 +44,5 @@ body:
     id: logs
     attributes:
       label: Logs
-      description: From %TEMP%\paneless (the mirror window's log, errors.log or on-connect.log).
+      description: From %TEMP%\paneless (the mirror window's log, errors.log, on-connect.log or assistant-activity.log).
       render: text

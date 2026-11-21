@@ -25,8 +25,8 @@ Open an issue with the **Feature request** form. Describe the situation you're i
 2. Fork, then create a branch from `main`.
 3. Keep changes focused. Follow the existing style (see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#style)).
 4. Check your change:
-   - `dotnet build` with no warnings;
-   - the smoke tests that need no device: `dotnet run --project tests/Paneless.Smoke -- --groups`;
+   - `dotnet build -c Release -warnaserror` with no warnings;
+   - the smoke tests that need no device: `--groups`, `--scripts-parse`, `--automation`, `--translations` and `--assistants` (`dotnet run --project tests/Paneless.Smoke -- --groups`);
    - for UI changes, a `--demo --snapshot` of the affected window;
    - if you have a device, the device tests that apply.
 5. Add a line to the top section of `CHANGELOG.md`.

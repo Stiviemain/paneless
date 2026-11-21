@@ -10,6 +10,13 @@ obj/
 known-devices.json
 settings.json
 unlock-codes.json
+groups.json
+profiles.json
+scripts.json
+keymaps.json
+recipes.json
+schedules.json
+alerts.json
 *.log
 
 # machine-specific shortcuts

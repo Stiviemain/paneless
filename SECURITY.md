@@ -20,5 +20,7 @@ Include what's affected, how to reproduce it, and what an attacker could do with
 - **Unlock codes** are encrypted for your Windows account with DPAPI (on macOS the keychain, on Linux the Secret Service). Anyone who can run programs as your Windows user can decrypt them, as with saved browser passwords.
 - A code is only typed after Paneless confirms the device is locked with its lock screen in front. One failed try pauses auto-unlock for that device.
 - **Wireless debugging** (adb) gives full control of a device to every computer it's paired with. This is Android's design, not Paneless's. Pair only computers you trust, and remove old pairings in *Developer options › Wireless debugging › Paired devices*.
-- Paneless sends nothing to the internet. The one exception is update checks against a source you set yourself.
-- Scripts run adb commands with the device permissions adb has. Built-in scripts that change a lot ask before running. Review scripts from others before you run them.
+- Paneless talks to your devices locally over your own network. The only network traffic outside your LAN is:
+  - automatic update checks against GitHub Releases (can be turned off in *Settings › Updates*);
+  - optional AI assistants connected through MCP: Paneless listens on a local named pipe restricted to your Windows account, only exposes devices and permission levels you allow (Read by default, confirmation on for changes), and never shares unlock codes. Data an assistant reads becomes part of your conversation with that AI service.
+- Scripts run adb commands with the device permissions adb has. Built-in scripts that change a lot ask before running. Imported scripts are previewed first and ask before running; review scripts from others before you run them.
