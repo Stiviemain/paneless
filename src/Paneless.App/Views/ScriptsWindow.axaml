@@ -172,7 +172,7 @@
       <Border Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="8">
         <Panel>
           <TextBlock Classes="dim" Margin="16" TextWrapping="Wrap" IsVisible="{Binding NoTargets}"
-                     Text="{l:T 'No devices on the network. Turn on Wireless debugging on a device, or connect one from the main window.'}" />
+                     Text="{l:T 'No devices found. Plug one in via USB, turn on Wireless debugging, or connect one from the main window.'}" />
           <ScrollViewer HorizontalScrollBarVisibility="Disabled">
             <ItemsControl ItemsSource="{Binding TargetGroups}" Margin="8,6">
               <ItemsControl.ItemTemplate>

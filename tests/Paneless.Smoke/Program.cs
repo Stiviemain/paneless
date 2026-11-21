@@ -14,7 +14,8 @@ if (args.Contains("--groups"))
     var gs = new GroupStore(new GroupData(), persist: false);
     var changes = 0;
     gs.Changed += () => changes++;
-    void Check(bool ok, string what) => Console.WriteLine($"{(ok ? "ok  " : "FAIL")} {what}");
+    var okAll = true;
+    void Check(bool ok, string what) { if (!ok) okAll = false; Console.WriteLine($"{(ok ? "ok  " : "FAIL")} {what}"); }
     var lab = gs.Create("  Test   lab ");
     Check(lab.Name == "Test lab", "name is tidied");
     Check(gs.Create("test LAB") == lab, "same name (any case) gives the same group");
@@ -47,7 +48,47 @@ if (args.Contains("--groups"))
     Check(eff.OnConnectScripts.SequenceEqual(["a", "b", "c"]), "on-connect scripts of group and device, no doubles");
     Check(EffectiveProfile.Resolve(global, null, null).BitrateMbps == 8 && !EffectiveProfile.Resolve(global, null, null).AutoMirror, "no profiles = global defaults");
     Check(new DeviceProfile().IsEmpty && !devP.IsEmpty, "empty profiles are dropped when saved");
-    return 0;
+
+    // USB & Wi-Fi merging in DeviceDirectory.Merge + Wi-Fi IP parsing.
+    var known = new Dictionary<string, KnownDevice> { ["SN123"] = new() { Name = "My Pixel", Model = "Pixel 11", Type = "Phone" } };
+    var infos = new Dictionary<string, DeviceInfo>
+    {
+        ["SN123"] = new("SN123", "Pixel 11", "Phone", "My Pixel"),
+        ["192.168.1.40:37123"] = new("SN123", "Pixel 11", "Phone", "My Pixel"),
+    };
+    var mdns = new List<MdnsService> { new() { Ip = "192.168.1.40", Sn = "SN123", Connect = "192.168.1.40:37123" } };
+
+    // 1. USB + mDNS simultaneously -> single row, still labelled "USB cable" (not IP:port).
+    var r1 = DeviceDirectory.Merge([new AdbDevice("SN123", "device", "Pixel_11")], mdns, infos, known, new HashSet<string>(), _ => UnlockStatus.None);
+    Check(r1.Count == 1 && !r1[0].IsNetwork && r1[0].Address == "USB cable" && r1[0].Sn == "SN123", "USB + mDNS stays USB cable");
+
+    // 2. Wi-Fi listed first + USB listed second -> prefers USB by default.
+    var both = new List<AdbDevice> { new("192.168.1.40:37123", "device", "Pixel_11"), new("SN123", "device", "Pixel_11") };
+    var r2 = DeviceDirectory.Merge(both, mdns, infos, known, new HashSet<string>(), _ => UnlockStatus.None);
+    Check(r2.Count == 1 && !r2[0].IsNetwork && r2[0].Serial == "SN123", "USB preferred over Wi-Fi when idle");
+
+    // 3. Actively mirroring over Wi-Fi + USB cable plugged in -> keeps active Wi-Fi mirror row.
+    var r3 = DeviceDirectory.Merge(both, mdns, infos, known, new HashSet<string> { "192.168.1.40:37123" }, _ => UnlockStatus.None);
+    Check(r3.Count == 1 && r3[0].IsNetwork && r3[0].State == DeviceState.Mirroring, "active Wi-Fi mirror not shadowed by USB");
+
+    // 4. Unauthorized USB device -> falls back to hardware serial so known name is kept.
+    var r4 = DeviceDirectory.Merge([new AdbDevice("SN123", "unauthorized", "")], [], new Dictionary<string, DeviceInfo>(), known, new HashSet<string>(), _ => UnlockStatus.None);
+    Check(r4.Count == 1 && r4[0].State == DeviceState.Unauthorized && r4[0].Name == "My Pixel" && r4[0].Sn == "SN123", "unauthorized USB keeps known name");
+
+    // 5. Ready Wi-Fi beats unauthorized USB for the same device.
+    var r5 = DeviceDirectory.Merge([new AdbDevice("SN123", "unauthorized", ""), new AdbDevice("192.168.1.40:37123", "device", "Pixel_11")], mdns, infos, known, new HashSet<string>(), _ => UnlockStatus.None);
+    Check(r5.Count == 1 && r5[0].State == DeviceState.Connected && r5[0].IsNetwork, "ready Wi-Fi beats unauthorized USB");
+
+    // 6. Emulator serial keeps its own address and doesn't claim "USB cable".
+    var r6 = DeviceDirectory.Merge([new AdbDevice("emulator-5554", "device", "sdk_gphone")], [], new Dictionary<string, DeviceInfo>(), known, new HashSet<string>(), _ => UnlockStatus.None);
+    Check(r6.Count == 1 && r6[0].Address == "emulator-5554" && r6[0].Sn == null, "emulator keeps serial address");
+
+    // 7. Wi-Fi IP parsing from wlan0 and ip route fallback.
+    Check(AdbClient.ParseWifiIp("23: wlan0: <UP>\n    inet 192.168.2.40/24 brd 192.168.2.255 scope global wlan0") == "192.168.2.40", "ParseWifiIp reads wlan0 inet");
+    Check(AdbClient.ParseWifiIp("192.168.2.0/24 dev wlan0 proto kernel scope link src 192.168.2.55") == "192.168.2.55", "ParseWifiIp reads ip route fallback");
+    Check(AdbClient.ParseWifiIp("127.0.0.1/8 scope host lo") == null, "ParseWifiIp ignores loopback");
+
+    return okAll ? 0 : 1;
 }
 
 if (args.Contains("--mirror-error"))
@@ -156,7 +197,8 @@ if (args.Contains("--camreopen"))
     mm.Reopened += (_, next) => { lock (reopened) reopened.Add(next); };
     var failures = new List<string>();
     mm.Failed += (_, why) => { lock (failures) failures.Add(why); };
-    void Check(bool ok, string what) => Console.WriteLine($"{(ok ? "ok  " : "FAIL")} {what}");
+    var okAll = true;
+    void Check(bool ok, string what) { if (!ok) okAll = false; Console.WriteLine($"{(ok ? "ok  " : "FAIL")} {what}"); }
 
     var cam = mm.StartCamera("fake-serial", "Fake phone", false, new MirrorOptions(false, false, false, false, null), 0);
     mm.LastWindow[cam] = (100, 100, 400, 700);
@@ -181,7 +223,7 @@ if (args.Contains("--camreopen"))
     foreach (var s in mm.Sessions) MirrorManager.Stop(s);
     await Task.Delay(500);
     Check(mm.Sessions.Count == 0, "all stopped");
-    return 0;
+    return okAll ? 0 : 1;
 }
 
 if (args.Contains("--camturn"))
@@ -279,7 +321,8 @@ if (args.Contains("--screenshot"))
 if (args.Contains("--automation"))
 {
     // Scheduled tasks, alerts, script sharing, the log parser and the inventory export. No device, nothing saved.
-    void Check(bool ok, string what) => Console.WriteLine($"{(ok ? "ok  " : "FAIL")} {what}");
+    var okAll = true;
+    void Check(bool ok, string what) { if (!ok) okAll = false; Console.WriteLine($"{(ok ? "ok  " : "FAIL")} {what}"); }
     var mon = new DateTime(2026, 11, 23, 2, 0, 0);          // a Monday, 02:00
     var daily = new ScheduledTask { Repeat = ScheduleRepeat.Daily, Time = "03:00" };
     Check(daily.Next(mon) == mon.Date.AddHours(3), "daily: next run today at 03:00");
@@ -326,13 +369,14 @@ if (args.Contains("--automation"))
     var csv = InventoryExport.Csv([(inv, "Test \"lab\"")]);
     Check(csv.Contains("\"Lab, 1\"") && csv.Contains("\"Test \"\"lab\"\"\"") && inv.StorageFreePercent is > 9.9 and < 10.1, "inventory CSV quotes commas and quotes");
     Check(InventoryExport.Html([(inv, "<b>")], "Report").Contains("&lt;b&gt;"), "inventory report escapes HTML");
-    return 0;
+    return okAll ? 0 : 1;
 }
 
 if (args.Contains("--assistants"))
 {
     // Adding Paneless to AI apps' settings: text in, text out, no real settings touched.
-    void Check(bool ok, string what) => Console.WriteLine($"{(ok ? "ok  " : "FAIL")} {what}");
+    var okAll = true;
+    void Check(bool ok, string what) { if (!ok) okAll = false; Console.WriteLine($"{(ok ? "ok  " : "FAIL")} {what}"); }
     const string exe = @"C:\Users\x\AppData\Local\PanelessApp\current\Paneless.exe";
     var json = McpConfig.WithJsonServer("""
         {
@@ -359,7 +403,7 @@ if (args.Contains("--assistants"))
     Check(McpConfig.Friendly("claude-ai", null) == "Claude" && McpConfig.Friendly("claude-code", null) == "Claude Code"
           && McpConfig.Friendly("codex-mcp-client", null) == "Codex" && McpConfig.Friendly("gemini-cli-mcp-client", null) == "Gemini"
           && McpConfig.Friendly("my-tool", "My Tool") == "My Tool" && McpConfig.Friendly(null, null).Length > 0, "assistants get readable names");
-    return 0;
+    return okAll ? 0 : 1;
 }
 
 if (args.Contains("--translations"))

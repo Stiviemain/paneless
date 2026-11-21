@@ -48,27 +48,60 @@ public sealed class DeviceDirectory(AdbClient adb, DataStore data)
         return info;
     }
 
+    public static bool IsNetworkSerial(string serial) =>
+        serial.Contains(':') || serial.Contains("._adb-tls-connect");
+
+    public static bool IsEmulatorSerial(string serial) =>
+        serial.StartsWith("emulator-", StringComparison.Ordinal);
+
     public async Task<IReadOnlyList<DeviceRow>> GetRowsAsync(ISet<string> mirroringSerials)
     {
         var mdns = await adb.GetMdnsServicesAsync();
         var devices = await adb.GetDevicesAsync();
+        var infos = new Dictionary<string, DeviceInfo>();
+        foreach (var d in devices)
+            if (d.State == "device" && await InfoAsync(d.Serial) is { } info) infos[d.Serial] = info;
+        return Merge(devices, mdns, infos, data.Known, mirroringSerials, UnlockStatusFor);
+    }
+
+    /// <summary>Merges adb devices and mDNS services into one deduplicated list. Pure and deterministic so it can be tested offline.</summary>
+    public static IReadOnlyList<DeviceRow> Merge(
+        IReadOnlyList<AdbDevice> devices,
+        IReadOnlyList<MdnsService> mdns,
+        IReadOnlyDictionary<string, DeviceInfo> infos,
+        IReadOnlyDictionary<string, KnownDevice> knownDevices,
+        ISet<string> mirroringSerials,
+        Func<string?, UnlockStatus> unlockStatusFor)
+    {
+        // When the same device is connected over both USB and Wi-Fi at once, keep any actively mirrored
+        // transport first, then prefer ready USB (lower latency) over ready Wi-Fi, then unauthorized/offline.
+        var ordered = devices
+            .OrderBy(d => mirroringSerials.Contains(d.Serial) ? 0
+                        : d.State == "device" ? (!IsNetworkSerial(d.Serial) ? 1 : 2)
+                        : 3)
+            .ToList();
+
         var seenSn = new HashSet<string>();
         var seenIp = new HashSet<string>();
         var rows = new List<DeviceRow>();
 
-        foreach (var d in devices)
+        foreach (var d in ordered)
         {
-            var info = d.State == "device" ? await InfoAsync(d.Serial) : null;
-            var sn = !string.IsNullOrEmpty(info?.Sn) ? info!.Sn : AdbClient.SnFromInstance(d.Serial);
+            var isNet = IsNetworkSerial(d.Serial);
+            var info = d.State == "device" && infos.TryGetValue(d.Serial, out var di) ? di : null;
+            // For USB devices, adb's serial already is the hardware serial, so known names still match while unauthorized.
+            var sn = !string.IsNullOrEmpty(info?.Sn) ? info!.Sn
+                   : isNet ? AdbClient.SnFromInstance(d.Serial)
+                   : (!IsEmulatorSerial(d.Serial) ? d.Serial : null);
             if (sn != null && !seenSn.Add(sn)) continue;   // same device listed twice by adb
             var ip = AdbClient.IsIpPort(d.Serial) ? d.Serial.Split(':')[0] : null;
             var svc = mdns.FirstOrDefault(s => (sn != null && s.Sn == sn) || (ip != null && s.Ip == ip));
             ip ??= svc?.Ip;
             if (ip != null) seenIp.Add(ip);
-            var known = sn != null && data.Known.TryGetValue(sn, out var k) ? k : null;
-            var isNet = d.Serial.Contains(':') || d.Serial.Contains("._adb-tls-connect");
-            var address = AdbClient.IsIpPort(d.Serial) ? d.Serial
-                        : svc?.Connect ?? (isNet ? d.Serial : Text.T("USB cable"));
+            var known = sn != null && knownDevices.TryGetValue(sn, out var k) ? k : null;
+            var address = !isNet ? (IsEmulatorSerial(d.Serial) ? d.Serial : Text.T("USB cable"))
+                        : AdbClient.IsIpPort(d.Serial) ? d.Serial
+                        : svc?.Connect ?? d.Serial;
             var state = d.State switch
             {
                 "device" => mirroringSerials.Contains(d.Serial) ? DeviceState.Mirroring : DeviceState.Connected,
@@ -80,18 +113,18 @@ public sealed class DeviceDirectory(AdbClient adb, DataStore data)
                 First(info?.Name, known?.Name, d.Model, Text.T("Android device")),
                 First(info?.Model, known?.Model, d.Model),
                 First(info?.Type, known?.Type),
-                address, state, svc?.Connect, svc?.Pair, UnlockStatusFor(sn)));
+                address, state, svc?.Connect, svc?.Pair, unlockStatusFor(sn)));
         }
 
         foreach (var s in mdns)
         {
             if ((s.Sn != null && seenSn.Contains(s.Sn)) || seenIp.Contains(s.Ip)) continue;
-            var known = s.Sn != null && data.Known.TryGetValue(s.Sn, out var k) ? k : null;
+            var known = s.Sn != null && knownDevices.TryGetValue(s.Sn, out var k) ? k : null;
             var state = s.Connect == null ? DeviceState.Pairing : known != null ? DeviceState.Available : DeviceState.Unpaired;
             var name = known?.Name ?? (state == DeviceState.Pairing ? Text.T("Device in pairing mode") : Text.T("New device"));
             rows.Add(new DeviceRow(
                 $"net:{s.Ip}", null, s.Sn, true, name, known?.Model ?? "", known?.Type ?? "",
-                First(s.Connect, s.Pair), state, s.Connect, s.Pair, UnlockStatusFor(s.Sn)));
+                First(s.Connect, s.Pair), state, s.Connect, s.Pair, unlockStatusFor(s.Sn)));
         }
         return rows;
     }

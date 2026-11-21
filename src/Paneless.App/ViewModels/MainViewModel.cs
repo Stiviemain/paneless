@@ -110,7 +110,7 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] public partial string EmptyText { get; set; } = Loc.T("Looking for devices…");
     [ObservableProperty] public partial string ManualAddress { get; set; } = "";
     [ObservableProperty] public partial string MirrorLabel { get; set; } = Loc.T("Mirror");
-    [ObservableProperty] public partial string Summary { get; set; } = Loc.T("Phones and tablets on your network with Wireless debugging turned on");
+    [ObservableProperty] public partial string Summary { get; set; } = Loc.T("Plug in a device via USB or turn on Wireless debugging");
     [ObservableProperty] public partial string SelectionText { get; set; } = "";
     [ObservableProperty] public partial string Search { get; set; } = "";
 
@@ -121,7 +121,8 @@ public sealed partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(MirrorCommand), nameof(PairCommand), nameof(AutoUnlockCommand),
-                                nameof(UnlockNowCommand), nameof(RefreshCommand), nameof(ConnectCommand))]
+                                nameof(UnlockNowCommand), nameof(RefreshCommand), nameof(ConnectCommand),
+                                nameof(SwitchToWifiCommand))]
     public partial bool IsBusy { get; set; }
 
     bool Ready => _s.Tools != null || _s.Demo;
@@ -286,10 +287,10 @@ public sealed partial class MainViewModel : ObservableObject
         IsEmpty = Items.Count == 0;
         if (IsEmpty)
             EmptyText = searching ? Loc.F("No devices match \"{0}\".", q)
-                : Loc.T("No devices found yet.\n\nOn each phone or tablet, turn on\nSettings › System › Developer options › Wireless debugging.\n\nFirst time with a device? Click Add device › Pair with a code.");
+                : Loc.T("No devices found yet.\n\nPlug a device in via USB (with USB debugging on), or turn on\nSettings › System › Developer options › Wireless debugging.\n\nFirst time over Wi-Fi? Click Add device › Pair with a code.");
         var mirroring = _rows.Count(r => r.State == DeviceState.Mirroring);
-        Summary = _rows.Count == 0 ? Loc.T("Phones and tablets on your network with Wireless debugging turned on")
-            : Loc.F("{0} on the network", Loc.Count(_rows.Count, "{0} device", "{0} devices"))
+        Summary = _rows.Count == 0 ? Loc.T("Plug in a device via USB or turn on Wireless debugging")
+            : Loc.Count(_rows.Count, "{0} device", "{0} devices")
               + (mirroring > 0 ? Loc.F(" · {0} mirroring", mirroring) : "")
               + (groups.Any ? $" · {Loc.Count(groups.Groups.Count, "{0} group", "{0} groups")}" : "");
         UpdateSelectionState();
@@ -515,6 +516,8 @@ public sealed partial class MainViewModel : ObservableObject
         AutoUnlockCommand.NotifyCanExecuteChanged();
         UnlockNowCommand.NotifyCanExecuteChanged();
         MoveToGroupCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(CanSwitchToWifi));
+        SwitchToWifiCommand.NotifyCanExecuteChanged();
         SelectionChanged?.Invoke();
     }
 
@@ -544,8 +547,10 @@ public sealed partial class MainViewModel : ObservableObject
             var r = targets[0];
             if (r.NeedsPairing) { if (ShowPairDialog != null) await ShowPairDialog(r.PairAddr); await RefreshListAsync(); }
             else if (r.State == DeviceState.Unauthorized) SetStatus(Loc.F("Unlock {0} and tap Allow on the debugging prompt.", r.Name), StatusKind.Warn);
-            else if (r.State == DeviceState.NotFound) SetStatus(Loc.F("{0} isn't on the network. Turn on Wireless debugging on it (same Wi-Fi as this computer).", r.Name), StatusKind.Warn);
-            else SetStatus(Loc.F("{0} is offline. Turn Wireless debugging off and on again on the device.", r.Name), StatusKind.Warn);
+            else if (r.State == DeviceState.NotFound) SetStatus(Loc.F("{0} isn't connected. Plug it in via USB or turn on Wireless debugging (same Wi-Fi as this computer).", r.Name), StatusKind.Warn);
+            else SetStatus(!r.IsNetwork
+                ? Loc.F("{0} is offline. Unplug and reconnect the USB cable, or toggle USB debugging.", r.Name)
+                : Loc.F("{0} is offline. Turn Wireless debugging off and on again on the device.", r.Name), StatusKind.Warn);
             return;
         }
         await MirrorRowsAsync(mirrorable);
@@ -682,6 +687,33 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>The one device an action is for: the single selected one, or the only device around.</summary>
     DeviceRow? One => Selected is [var only] ? only.Row : _selectedKeys.Count == 0 && _rows.Count == 1 ? _rows[0] : null;
 
+    DeviceRow? SwitchToWifiTarget =>
+        One is { IsNetwork: false, Serial: { } s, State: DeviceState.Connected or DeviceState.Mirroring } r
+        && !DeviceDirectory.IsEmulatorSerial(s) ? r : null;
+
+    public bool CanSwitchToWifi => SwitchToWifiTarget != null;
+
+    bool CanRunSwitchToWifi() => Ready && !IsBusy && SwitchToWifiTarget != null;
+
+    [RelayCommand(CanExecute = nameof(CanRunSwitchToWifi))]
+    async Task SwitchToWifiAsync()
+    {
+        if (SwitchToWifiTarget is not { Serial: { } serial } r) return;
+        if (_s.Demo) { SetStatus(Loc.F("Demo mode: would switch {0} to Wi-Fi.", r.Name), StatusKind.Ok); return; }
+        IsBusy = true;
+        try
+        {
+            SetStatus(Loc.F("Switching {0} to Wi-Fi…", r.Name));
+            var (ok, addr, msg) = await _s.Adb!.SwitchToWifiAsync(serial);
+            if (ok && addr != null)
+                SetStatus(Loc.F("Switched {0} to Wi-Fi ({1}). You can unplug the USB cable now.", r.Name, addr), StatusKind.Ok);
+            else
+                SetStatus(addr != null ? Loc.F("{0} ({1}): {2}", r.Name, addr, msg) : Loc.F("{0}: {1}", r.Name, msg), StatusKind.Error);
+        }
+        finally { IsBusy = false; }
+        await RefreshListAsync();
+    }
+
     [RelayCommand]
     void OpenSettings() => ShowSettings?.Invoke();
 
@@ -701,14 +733,14 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     void Apps()
     {
-        if (One is not { CanMirror: true } r) { SetStatus(Loc.T("Select one device that's on the network."), StatusKind.Warn); return; }
+        if (One is not { CanMirror: true } r) { SetStatus(Loc.T("Select one available device first."), StatusKind.Warn); return; }
         ShowApps?.Invoke(r);
     }
 
     /// <summary>Starts a scrcpy window of another kind (app, second screen, camera) for one device.</summary>
     async Task StartWindowAsync(DeviceRow? r, string what, Func<string, MirrorSession> start, Func<string, Task>? prepare = null)
     {
-        if (r is not { CanMirror: true }) { SetStatus(Loc.T("Select one device that's on the network."), StatusKind.Warn); return; }
+        if (r is not { CanMirror: true }) { SetStatus(Loc.T("Select one available device first."), StatusKind.Warn); return; }
         if (_s.Demo) { SetStatus(Loc.F("Demo mode: would open {0} of {1}.", what, r.Name), StatusKind.Ok); return; }
         var serial = await _s.Directory!.ConnectAsync(r);
         if (serial == null) { SetStatus(Loc.F("Couldn't connect to {0}.", r.Name), StatusKind.Error); return; }

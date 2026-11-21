@@ -175,7 +175,7 @@
             <Flyout Placement="BottomEdgeAlignedRight">
               <StackPanel Width="330" Spacing="10" Margin="4">
                 <TextBlock Classes="dim" FontSize="12" TextWrapping="Wrap"
-                           Text="{l:T 'Devices with Wireless debugging turned on show up in the list by themselves. The first time, pair them with a code.'}" />
+                           Text="{l:T 'Devices plugged in via USB or with Wireless debugging on show up automatically. For Wi-Fi, pair once with a code.'}" />
                 <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
                         Content="{l:T 'Pair with a code…'}" Command="{Binding PairCommand}" />
                 <TextBlock Classes="label" Text="{l:T 'Not listed? Connect by address'}" Margin="0,6,0,0" />
@@ -254,6 +254,7 @@
               <MenuItem Header="{l:T 'Open a second screen'}" Command="{Binding SecondScreenCommand}" />
               <MenuItem Header="{l:T 'Back camera'}" Command="{Binding CameraBackCommand}" />
               <MenuItem Header="{l:T 'Front camera'}" Command="{Binding CameraFrontCommand}" />
+              <MenuItem Header="{l:T 'Switch to Wi-Fi'}" Command="{Binding SwitchToWifiCommand}" IsVisible="{Binding CanSwitchToWifi}" />
               <Separator />
               <MenuItem Header="{l:T 'Arrange all mirror windows'}" Command="{Binding ArrangeAllCommand}" />
             </MenuFlyout>
@@ -321,6 +322,7 @@
                   <MenuItem Header="{l:T 'Back camera'}" Command="{Binding CameraBackCommand}" />
                   <MenuItem Header="{l:T 'Front camera'}" Command="{Binding CameraFrontCommand}" />
                 </MenuItem>
+                <MenuItem Header="{l:T 'Switch to Wi-Fi'}" Command="{Binding SwitchToWifiCommand}" IsVisible="{Binding CanSwitchToWifi}" />
                 <Separator />
                 <MenuItem Name="MoveMenu" Header="{l:T 'Move to group'}" />
                 <MenuItem Header="{l:T 'Device settings…'}" Command="{Binding DeviceSettingsCommand}" />
@@ -361,7 +363,7 @@
                     </StackPanel>
                   </Button>
                   <Button Grid.Column="1" Classes="link" Content="{l:T 'Mirror all'}" Command="{Binding MirrorAllCommand}"
-                          IsVisible="{Binding CanMirrorAll}" ToolTip.Tip="{l:T 'Mirror every device of this group that’s on the network'}" />
+                          IsVisible="{Binding CanMirrorAll}" ToolTip.Tip="{l:T 'Mirror every available device in this group'}" />
                   <Button Grid.Column="2" Classes="link" Margin="0,0,6,0" Padding="10,2" Content="⋯" FontSize="16" ToolTip.Tip="{l:T 'Group actions'}">
                     <Button.Flyout>
                       <MenuFlyout Placement="BottomEdgeAlignedRight">

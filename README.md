@@ -13,7 +13,7 @@
 
 <p align="center">
   <b>Painless screen mirroring and device management for your Android devices.</b><br>
-  Finds the phones, tablets and watches on your Wi-Fi, mirrors any of them to your PC with one click,<br>
+  Connects phones, tablets and watches over Wi-Fi or USB, mirrors any of them to your PC with one click,<br>
   and manages one device or a whole fleet at once: install apps, run scripts, change settings, control groups together.<br>
   Built on <a href="https://github.com/Genymobile/scrcpy">scrcpy</a>, with an interface made with <a href="https://avaloniaui.net/">Avalonia</a>.
 </p>
@@ -22,7 +22,7 @@
   <a href="https://github.com/Stiviemain/paneless/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/Stiviemain/paneless?include_prereleases&label=release"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
   <img alt="Windows 10/11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4">
-  <img alt="Android 11+" src="https://img.shields.io/badge/Android-11%2B-3ddc84">
+  <img alt="Android USB and Wi-Fi" src="https://img.shields.io/badge/Android-USB%20%7C%20Wi--Fi-3ddc84">
   <a href="https://avaloniaui.net/"><img alt="Built with Avalonia" src="https://img.shields.io/badge/UI-Avalonia-8b44ac"></a>
 </p>
 
@@ -69,8 +69,8 @@ The interface is built with [Avalonia](https://avaloniaui.net/), a cross-platfor
 ## Features
 
 **Finding and organising devices**
-- **Finds devices by itself** (wireless debugging over mDNS) and shows name, model, status, battery and address. The list refreshes every few seconds.
-- **Pairs new devices** with the 6-digit code. The pairing address fills itself in.
+- **Works over Wi-Fi and USB:** finds wireless devices automatically (mDNS) and picks up USB-connected devices as soon as you plug them in. Right-click any USB device › **Switch to Wi-Fi** to cut the cord (also works on Android 10 and older).
+- **Pairs new Wi-Fi devices** with the 6-digit code. The pairing address fills itself in.
 - **Groups:** collapsible sections, *Mirror all*, and a group manager. Devices of a group that aren't around are still listed.
 - **Search and natural sort** ("Lab phone 2" before "Lab phone 10") for long lists.
 - **Connects known devices by itself** when they show up on the network.
@@ -150,10 +150,11 @@ macOS and Linux builds are planned: the code is already cross-platform thanks to
 On each device, once:
 
 1. **Settings › About phone**, tap **Build number** 7 times to unlock developer options.
-2. **Settings › System › Developer options**, turn on **Wireless debugging**.
-3. In Paneless, click **+ Add device › Pair with a code**. On the device, tap **Pair device with pairing code** and type the 6-digit code into Paneless.
+2. Choose how you want to connect:
+   - **Over USB (Android 5+):** under **Settings › System › Developer options**, turn on **USB debugging**, plug the device into your PC, and tap **Allow** on the prompt. You can also right-click the device › **Switch to Wi-Fi** to unplug the cable afterwards.
+   - **Over Wi-Fi (Android 11+):** under **Developer options**, turn on **Wireless debugging**, then in Paneless click **+ Add device › Pair with a code**, tap **Pair device with pairing code** on the device, and enter the 6-digit code.
 
-From then on, the device appears whenever Wireless debugging is on and it's on the same Wi-Fi. Android 17 turns wireless debugging back on by itself on trusted networks.
+From then on, plugged-in USB devices appear immediately, and paired Wi-Fi devices appear whenever Wireless debugging is on on the same Wi-Fi. Android 17 turns wireless debugging back on by itself on trusted networks.
 
 ## Using Paneless
 
@@ -162,6 +163,7 @@ From then on, the device appears whenever Wireless debugging is on and it's on t
 | Mirror a device | Double-click it, or select it and press **Mirror** / Enter |
 | Mirror several | Ctrl- or Shift-click them, then **Mirror** |
 | Mirror a whole group | **Mirror all** on the group's heading |
+| Unplug a USB device and keep mirroring | Right-click › **Switch to Wi-Fi** (or **More › Switch to Wi-Fi**) |
 | Make or edit groups | **Groups…**, or right-click devices › **Move to group** |
 | Change settings for one device | Right-click › **Device settings…** (a group: its ⋯ › **Group settings…**) |
 | Run a command on devices | **Run script…** (on a group: its ⋯ menu) |

@@ -152,7 +152,7 @@ public partial class App : Application
             if (now == shape) return;
             shape = now;
             mirrorMenu.Items.Clear();
-            if (rows.Count == 0) mirrorMenu.Items.Add(new NativeMenuItem(Localization.Loc.T("No devices on the network")) { IsEnabled = false });
+            if (rows.Count == 0) mirrorMenu.Items.Add(new NativeMenuItem(Localization.Loc.T("No devices found")) { IsEnabled = false });
             foreach (var r in rows)
             {
                 var item = new NativeMenuItem(r.State == DeviceState.Mirroring ? Localization.Loc.F("{0} (mirroring)", r.Name) : r.Name);

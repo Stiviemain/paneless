@@ -49,6 +49,51 @@ public sealed partial class AdbClient(string adbPath)
 
     public Task<ProcessResult> PairAsync(string address, string code) => RunAsync(TimeSpan.FromSeconds(20), "pair", address, code);
 
+    public Task<ProcessResult> TcpIpAsync(string serial, int port = 5555) =>
+        RunAsync(TimeSpan.FromSeconds(10), "-s", serial, "tcpip", port.ToString());
+
+    /// <summary>The device's current IPv4 address on Wi-Fi, or null if not connected to Wi-Fi.</summary>
+    public async Task<string?> GetWifiIpAsync(string serial)
+    {
+        var r = await ShellAsync(serial, "ip -4 addr show wlan0; ip route");
+        return r.Ok ? ParseWifiIp(r.Output) : null;
+    }
+
+    /// <summary>Switches a USB-connected device to adb over Wi-Fi (tcpip) and connects to it so the cable can be unplugged.</summary>
+    public async Task<(bool Ok, string? Address, string Message)> SwitchToWifiAsync(string serial, int port = 5555)
+    {
+        var ip = await GetWifiIpAsync(serial);
+        if (ip == null) return (false, null, Text.T("No Wi-Fi IP address found. Connect the device to the same Wi-Fi first."));
+        var tcp = await TcpIpAsync(serial, port);
+        if (!tcp.Ok) return (false, null, tcp.LastLine.Length > 0 ? tcp.LastLine : Text.T("Couldn't switch the device to Wi-Fi mode."));
+
+        var addr = $"{ip}:{port}";
+        // adbd restarts briefly after "adb tcpip"; give it a moment and retry connect once if it's still coming up.
+        await Task.Delay(1200);
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            await ConnectAsync(addr);
+            if (await WaitReadyAsync(addr, TimeSpan.FromSeconds(4))) return (true, addr, "");
+            if (attempt == 0) await Task.Delay(800);
+        }
+        return (false, addr, Text.T("Wi-Fi mode is on, but the device couldn't be reached (same Wi-Fi? VPN?)."));
+    }
+
+    public static string? ParseWifiIp(string output)
+    {
+        static bool Usable(string ip) => !ip.StartsWith("127.", StringComparison.Ordinal) && !ip.StartsWith("169.254.", StringComparison.Ordinal);
+        foreach (var line in Lines(output))
+            if (InetIpRx().Match(line) is { Success: true } m && Usable(m.Groups[1].Value)) return m.Groups[1].Value;
+        string? fallback = null;
+        foreach (var line in Lines(output))
+            if (RouteSrcRx().Match(line) is { Success: true } m && Usable(m.Groups[1].Value))
+            {
+                if (line.Contains("wlan", StringComparison.OrdinalIgnoreCase)) return m.Groups[1].Value;
+                fallback ??= m.Groups[1].Value;
+            }
+        return fallback;
+    }
+
     public async Task<IReadOnlyList<AdbDevice>> GetDevicesAsync()
     {
         var r = await RunAsync("devices", "-l");
@@ -317,4 +362,8 @@ public sealed partial class AdbClient(string adbPath)
     private static partial Regex TvRx();
     [GeneratedRegex("unavailable|ERROR")]
     private static partial Regex UnavailableRx();
+    [GeneratedRegex(@"\binet\s+(\d{1,3}(?:\.\d{1,3}){3})/")]
+    private static partial Regex InetIpRx();
+    [GeneratedRegex(@"\bsrc\s+(\d{1,3}(?:\.\d{1,3}){3})\b")]
+    private static partial Regex RouteSrcRx();
 }
