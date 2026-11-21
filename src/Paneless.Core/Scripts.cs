@@ -141,6 +141,11 @@ public sealed class ScriptRunner(AdbClient adb)
 public sealed class ScriptStore
 {
     const string File = "scripts.json";
-    public List<AdbScript> Mine { get; } = JsonFile.Load<List<AdbScript>>(File);
-    public void Save() => JsonFile.Save(File, Mine);
+    readonly bool _persist;
+
+    public ScriptStore() : this(JsonFile.Load<List<AdbScript>>(File), persist: true) { }
+    public ScriptStore(List<AdbScript> mine, bool persist) { Mine = mine; _persist = persist; }
+
+    public List<AdbScript> Mine { get; }
+    public void Save() { if (_persist) JsonFile.Save(File, Mine); }
 }

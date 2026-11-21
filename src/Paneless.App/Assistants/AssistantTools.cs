@@ -221,7 +221,8 @@ public sealed class AssistantTools
             Task.FromResult(ToolResult.Json(new JsonArray(_s.Groups.Groups.Select(g => (JsonNode)new JsonObject
             {
                 ["name"] = g.Name,
-                ["devices"] = new JsonArray(g.Members.Select(m => (JsonNode)(_main.NetworkRows.FirstOrDefault(r => r.GroupId == m)?.Name ?? _s.KnownFor(m)?.Name ?? m)).ToArray()),
+                ["devices"] = new JsonArray(g.Members.Where(m => AccessOf(m) != AssistantAccess.Off)
+                    .Select(m => (JsonNode)(_main.NetworkRows.FirstOrDefault(r => r.GroupId == m)?.Name ?? _s.KnownFor(m)?.Name ?? m)).ToArray()),
             }).ToArray()))));
 
         Add("device_info", "Facts about a device: manufacturer, model, Android version, security patch, battery (level, health, temperature), storage, RAM, screen size, IP address, uptime.",
@@ -262,8 +263,11 @@ public sealed class AssistantTools
                     var rank = "VDIWEF".IndexOf(char.ToUpperInvariant(ml[0]));
                     lines = lines.Where(x => "VDIWEF".IndexOf(x.Level) >= rank);
                 }
-                if (a["package"]?.ToString() is { Length: > 0 } pkg && await LogcatSession.PidOfAsync(_s.Adb, serial, pkg) is { } pid)
-                    lines = lines.Where(x => x.Pid == pid);
+                if (a["package"]?.ToString() is { Length: > 0 } pkg)
+                {
+                    if (await LogcatSession.PidOfAsync(_s.Adb, serial, pkg) is { } pid) lines = lines.Where(x => x.Pid == pid);
+                    else lines = lines.Where(x => x.Raw.Contains(pkg, StringComparison.OrdinalIgnoreCase));
+                }
                 if (a["contains"]?.ToString() is { Length: > 0 } c) lines = lines.Where(x => x.Raw.Contains(c, StringComparison.OrdinalIgnoreCase));
                 var text = string.Join('\n', lines.Select(x => x.Raw).TakeLast(n));
                 return ToolResult.Text(text.Length == 0 ? "(no matching lines)" : text);

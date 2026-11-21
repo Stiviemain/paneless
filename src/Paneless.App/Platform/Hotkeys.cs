@@ -59,6 +59,7 @@ public static class GlobalHotkeys
     static Dictionary<string, string> _wanted = new();     // shortcut text → device id
     static readonly Dictionary<int, string> Registered = new();
     static readonly object Gate = new();
+    static ManualResetEventSlim? _reloaded;
 
     /// <summary>Raised (on the hotkey thread) with the device id whose shortcut was pressed.</summary>
     public static event Action<string>? Pressed;
@@ -68,18 +69,19 @@ public static class GlobalHotkeys
     /// <summary>Replaces all shortcuts: text ("Ctrl+Alt+P") → device id.</summary>
     public static void Set(IReadOnlyDictionary<string, string> shortcuts)
     {
+        ManualResetEventSlim? wait = null;
         lock (Gate)
         {
             _wanted = new Dictionary<string, string>(shortcuts);
             if (_thread == null)
             {
-                if (_wanted.Count == 0) return;
-                var ready = new ManualResetEventSlim();
+                if (_wanted.Count == 0) { Failed = []; return; }
+                wait = new ManualResetEventSlim();
+                _reloaded = wait;
                 _thread = new Thread(() =>
                 {
                     _threadId = GetCurrentThreadId();
                     Reload();
-                    ready.Set();
                     while (GetMessage(out var m, 0, 0, 0) > 0)
                     {
                         if (m.Message == WM_HOTKEY && Registered.TryGetValue((int)m.WParam, out var id)) Pressed?.Invoke(id);
@@ -87,10 +89,15 @@ public static class GlobalHotkeys
                     }
                 }) { IsBackground = true, Name = "Paneless hotkeys" };
                 _thread.Start();
-                ready.Wait(2000);
             }
-            else PostThreadMessage(_threadId, WM_APP_RELOAD, 0, 0);
+            else
+            {
+                wait = new ManualResetEventSlim();
+                _reloaded = wait;
+                PostThreadMessage(_threadId, WM_APP_RELOAD, 0, 0);
+            }
         }
+        wait.Wait(2000);
     }
 
     static void Reload()
@@ -98,7 +105,8 @@ public static class GlobalHotkeys
         foreach (var id in Registered.Keys) UnregisterHotKey(0, id);
         Registered.Clear();
         Dictionary<string, string> wanted;
-        lock (Gate) wanted = _wanted;
+        ManualResetEventSlim? done;
+        lock (Gate) { wanted = _wanted; done = _reloaded; }
         var failed = new List<string>();
         var next = 1;
         foreach (var (text, device) in wanted)
@@ -108,5 +116,6 @@ public static class GlobalHotkeys
             else failed.Add(text);
         }
         Failed = failed;
+        done?.Set();
     }
 }

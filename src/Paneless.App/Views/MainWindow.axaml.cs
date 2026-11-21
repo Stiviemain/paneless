@@ -14,6 +14,7 @@ public partial class MainWindow : Window
 {
     readonly AppServices? _services;
     bool _restoring;
+    bool _opened;
 
     public MainWindow() => InitializeComponent();   // for the XAML previewer
 
@@ -58,7 +59,8 @@ public partial class MainWindow : Window
 
         Opened += async (_, _) =>
         {
-            if (Vm == null) return;
+            if (_opened || Vm == null) return;
+            _opened = true;
             Vm.ShowSettings = () => ShowSettings();
             Vm.ShowDeviceSettings = (id, name, group) => ShowDeviceSettings(id, name, group);
             Vm.ShowApps = row => ShowApps(row);

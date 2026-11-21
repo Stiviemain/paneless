@@ -24,7 +24,7 @@ public sealed partial class UnlockViewModel : ObservableObject
 
     public Action? Close { get; set; }
 
-    public string Title => $"Auto-unlock {_row.Name}";
+    public string Title => Loc.F("Auto-unlock {0}", _row.Name);
     public string Intro =>
         Loc.T("When you mirror this device while it's locked, Paneless wakes it and enters its PIN or password for you. Swipe patterns can't be stored.");
     public string Warning =>

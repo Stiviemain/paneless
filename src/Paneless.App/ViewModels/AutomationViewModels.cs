@@ -308,6 +308,25 @@ public sealed partial class SchedulesViewModel : ObservableObject
         foreach (var t in s.Schedules.All) Items.Add(new ScheduleItem(t));
         Selected = Items.FirstOrDefault();
         service.TaskRan += (t, _) => Items.FirstOrDefault(i => i.Task == t)?.Refresh();
+        s.Groups.Changed += () => Avalonia.Threading.Dispatcher.UIThread.Post(RefreshGroups);
+        s.Recipes.Changed += () => Avalonia.Threading.Dispatcher.UIThread.Post(RefreshTargets);
+    }
+
+    void RefreshGroups()
+    {
+        var t = Selected?.Task;
+        Groups.Clear();
+        foreach (var g in _s.Groups.Groups) Groups.Add(new GroupPick(g.Name, t?.Groups.Contains(g.Name) == true, SaveGroups));
+    }
+
+    void RefreshTargets()
+    {
+        if (Action != ActionChoices[1]) return;
+        _loading = true;
+        var keep = Selected?.Task.Target;
+        FillTargetChoices();
+        TargetChoice = TargetChoices.FirstOrDefault(c => c.Id == keep);
+        _loading = false;
     }
 
     public Func<string, string, Task<bool>>? ConfirmAsync { get; set; }
@@ -395,7 +414,7 @@ public sealed partial class SchedulesViewModel : ObservableObject
     partial void OnTargetChoiceChanged(NamedChoice? value) { if (value != null) Edit(t => t.Target = value.Id); }
     partial void OnCommandChanged(string value) { if (Action == ActionChoices[3]) Edit(t => t.Target = value); }
     partial void OnRepeatChanged(string value) { Edit(t => t.Repeat = (ScheduleRepeat)Math.Max(0, RepeatChoices.ToList().IndexOf(value))); ShowFlags(); }
-    partial void OnTimeChanged(string value) { if (TimeSpan.TryParse(value, out var ts) && ts < TimeSpan.FromDays(1)) Edit(t => t.Time = ts.ToString(@"hh\:mm")); }
+    partial void OnTimeChanged(string value) { if (TimeSpan.TryParse(value, out var ts) && ts >= TimeSpan.Zero && ts < TimeSpan.FromDays(1)) Edit(t => t.Time = ts.ToString(@"hh\:mm")); }
     partial void OnHoursChanged(decimal value) => Edit(t => t.Hours = (int)Math.Clamp(value, 1, 168));
     void SaveGroups() => Edit(t => t.Groups = Groups.Where(g => g.IsChecked).Select(g => g.Name).ToList());
     void SaveDays() => Edit(t => t.Days = Days.Where(d => d.IsChecked).Select(d => d.Day).ToList());
@@ -450,12 +469,21 @@ public sealed partial class RuleItem : ObservableObject
     readonly Action _save;
     public RuleItem(AlertRule rule, IReadOnlyList<string> scopes, Action save)
     {
-        Rule = rule; Scopes = scopes; _save = save;
-        _scope = rule.Groups.FirstOrDefault() ?? scopes[0];
+        Rule = rule; Scopes = new(scopes); _save = save;
+        _scope = rule.Groups.FirstOrDefault() is { } g && scopes.Contains(g) ? g : scopes[0];
     }
 
     public AlertRule Rule { get; }
-    public IReadOnlyList<string> Scopes { get; }
+    public ObservableCollection<string> Scopes { get; }
+
+    public void UpdateScopes(IReadOnlyList<string> scopes)
+    {
+        var keep = Scope;
+        Scopes.Clear();
+        foreach (var sc in scopes) Scopes.Add(sc);
+        _scope = Scopes.Contains(keep) ? keep : Scopes[0];
+        OnPropertyChanged(nameof(Scope));
+    }
     public string Title => Rule.Kind switch
     {
         AlertKind.LowBattery => Loc.T("Battery low"),
@@ -499,11 +527,18 @@ public sealed partial class AlertsViewModel : ObservableObject
     public AlertsViewModel(AppServices s)
     {
         _s = s;
-        IReadOnlyList<string> scopes = [Loc.T("All devices"), .. s.Groups.Groups.Select(g => g.Name)];
+        var scopes = BuildScopes();
         foreach (var r in s.Alerts.Data.Rules.OrderBy(r => (int)r.Kind)) Rules.Add(new RuleItem(r, scopes, s.Alerts.Save));
         LoadEvents();
         s.Alerts.Changed += () => Avalonia.Threading.Dispatcher.UIThread.Post(LoadEvents);
+        s.Groups.Changed += () => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            var latest = BuildScopes();
+            foreach (var r in Rules) r.UpdateScopes(latest);
+        });
     }
+
+    IReadOnlyList<string> BuildScopes() => [Loc.T("All devices"), .. _s.Groups.Groups.Select(g => g.Name)];
 
     public ObservableCollection<RuleItem> Rules { get; } = new();
     public ObservableCollection<EventItem> Events { get; } = new();

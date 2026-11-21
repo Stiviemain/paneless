@@ -154,7 +154,7 @@ public sealed partial class GroupsViewModel : ObservableObject
         ShowDevices();
     }
 
-    static string Detail(string? model, string? type) => string.Join(" · ", new[] { type, model }.Where(s => !string.IsNullOrEmpty(s)));
+    static string Detail(string? model, string? type) => string.Join(" · ", new[] { string.IsNullOrEmpty(type) ? null : Loc.T(type), model }.Where(s => !string.IsNullOrEmpty(s)));
 
     void Upsert(string id, string name, string detail, bool onlyIfNew = false)
     {
@@ -174,7 +174,7 @@ public sealed partial class GroupsViewModel : ObservableObject
         {
             var inGroup = _s.Groups.GroupOf(d.Id);
             d.SetQuietly(group != null && inGroup == group);
-            d.WhereText = inGroup == null ? "" : inGroup == group ? "" : $"in {inGroup.Name}";
+            d.WhereText = inGroup == null ? "" : inGroup == group ? "" : Loc.F("in {0}", inGroup.Name);
         }
     }
 

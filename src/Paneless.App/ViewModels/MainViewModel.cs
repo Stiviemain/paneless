@@ -308,7 +308,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     // ---------------------------------------------------------------- battery
 
-    readonly Dictionary<string, (BatteryInfo? Info, DateTime At)> _battery = new();
+    readonly System.Collections.Concurrent.ConcurrentDictionary<string, (BatteryInfo? Info, DateTime At)> _battery = new();
     readonly HashSet<string> _batteryBusy = new();
 
     /// <summary>Reads the battery of each connected device every 30 seconds, in the background.</summary>
@@ -510,7 +510,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         var sel = Selected;
         MirrorLabel = sel is [{ Row.NeedsPairing: true }] ? Loc.T("Pair…") : sel.Count > 1 ? Loc.F("Mirror {0}", sel.Count) : Loc.T("Mirror");
-        SelectionText = sel.Count > 1 ? $"{sel.Count} selected" : "";
+        SelectionText = sel.Count > 1 ? Loc.F("{0} selected", sel.Count) : "";
         MirrorCommand.NotifyCanExecuteChanged();
         AutoUnlockCommand.NotifyCanExecuteChanged();
         UnlockNowCommand.NotifyCanExecuteChanged();
@@ -816,7 +816,7 @@ public sealed partial class MainViewModel : ObservableObject
         var rows = SelectedRows;
         if (rows.Count == 0) return;
         _s.Groups.Assign(rows.Select(r => r.GroupId), group);
-        var who = rows.Count == 1 ? rows[0].Name : $"{rows.Count} devices";
+        var who = rows.Count == 1 ? rows[0].Name : Loc.Count(rows.Count, "{0} device", "{0} devices");
         SetStatus(group == null ? Loc.F(rows.Count == 1 ? "Took {0} out of its group." : "Took {0} out of their groups.", who) : Loc.F("Moved {0} to {1}.", who, group.Name), StatusKind.Ok);
     }
 

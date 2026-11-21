@@ -12,7 +12,7 @@ public sealed partial class AppItem(AppPackage p) : ObservableObject
     public string Package { get; } = p.Name;
     [ObservableProperty] public partial bool Disabled { get; set; } = p.Disabled;
     partial void OnDisabledChanged(bool value) => OnPropertyChanged(nameof(Note));
-    public string Note => Disabled ? "disabled" : "";
+    public string Note => Disabled ? Loc.T("disabled") : "";
 }
 
 /// <summary>The apps of one device: open (also in a window of its own), stop, clear, disable, uninstall, install.</summary>
@@ -115,7 +115,7 @@ public sealed partial class AppsViewModel : ObservableObject
         if (_s.Demo) { Say(Loc.F("Demo mode: would open {0}.", p), StatusKind.Ok); return; }
         if (_serial == null) return;
         var r = await _s.Adb!.LaunchAsync(_serial, p);
-        Say(r.Output.Contains("No activities found") ? $"{p} has no screen to open." : $"Opened {p} on {_row.Name}.",
+        Say(r.Output.Contains("No activities found") ? Loc.F("{0} has no screen to open.", p) : Loc.F("Opened {0} on {1}.", p, _row.Name),
             r.Output.Contains("No activities found") ? StatusKind.Warn : StatusKind.Ok);
     }
 

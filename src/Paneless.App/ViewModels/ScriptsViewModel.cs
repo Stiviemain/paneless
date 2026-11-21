@@ -102,7 +102,7 @@ public sealed partial class ScriptsViewModel : ObservableObject
 {
     readonly AppServices _s;
     readonly MainViewModel _main;
-    readonly ScriptStore _store = new();
+    readonly ScriptStore _store;
     ScriptEntry? _current;
     bool _loading;
     object? _lastValid;
@@ -112,6 +112,7 @@ public sealed partial class ScriptsViewModel : ObservableObject
     {
         _s = services;
         _main = main;
+        _store = services.Scripts;
         RebuildList();
         RebuildTargets((tickKeys ?? main.SelectedRows.Select(r => r.Key).ToList()).ToHashSet(), firstTime: true);
         main.DevicesChanged += OnDevicesChanged;

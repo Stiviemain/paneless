@@ -35,7 +35,7 @@
     <Grid ColumnDefinitions="*,24,*">
       <!-- left: mirroring -->
       <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Spacing="10">
+        <StackPanel Spacing="10" Margin="0,0,14,0">
           <TextBlock Classes="section" Text="{l:T 'Mirroring'}" />
           <ItemsControl ItemsSource="{Binding Rows}">
             <ItemsControl.ItemTemplate>

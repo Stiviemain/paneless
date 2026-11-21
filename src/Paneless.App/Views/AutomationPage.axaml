@@ -221,7 +221,7 @@
             </StackPanel>
             <Button DockPanel.Dock="Bottom" Classes="flat" HorizontalAlignment="Left" Margin="0,8,0,0" Content="{l:T 'Show a test notification'}" Command="{Binding TestNotificationCommand}" />
             <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-              <ItemsControl ItemsSource="{Binding Rules}">
+              <ItemsControl ItemsSource="{Binding Rules}" Margin="0,0,14,0">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:RuleItem">
                     <Border Classes="card" Padding="12,10" Margin="0,0,0,8">

@@ -62,8 +62,12 @@ public sealed class AppServices
     public EffectiveProfile EffectiveFor(string groupId) =>
         EffectiveProfile.Resolve(Data.Settings, Groups.GroupOf(groupId)?.Profile, Profiles.Get(groupId));
 
+    /// <summary>User scripts. In demo mode in memory only so real scripts.json is never touched.</summary>
+    public ScriptStore Scripts => _scripts ??= Demo ? new ScriptStore([], persist: false) : new ScriptStore();
+    ScriptStore? _scripts;
+
     /// <summary>All scripts (yours first, then the built-ins).</summary>
-    public IReadOnlyList<AdbScript> AllScripts() => [.. new ScriptStore().Mine, .. BuiltInScripts.All];
+    public IReadOnlyList<AdbScript> AllScripts() => [.. Scripts.Mine, .. BuiltInScripts.All];
 
     /// <summary>Name/model/type of a device that has been connected before (by serial number).</summary>
     public KnownDevice? KnownFor(string sn) =>

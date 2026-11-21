@@ -211,12 +211,13 @@ public sealed partial class MirrorManager(ToolPaths tools)
         Directory.CreateDirectory(AppPaths.LogDir);
         var log = Path.Combine(AppPaths.LogDir, $"{kind.ToString().ToLowerInvariant()}-" + string.Concat(serial.Select(c => char.IsLetterOrDigit(c) || c == '.' ? c : '_')) + ".log");
         var writer = OpenLog(ref log);
+        var writerClosed = false;
         var p = new Process { StartInfo = psi, EnableRaisingEvents = true };
         MirrorSession? session = null;
         void Append(object _, DataReceivedEventArgs e)
         {
             if (e.Data == null) return;
-            lock (writer) writer.WriteLine(e.Data);
+            lock (writer) { if (!writerClosed) writer.WriteLine(e.Data); }
             // "[server] INFO: New display: 1080x1920/283 (id=163)"
             if (session != null && session.DisplayId == null && e.Data.Contains("New display") && DisplayIdRx.Match(e.Data) is { Success: true } m)
                 session.DisplayId = int.Parse(m.Groups[1].Value);
@@ -228,7 +229,7 @@ public sealed partial class MirrorManager(ToolPaths tools)
         p.Exited += (_, _) =>
         {
             p.WaitForExit(3000);   // flush the output handlers (bounded: a leftover child could hold the pipe)
-            lock (writer) writer.Dispose();
+            lock (writer) { writerClosed = true; writer.Dispose(); }
             lock (_lock) _sessions.Remove(session);
             int code;
             try { code = p.ExitCode; } catch { code = 0; }

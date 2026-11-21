@@ -71,8 +71,13 @@ public partial class App : Application
             else
             {
                 SetUpTray(desktop, window, vm, services);
-                // Started with Windows: stay in the notification area.
-                if (args.Contains("--tray")) window.Opened += (_, _) => window.Hide();
+                // Started with Windows: stay in the notification area (once, so clicking the tray icon can show it later).
+                if (args.Contains("--tray"))
+                {
+                    EventHandler? hideOnce = null;
+                    hideOnce = (_, _) => { window.Opened -= hideOnce; window.Hide(); };
+                    window.Opened += hideOnce;
+                }
                 window.Closing += (_, e) =>
                 {
                     if (_quitting || !services.Data.Settings.CloseToTray) return;
@@ -88,8 +93,10 @@ public partial class App : Application
                         window.Activate();
                     }));
                     // Updates from GitHub Releases: shortly after start-up, then every 6 hours.
-                    window.Opened += async (_, _) =>
+                    EventHandler? startUpdates = null;
+                    startUpdates = async (_, _) =>
                     {
+                        window.Opened -= startUpdates;
                         await Task.Delay(TimeSpan.FromSeconds(20));
                         while (true)
                         {
@@ -101,6 +108,7 @@ public partial class App : Application
                             await Task.Delay(TimeSpan.FromHours(6));
                         }
                     };
+                    window.Opened += startUpdates;
                 }
             }
         }

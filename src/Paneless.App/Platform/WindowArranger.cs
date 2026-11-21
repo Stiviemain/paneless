@@ -18,7 +18,7 @@ public static class WindowArranger
             try { s.Process.Refresh(); } catch { continue; }
             var h = s.Process.MainWindowHandle;
             if (h == 0 || Win32.Bounds(h) is not { } b || b.Right <= b.Left || b.Bottom <= b.Top) continue;
-            windows.Add((h, (double)(b.Right - b.Left) / (b.Bottom - b.Top), s.Kind == SessionKind.Mirror));
+            windows.Add((h, (double)(b.Right - b.Left) / (b.Bottom - b.Top), s.Kind is SessionKind.Mirror or SessionKind.Screen or SessionKind.App));
         }
         if (windows.Count == 0) return;
 
