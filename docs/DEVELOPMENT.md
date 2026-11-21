@@ -45,6 +45,7 @@ dotnet run --project src/Paneless.App
 - **Single instance:** a per-user mutex; a second start asks the first one (over a pipe) to show its window.
 - **Updates:** Velopack. `Updates.CheckAsync` reads GitHub Releases (`GithubSource`; betas when *Include beta versions* is on) or another source, downloads in the background and applies on exit.
 - **Translations:** English text is the key. `Loc.T` / `Loc.F` / `Loc.Count` in C#, `{l:T '…'}` in XAML, `Text.T` / `Text.F` in Core. `Localization/de.json` and `fr.json` are embedded; missing entries stay English. Built-in script names and descriptions are translated when the list is first built.
+- **Theme:** `App.axaml` defines Light (`Default`) and `Dark` resource dictionaries plus `FluentTheme` palettes, referenced with `{DynamicResource}`. `Theme.Apply` sets `RequestedThemeVariant` (System default, Light, or Dark) and updates mutable C# `SolidColorBrush` instances on `ActualThemeVariantChanged` so open windows switch live without restarting.
 
 ## Testing
 
@@ -69,7 +70,7 @@ Views:
 - `page-wall`, `page-logs`, `page-inventory`, `page-assistants`, `page-automation-0` (recipes), `-1` (scheduled tasks), `-2` (alerts)
 - `mcp-selftest`, which talks to Paneless through the real `--mcp` bridge like an AI app does and writes the conversation to `<png>.mcp.txt`
 
-Add `--lang de` or `--lang fr` to see a translation without changing your settings.
+Add `--lang de` or `--lang fr` to see a translation, and `--theme light` or `--theme dark` to test a theme, without changing your settings.
 
 **Smoke tests** (`tests/Paneless.Smoke`):
 

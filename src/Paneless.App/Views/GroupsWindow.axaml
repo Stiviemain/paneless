@@ -14,7 +14,7 @@
       <Setter Property="MinHeight" Value="0" />
     </Style>
     <Style Selector="ListBox.list ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{StaticResource SelBrush}" />
+      <Setter Property="Background" Value="{DynamicResource SelBrush}" />
     </Style>
     <Style Selector="Button.small">
       <Setter Property="Padding" Value="10,5" />
@@ -24,7 +24,7 @@
       <Setter Property="BorderThickness" Value="0" />
       <Setter Property="Padding" Value="8,4" />
       <Setter Property="FontSize" Value="13" />
-      <Setter Property="Foreground" Value="{StaticResource DimBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource DimBrush}" />
       <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
   </Window.Styles>
@@ -50,7 +50,7 @@
           <Button Classes="small" Content="↓" Command="{Binding MoveDownCommand}" ToolTip.Tip="{l:T 'Move down'}" />
           <Button Classes="small" Content="{l:T 'Delete'}" Command="{Binding DeleteCommand}" />
         </StackPanel>
-        <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
+        <Border Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
           <Panel>
             <ListBox Classes="list" ItemsSource="{Binding Groups}" SelectedItem="{Binding SelectedGroup}" Background="Transparent">
               <ListBox.ItemTemplate>
@@ -81,7 +81,7 @@
           <Button Grid.Column="2" Classes="link" Content="{l:T 'Tick all shown'}" Command="{Binding TickAllShownCommand}" />
           <Button Grid.Column="3" Classes="link" Content="{l:T 'Untick all shown'}" Command="{Binding UntickAllShownCommand}" />
         </Grid>
-        <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
+        <Border Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
           <Panel>
             <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasGroup}">
               <ItemsControl ItemsSource="{Binding Devices}" Margin="10,6">
@@ -91,7 +91,7 @@
                       <CheckBox IsChecked="{Binding IsMember}" MinWidth="0" Margin="0,0,6,0" />
                       <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                       <TextBlock Grid.Column="2" Text="{Binding Detail}" Classes="dim" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="10,0" />
-                      <TextBlock Grid.Column="3" Text="{Binding WhereText}" Foreground="{StaticResource AmberBrush}" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Grid.Column="3" Text="{Binding WhereText}" Foreground="{DynamicResource AmberBrush}" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                       <TextBlock Grid.Column="4" Text="{Binding OnlineText}" Foreground="{Binding OnlineBrush}" VerticalAlignment="Center" Margin="10,0,4,0"
                                  ToolTip.Tip="{l:T '● on the network now · ○ not on the network'}" />
                     </Grid>

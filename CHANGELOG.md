@@ -28,6 +28,7 @@ A new layout with a navigation bar on the left, automation, overview pages, AI a
 - **Automatic updates** from GitHub Releases, installed when you close Paneless (betas optional).
 - **Script sharing:** export scripts to a file or the clipboard, import them from a file, the clipboard or a link such as a GitHub Gist.
 - **German and French**, following Windows' language or chosen in Settings.
+- **Light and dark mode** in Settings, following the system theme by default and switching live.
 - Starting Paneless a second time brings the open window to the front.
 
 ## 1.0.0-beta.1 (2026-11-21)

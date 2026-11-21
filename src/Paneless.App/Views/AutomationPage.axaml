@@ -11,7 +11,7 @@
       <Setter Property="Padding" Value="10,0" />
     </Style>
     <Style Selector="TextBlock.fieldlabel">
-      <Setter Property="Foreground" Value="{StaticResource DimBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource DimBrush}" />
       <Setter Property="FontSize" Value="12" />
       <Setter Property="Margin" Value="0,0,0,4" />
     </Style>
@@ -94,7 +94,7 @@
                 <ItemsControl ItemsSource="{Binding Steps}" Margin="10,8">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:StepItem">
-                      <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,0,1" Padding="0,8">
+                      <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1" Padding="0,8">
                         <Grid ColumnDefinitions="140,*,Auto">
                           <TextBlock Text="{Binding Title}" FontWeight="SemiBold" VerticalAlignment="Center" />
                           <StackPanel Grid.Column="1" Spacing="6">
@@ -102,7 +102,7 @@
                               <TextBox Text="{Binding Path}" PlaceholderText="{l:T 'File on this computer'}" />
                               <Button Grid.Column="2" Content="…" Command="{Binding $parent[ItemsControl].((vm:RecipesViewModel)DataContext).BrowseCommand}" CommandParameter="{Binding}" />
                             </Grid>
-                            <TextBlock Classes="small" Foreground="{StaticResource AmberBrush}" Text="{l:T 'This file doesn’t exist (any more).'}" IsVisible="{Binding FileMissing}" />
+                            <TextBlock Classes="small" Foreground="{DynamicResource AmberBrush}" Text="{l:T 'This file doesn’t exist (any more).'}" IsVisible="{Binding FileMissing}" />
                             <TextBox Text="{Binding Target}" IsVisible="{Binding HasTarget}" PlaceholderText="{l:T 'Folder on the device (empty: the device’s drop folder)'}" />
                             <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Scripts}" SelectedItem="{Binding Script}" IsVisible="{Binding HasScript}"
                                       PlaceholderText="{l:T 'Choose a script'}" />

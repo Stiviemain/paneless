@@ -271,6 +271,21 @@ public sealed partial class SettingsViewModel : ObservableObject
     public bool AutoUpdate { get => G.AutoUpdate; set { G.AutoUpdate = value; Save(); OnPropertyChanged(); } }
     public bool BetaUpdates { get => G.BetaUpdates; set { G.BetaUpdates = value; Save(); OnPropertyChanged(); } }
 
+    /// <summary>Appearance: applies immediately to every open window.</summary>
+    public IReadOnlyList<Choice> ThemeChoices { get; } = Paneless.App.Theme.Modes.Select(m => new Choice(Loc.T(m.Name), m.Code)).ToList();
+    public Choice Theme
+    {
+        get => ThemeChoices.FirstOrDefault(c => (string?)c.Value == G.Theme) ?? ThemeChoices[0];
+        set
+        {
+            if (value == null) return;
+            G.Theme = (string?)value.Value ?? "";
+            Paneless.App.Theme.Apply(G.Theme);
+            Save();
+            OnPropertyChanged();
+        }
+    }
+
     /// <summary>Language: takes effect after a restart (every window reads its texts once).</summary>
     public IReadOnlyList<Choice> LanguageChoices { get; } = Localization.Loc.Languages.Select(l => new Choice(l.Code == "" ? Localization.Loc.T(l.Name) : l.Name, l.Code)).ToList();
     readonly string _startLanguage = "";

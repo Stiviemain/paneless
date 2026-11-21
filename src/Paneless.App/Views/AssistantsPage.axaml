@@ -44,7 +44,7 @@
               <TextBox Classes="code" Text="{Binding Snippet, Mode=OneWay}" MaxHeight="150" />
               <Button Grid.Column="2" Content="{l:T 'Copy'}" Command="{Binding CopyCommand}" VerticalAlignment="Top" />
             </Grid>
-            <TextBlock Classes="small" Foreground="{StaticResource AmberBrush}" Text="{Binding Message}" TextWrapping="Wrap" IsVisible="{Binding Message, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <TextBlock Classes="small" Foreground="{DynamicResource AmberBrush}" Text="{Binding Message}" TextWrapping="Wrap" IsVisible="{Binding Message, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
             <TextBlock Classes="small" TextWrapping="Wrap" Text="{l:T 'ChatGPT and Gemini in a web browser can’t reach programs on your PC, so they can’t use Paneless.'}" />
           </StackPanel>
 
@@ -113,9 +113,9 @@
                     <TextBlock Text="{Binding Mark}" Foreground="{Binding Brush}" />
                     <StackPanel Grid.Column="1">
                       <TextBlock>
-                        <Run Text="{Binding Client}" Foreground="#4f8cff" />
+                        <Run Text="{Binding Client}" Foreground="{DynamicResource AccentBrush}" />
                         <Run Text="{Binding Tool}" FontWeight="SemiBold" />
-                        <Run Text="{Binding Target}" Foreground="{StaticResource DimBrush}" />
+                        <Run Text="{Binding Target}" Foreground="{DynamicResource DimBrush}" />
                       </TextBlock>
                       <TextBlock Classes="small" Text="{Binding Detail}" Foreground="{Binding Brush}" TextWrapping="Wrap" MaxHeight="40" />
                     </StackPanel>

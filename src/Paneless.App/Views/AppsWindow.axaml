@@ -14,7 +14,7 @@
       <Setter Property="MinHeight" Value="0" />
     </Style>
     <Style Selector="ListBox#AppList ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{StaticResource SelBrush}" />
+      <Setter Property="Background" Value="{DynamicResource SelBrush}" />
     </Style>
   </Window.Styles>
 
@@ -33,14 +33,14 @@
     <Grid ColumnDefinitions="*,16,230">
       <DockPanel>
         <TextBox DockPanel.Dock="Top" Text="{Binding Filter}" PlaceholderText="{l:T 'Filter by package name, e.g. whatsapp'}" Margin="0,0,0,8" />
-        <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
+        <Border Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
           <Panel>
             <ListBox x:Name="AppList" ItemsSource="{Binding Apps}" SelectedItem="{Binding Selected}" Background="Transparent">
               <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:AppItem">
                   <Grid ColumnDefinitions="*,Auto">
                     <TextBlock Text="{Binding Package}" TextTrimming="CharacterEllipsis" FontFamily="Cascadia Mono, Consolas, Menlo, monospace" FontSize="13" />
-                    <TextBlock Grid.Column="1" Text="{Binding Note}" Foreground="{StaticResource AmberBrush}" FontSize="12" Margin="8,0,0,0" />
+                    <TextBlock Grid.Column="1" Text="{Binding Note}" Foreground="{DynamicResource AmberBrush}" FontSize="12" Margin="8,0,0,0" />
                   </Grid>
                 </DataTemplate>
               </ListBox.ItemTemplate>
@@ -59,7 +59,7 @@
         <Button HorizontalAlignment="Stretch" Content="{Binding ToggleLabel}" Command="{Binding ToggleEnabledCommand}" />
         <Button HorizontalAlignment="Stretch" Content="{l:T 'Clear data…'}" Command="{Binding ClearDataCommand}" />
         <Button HorizontalAlignment="Stretch" Content="{l:T 'Uninstall…'}" Command="{Binding UninstallCommand}" />
-        <Border Height="1" Background="{StaticResource LineBrush}" Margin="0,8" />
+        <Border Height="1" Background="{DynamicResource LineBrush}" Margin="0,8" />
         <Button HorizontalAlignment="Stretch" Content="{l:T 'Install an APK…'}" Command="{Binding InstallCommand}" />
         <CheckBox IsChecked="{Binding AlsoOnGroup}" IsVisible="{Binding InGroup}">
           <TextBlock Text="{Binding AlsoOnGroupText}" TextWrapping="Wrap" />

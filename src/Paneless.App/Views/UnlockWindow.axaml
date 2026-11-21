@@ -19,7 +19,7 @@
       <TextBox Text="{Binding Confirm}" PasswordChar="•" />
     </StackPanel>
 
-    <TextBlock Foreground="{StaticResource AmberBrush}" FontSize="12" TextWrapping="Wrap" Text="{Binding Warning}" />
+    <TextBlock Foreground="{DynamicResource AmberBrush}" FontSize="12" TextWrapping="Wrap" Text="{Binding Warning}" />
     <TextBlock Text="{Binding Status}" Foreground="{Binding StatusBrush}" TextWrapping="Wrap" MinHeight="20" />
 
     <Grid ColumnDefinitions="Auto,*,Auto">

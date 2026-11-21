@@ -31,7 +31,7 @@
 
     <Border Classes="card" ClipToBounds="True">
       <DockPanel>
-        <Grid DockPanel.Dock="Top" Height="32" Background="{StaticResource HeaderBrush}" ColumnDefinitions="1.5*,1.5*,0.9*,0.9*,0.7*,1.7*,0.6*,1*,0.6*">
+        <Grid DockPanel.Dock="Top" Height="32" Background="{DynamicResource HeaderBrush}" ColumnDefinitions="1.5*,1.5*,0.9*,0.9*,0.7*,1.7*,0.6*,1*,0.6*">
           <TextBlock Grid.Column="0" Classes="colhead" Text="{l:T 'Device'}" />
           <TextBlock Grid.Column="1" Classes="colhead" Text="{l:T 'Model'}" />
           <TextBlock Grid.Column="2" Classes="colhead" Text="{l:T 'Android'}" />

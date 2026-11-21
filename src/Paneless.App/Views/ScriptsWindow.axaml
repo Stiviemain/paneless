@@ -14,7 +14,7 @@
       <Setter Property="FontSize" Value="13" />
     </Style>
     <Style Selector="TextBlock.label">
-      <Setter Property="Foreground" Value="{StaticResource DimBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource DimBrush}" />
       <Setter Property="FontSize" Value="12" />
       <Setter Property="Margin" Value="0,0,0,6" />
     </Style>
@@ -23,10 +23,10 @@
       <Setter Property="MinHeight" Value="0" />
     </Style>
     <Style Selector="ListBox#ScriptList ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{StaticResource SelBrush}" />
+      <Setter Property="Background" Value="{DynamicResource SelBrush}" />
     </Style>
     <Style Selector="Path.chevron">
-      <Setter Property="Stroke" Value="{StaticResource DimBrush}" />
+      <Setter Property="Stroke" Value="{DynamicResource DimBrush}" />
       <Setter Property="StrokeThickness" Value="1.8" />
       <Setter Property="StrokeLineCap" Value="Round" />
       <Setter Property="StrokeJoin" Value="Round" />
@@ -45,7 +45,7 @@
       <Setter Property="BorderThickness" Value="0" />
       <Setter Property="Padding" Value="10,4" />
       <Setter Property="FontSize" Value="13" />
-      <Setter Property="Foreground" Value="{StaticResource DimBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource DimBrush}" />
       <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
   </Window.Styles>
@@ -67,20 +67,20 @@
           </DropDownButton.Flyout>
         </DropDownButton>
       </Grid>
-      <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
+      <Border Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
         <ListBox x:Name="ScriptList" ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedEntry}" Background="Transparent">
           <ListBox.DataTemplates>
             <DataTemplate DataType="vm:CategoryHeader">
-              <TextBlock Text="{Binding Title}" Foreground="{StaticResource DimBrush}" FontSize="12" FontWeight="SemiBold" Margin="0,8,0,0" />
+              <TextBlock Text="{Binding Title}" Foreground="{DynamicResource DimBrush}" FontSize="12" FontWeight="SemiBold" Margin="0,8,0,0" />
             </DataTemplate>
             <DataTemplate DataType="vm:ListHint">
-              <TextBlock Text="{Binding Text}" Foreground="{StaticResource DimBrush}" FontSize="12" FontStyle="Italic"
+              <TextBlock Text="{Binding Text}" Foreground="{DynamicResource DimBrush}" FontSize="12" FontStyle="Italic"
                          TextWrapping="Wrap" Margin="8,0,0,0" />
             </DataTemplate>
             <DataTemplate DataType="vm:ScriptEntry">
               <Grid ColumnDefinitions="*,Auto">
                 <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" Margin="8,0,0,0" />
-                <TextBlock Grid.Column="1" Text="{l:T 'asks first'}" FontSize="11" Foreground="{StaticResource AmberBrush}"
+                <TextBlock Grid.Column="1" Text="{l:T 'asks first'}" FontSize="11" Foreground="{DynamicResource AmberBrush}"
                            IsVisible="{Binding Confirm}" VerticalAlignment="Center" />
               </Grid>
             </DataTemplate>
@@ -117,7 +117,7 @@
 
         <TextBlock Classes="dim" Text="{Binding EditDescription}" TextWrapping="Wrap" IsVisible="{Binding IsBuiltIn}" />
         <TextBox Text="{Binding EditDescription}" PlaceholderText="{l:T 'What does it do? (optional)'}" IsVisible="{Binding IsMine}" TextWrapping="Wrap" />
-        <TextBlock Text="{Binding Warning}" Foreground="{StaticResource AmberBrush}" TextWrapping="Wrap" IsVisible="{Binding HasWarning}" />
+        <TextBlock Text="{Binding Warning}" Foreground="{DynamicResource AmberBrush}" TextWrapping="Wrap" IsVisible="{Binding HasWarning}" />
 
         <StackPanel>
           <TextBlock Classes="label" Text="Commands: one per line. # starts a comment. {name} or {name=default} asks for a value when it runs." />
@@ -154,7 +154,7 @@
       <TextBlock DockPanel.Dock="Top" Classes="dim" Text="{l:T 'Pick a script on the left, or click + New to write your own.'}"
                  IsVisible="{Binding !HasScript}" Margin="0,40,0,0" HorizontalAlignment="Center" />
 
-      <Border Margin="0,14,0,0" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}"
+      <Border Margin="0,14,0,0" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}"
               BorderThickness="1" CornerRadius="8">
         <TextBox Classes="mono" Text="{Binding Output}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
                  Background="Transparent" BorderThickness="0" PlaceholderText="{l:T 'Output appears here.'}"
@@ -169,7 +169,7 @@
         <Button Grid.Column="1" Classes="link" Content="{l:T 'All'}" Command="{Binding TickAllCommand}" />
         <Button Grid.Column="2" Classes="link" Content="{l:T 'None'}" Command="{Binding TickNoneCommand}" />
       </Grid>
-      <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="8">
+      <Border Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="8">
         <Panel>
           <TextBlock Classes="dim" Margin="16" TextWrapping="Wrap" IsVisible="{Binding NoTargets}"
                      Text="{l:T 'No devices on the network. Turn on Wireless debugging on a device, or connect one from the main window.'}" />

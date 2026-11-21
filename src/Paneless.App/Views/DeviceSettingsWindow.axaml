@@ -15,7 +15,7 @@
       <Setter Property="Margin" Value="0,4,0,8" />
     </Style>
     <Style Selector="TextBlock.label">
-      <Setter Property="Foreground" Value="{StaticResource DimBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource DimBrush}" />
       <Setter Property="FontSize" Value="12" />
     </Style>
   </Window.Styles>
@@ -76,7 +76,7 @@
                      Text="{l:T 'Run these scripts every time it connects (also after a restart of the device or of Paneless). Only scripts that need no values are listed.'}" />
           <TextBox Text="{Binding ScriptFilter}" PlaceholderText="{l:T 'Filter scripts'}" />
         </StackPanel>
-        <Border Margin="0,8,0,0" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="8">
+        <Border Margin="0,8,0,0" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="8">
           <ScrollViewer HorizontalScrollBarVisibility="Disabled">
             <ItemsControl ItemsSource="{Binding ShownScripts}" Margin="10,6">
               <ItemsControl.ItemTemplate>

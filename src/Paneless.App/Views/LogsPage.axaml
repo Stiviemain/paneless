@@ -28,7 +28,7 @@
       <CheckBox Content="{l:T 'Crashes only'}" IsChecked="{Binding CrashesOnly}" />
       <CheckBox Grid.Column="1" Content="{l:T 'Follow the newest lines'}" IsChecked="{Binding FollowNewest}" Margin="16,0,0,0" />
       <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
-        <TextBlock Classes="small" Foreground="{StaticResource AmberBrush}" VerticalAlignment="Center"
+        <TextBlock Classes="small" Foreground="{DynamicResource AmberBrush}" VerticalAlignment="Center"
                    Text="{Binding Crashes, StringFormat='{}{0} ⚠'}" IsVisible="{Binding HasCrashes}" ToolTip.Tip="{l:T 'App crashes in this log'}" />
         <TextBlock Classes="small" Text="{Binding Status}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
       </StackPanel>
@@ -46,9 +46,9 @@
           <ListBox.ItemTemplate>
             <DataTemplate x:DataType="vm:LogItem">
               <Grid ColumnDefinitions="92,18,150,*" TextElement.FontFamily="Cascadia Mono, Consolas, Menlo, monospace">
-                <TextBlock Text="{Binding Time}" FontSize="12" Foreground="{StaticResource DimBrush}" />
+                <TextBlock Text="{Binding Time}" FontSize="12" Foreground="{DynamicResource DimBrush}" />
                 <TextBlock Grid.Column="1" Text="{Binding Level}" FontSize="12" Foreground="{Binding Brush}" />
-                <TextBlock Grid.Column="2" Text="{Binding Tag}" FontSize="12" Foreground="{StaticResource DimBrush}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Column="2" Text="{Binding Tag}" FontSize="12" Foreground="{DynamicResource DimBrush}" TextTrimming="CharacterEllipsis" />
                 <TextBlock Grid.Column="3" Text="{Binding Message}" FontSize="12" Foreground="{Binding Brush}" FontWeight="{Binding Weight}" TextWrapping="Wrap" />
               </Grid>
             </DataTemplate>

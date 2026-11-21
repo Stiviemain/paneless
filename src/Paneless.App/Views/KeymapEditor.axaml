@@ -41,7 +41,7 @@
     <TextBlock DockPanel.Dock="Top" x:Name="HintText" Margin="0,12,0,8" TextWrapping="Wrap" />
     <TextBlock DockPanel.Dock="Bottom" x:Name="StatusText" Classes="dim" Margin="0,10,0,0" TextWrapping="Wrap" />
 
-    <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
+    <Border Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
       <Panel>
         <Viewbox Stretch="Uniform" Margin="10">
           <Grid x:Name="Surface" Width="1080" Height="2400">

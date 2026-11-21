@@ -48,9 +48,10 @@ public partial class App : Application
             var view = ArgAfter(args, "--snapshot-view") ?? "main";
 
             var services = new AppServices(demo);
-            // Language first: every window reads its texts while it's built.
+            // Language and theme first: every window reads its texts and colours while it's built.
             Localization.Loc.Init(ArgAfter(args, "--lang") ?? services.Data.Settings.Language);
             Paneless.Core.Text.Translate = Localization.Loc.T;
+            Theme.Apply(ArgAfter(args, "--theme") ?? services.Data.Settings.Theme);
 
             // One Paneless per user: a second start brings the first one forward.
             if (snapshot == null && !demo && !SingleInstance.TryClaim())

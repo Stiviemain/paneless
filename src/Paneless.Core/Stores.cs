@@ -34,6 +34,8 @@ public sealed class AppSettings
     public bool BetaUpdates { get; set; } = true;
     /// <summary>"" = Windows' language, or "en", "de", "fr".</summary>
     public string Language { get; set; } = "";
+    /// <summary>"" = system default, or "light", "dark".</summary>
+    public string Theme { get; set; } = "";
     /// <summary>Let Claude (Claude Desktop / Claude Code) use Paneless through MCP.</summary>
     public bool AssistantsEnabled { get; set; }
     /// <summary>What Claude may do on devices without a setting of their own.</summary>

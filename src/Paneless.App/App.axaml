@@ -1,34 +1,58 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="Paneless.App.App"
-             RequestedThemeVariant="Dark">
+             RequestedThemeVariant="Default">
 
   <Application.Resources>
-    <SolidColorBrush x:Key="BgBrush" Color="#17181c" />
-    <SolidColorBrush x:Key="PanelBrush" Color="#212228" />
-    <SolidColorBrush x:Key="HeaderBrush" Color="#1b1c21" />
-    <SolidColorBrush x:Key="LineBrush" Color="#33353d" />
-    <SolidColorBrush x:Key="SelBrush" Color="#263a5e" />
-    <SolidColorBrush x:Key="HoverBrush" Color="#272830" />
-    <SolidColorBrush x:Key="TextBrush" Color="#eceef2" />
-    <SolidColorBrush x:Key="DimBrush" Color="#9a9ca6" />
-    <SolidColorBrush x:Key="AmberBrush" Color="#e8b75a" />
+    <ResourceDictionary>
+      <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Default">
+          <SolidColorBrush x:Key="BgBrush" Color="#f4f5f7" />
+          <SolidColorBrush x:Key="PanelBrush" Color="#ffffff" />
+          <SolidColorBrush x:Key="HeaderBrush" Color="#ebedf2" />
+          <SolidColorBrush x:Key="LineBrush" Color="#d8dce4" />
+          <SolidColorBrush x:Key="SelBrush" Color="#dce7fb" />
+          <SolidColorBrush x:Key="HoverBrush" Color="#e5e8ef" />
+          <SolidColorBrush x:Key="TextBrush" Color="#181a20" />
+          <SolidColorBrush x:Key="DimBrush" Color="#5b606e" />
+          <SolidColorBrush x:Key="AccentBrush" Color="#2563eb" />
+          <SolidColorBrush x:Key="LinkBrush" Color="#1d56d8" />
+          <SolidColorBrush x:Key="AmberBrush" Color="#b4690e" />
+          <SolidColorBrush x:Key="RedBrush" Color="#c93434" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+          <SolidColorBrush x:Key="BgBrush" Color="#17181c" />
+          <SolidColorBrush x:Key="PanelBrush" Color="#212228" />
+          <SolidColorBrush x:Key="HeaderBrush" Color="#1b1c21" />
+          <SolidColorBrush x:Key="LineBrush" Color="#33353d" />
+          <SolidColorBrush x:Key="SelBrush" Color="#263a5e" />
+          <SolidColorBrush x:Key="HoverBrush" Color="#272830" />
+          <SolidColorBrush x:Key="TextBrush" Color="#eceef2" />
+          <SolidColorBrush x:Key="DimBrush" Color="#9a9ca6" />
+          <SolidColorBrush x:Key="AccentBrush" Color="#4f8cff" />
+          <SolidColorBrush x:Key="LinkBrush" Color="#8db4ff" />
+          <SolidColorBrush x:Key="AmberBrush" Color="#e8b75a" />
+          <SolidColorBrush x:Key="RedBrush" Color="#f07272" />
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+    </ResourceDictionary>
   </Application.Resources>
 
   <Application.Styles>
     <FluentTheme>
       <FluentTheme.Palettes>
+        <ColorPaletteResources x:Key="Light" Accent="#2563eb" RegionColor="#f4f5f7" AltHigh="#ffffff" BaseHigh="#181a20" />
         <ColorPaletteResources x:Key="Dark" Accent="#4f8cff" RegionColor="#17181c" AltHigh="#17181c" BaseHigh="#eceef2" />
       </FluentTheme.Palettes>
     </FluentTheme>
 
     <Style Selector="Window">
-      <Setter Property="Background" Value="{StaticResource BgBrush}" />
-      <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+      <Setter Property="Background" Value="{DynamicResource BgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
       <Setter Property="FontSize" Value="14" />
     </Style>
     <Style Selector="TextBlock.dim">
-      <Setter Property="Foreground" Value="{StaticResource DimBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource DimBrush}" />
     </Style>
     <!-- pages of the main window -->
     <Style Selector="TextBlock.pagetitle">
@@ -36,7 +60,7 @@
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <Style Selector="TextBlock.pagehint">
-      <Setter Property="Foreground" Value="{StaticResource DimBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource DimBrush}" />
       <Setter Property="TextWrapping" Value="Wrap" />
       <Setter Property="FontSize" Value="13" />
     </Style>
@@ -45,12 +69,12 @@
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <Style Selector="TextBlock.small">
-      <Setter Property="Foreground" Value="{StaticResource DimBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource DimBrush}" />
       <Setter Property="FontSize" Value="12" />
     </Style>
     <Style Selector="Border.card">
-      <Setter Property="Background" Value="{StaticResource PanelBrush}" />
-      <Setter Property="BorderBrush" Value="{StaticResource LineBrush}" />
+      <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="8" />
     </Style>
@@ -58,21 +82,21 @@
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="BorderThickness" Value="0" />
       <Setter Property="Padding" Value="8,4" />
-      <Setter Property="Foreground" Value="{StaticResource DimBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource DimBrush}" />
     </Style>
     <Style Selector="Button.flat:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{StaticResource HoverBrush}" />
-      <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+      <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
     </Style>
     <Style Selector="ListBox.plain ListBoxItem">
       <Setter Property="Padding" Value="12,7" />
       <Setter Property="MinHeight" Value="0" />
     </Style>
     <Style Selector="ListBox.plain ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{StaticResource SelBrush}" />
+      <Setter Property="Background" Value="{DynamicResource SelBrush}" />
     </Style>
     <Style Selector="TextBlock.colhead">
-      <Setter Property="Foreground" Value="{StaticResource DimBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource DimBrush}" />
       <Setter Property="FontSize" Value="12" />
       <Setter Property="Margin" Value="12,0" />
       <Setter Property="VerticalAlignment" Value="Center" />
@@ -81,28 +105,28 @@
       <Setter Property="Margin" Value="12,0" />
       <Setter Property="VerticalAlignment" Value="Center" />
       <Setter Property="TextTrimming" Value="CharacterEllipsis" />
-      <Setter Property="Foreground" Value="{StaticResource DimBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource DimBrush}" />
     </Style>
     <Style Selector="Button">
       <Setter Property="Padding" Value="14,7" />
       <Setter Property="CornerRadius" Value="6" />
     </Style>
 
-    <!-- Device list rows: thin separators, dark selection instead of Fluent's accent fill. -->
+    <!-- Device list rows: thin separators, soft selection instead of Fluent's solid accent fill. -->
     <Style Selector="ListBox#DeviceList ListBoxItem">
       <Setter Property="Padding" Value="0" />
       <Setter Property="MinHeight" Value="0" />
-      <Setter Property="BorderBrush" Value="{StaticResource LineBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}" />
       <Setter Property="BorderThickness" Value="0,0,0,1" />
     </Style>
     <Style Selector="ListBox#DeviceList ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{StaticResource HoverBrush}" />
+      <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
     </Style>
     <Style Selector="ListBox#DeviceList ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{StaticResource SelBrush}" />
+      <Setter Property="Background" Value="{DynamicResource SelBrush}" />
     </Style>
     <Style Selector="ListBox#DeviceList ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{StaticResource SelBrush}" />
+      <Setter Property="Background" Value="{DynamicResource SelBrush}" />
     </Style>
   </Application.Styles>
 </Application>
