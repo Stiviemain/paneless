@@ -62,6 +62,11 @@ public sealed partial class MirrorManager(ToolPaths tools)
         if (o.MaxSize is { } max) yield return $"--max-size={max}";
     }
 
+    bool HasDisplaySession(string serial)
+    {
+        lock (_lock) return _sessions.Any(s => s.IsRunning && s.Serial == serial && s.Kind is SessionKind.Mirror or SessionKind.Screen or SessionKind.App);
+    }
+
     /// <summary>Mirrors the device's screen.</summary>
     public MirrorSession Start(string serial, string name, MirrorOptions o)
     {
@@ -70,7 +75,7 @@ public sealed partial class MirrorManager(ToolPaths tools)
         if (o.ScreenOff) args.Add("--turn-screen-off");
         if (!o.Audio) args.Add("--no-audio");
         if (o.OnTop) args.Add("--always-on-top");
-        if (o.KeepAwake || o.ScreenOff) args.Add("--screen-off-timeout=3600");
+        if ((o.KeepAwake || o.ScreenOff) && !HasDisplaySession(serial)) args.Add("--screen-off-timeout=3600");
         return StartCore(serial, name, SessionKind.Mirror, args);
     }
 
@@ -81,7 +86,9 @@ public sealed partial class MirrorManager(ToolPaths tools)
         var title = $"{name} – {package}";
         var args = new List<string> { "--window-title", title, "--new-display=1080x1920", "--flex-display", "--start-app=" + package, "--no-audio" };
         args.AddRange(Quality(o with { MaxSize = null }));
+        if (o.ScreenOff) args.Add("--turn-screen-off");
         if (o.OnTop) args.Add("--always-on-top");
+        if ((o.KeepAwake || o.ScreenOff) && !HasDisplaySession(serial)) args.Add("--screen-off-timeout=3600");
         return StartCore(serial, title, SessionKind.App, args);
     }
 
@@ -91,7 +98,9 @@ public sealed partial class MirrorManager(ToolPaths tools)
         var title = $"{name} – second screen";
         var args = new List<string> { "--window-title", title, "--new-display=1600x1000", "--flex-display", "--no-audio" };
         args.AddRange(Quality(o with { MaxSize = null }));
+        if (o.ScreenOff) args.Add("--turn-screen-off");
         if (o.OnTop) args.Add("--always-on-top");
+        if ((o.KeepAwake || o.ScreenOff) && !HasDisplaySession(serial)) args.Add("--screen-off-timeout=3600");
         return StartCore(serial, title, SessionKind.Screen, args);
     }
 

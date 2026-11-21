@@ -45,7 +45,7 @@ public sealed partial class UnlockService(AdbClient adb, DataStore data, ISecret
         return new LockInfo(locked, LockScreenRx().IsMatch(focus));
     }
 
-    public async Task<UnlockResult> UnlockAsync(string serial, string sn, string name)
+    public async Task<UnlockResult> UnlockAsync(string serial, string sn, string name, bool wakeIfUnlocked = true)
     {
         if (!data.Unlock.TryGetValue(sn, out var entry)) return new(false, Text.F("No unlock code is saved for {0}.", name));
         if (!entry.Enabled) return new(false, Text.F("Auto-unlock for {0} is paused after a failed try. Save its code again to turn it back on.", name));
@@ -54,7 +54,7 @@ public sealed partial class UnlockService(AdbClient adb, DataStore data, ISecret
         if (st.Locked == null) return new(false, Text.F("Couldn't read the lock state of {0}, so nothing was typed.", name));
         if (st.Locked == false)
         {
-            await adb.ShellAsync(serial, "input keyevent KEYCODE_WAKEUP", TimeSpan.FromSeconds(5));
+            if (wakeIfUnlocked) await adb.ShellAsync(serial, "input keyevent KEYCODE_WAKEUP", TimeSpan.FromSeconds(5));
             return new(true, Text.F("{0} is already unlocked.", name));
         }
 

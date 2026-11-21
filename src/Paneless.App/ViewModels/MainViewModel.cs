@@ -577,13 +577,14 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         }
         string? note = null;
+        var opts = Options(r);
         if (_s.Unlock!.IsReady(r.Sn))
         {
             SetStatus(Loc.F("Unlocking {0}…", r.Name));
-            var res = await _s.Unlock.UnlockAsync(serial, r.Sn!, r.Name);
+            var res = await _s.Unlock.UnlockAsync(serial, r.Sn!, r.Name, wakeIfUnlocked: !opts.ScreenOff);
             if (!res.Ok) note = res.Message;
         }
-        var session = _s.Mirrors!.Start(serial, r.Name, Options(r));
+        var session = _s.Mirrors!.Start(serial, r.Name, opts);
         MirrorStarted?.Invoke(session, r);
         if (note != null) SetStatus(Loc.F("Mirroring {0}, but: {1}", r.Name, note), StatusKind.Warn);
         else SetStatus(Loc.F("Mirroring {0}. Close its window to stop.", r.Name), StatusKind.Ok);
@@ -738,17 +739,34 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     /// <summary>Starts a scrcpy window of another kind (app, second screen, camera) for one device.</summary>
-    async Task StartWindowAsync(DeviceRow? r, string what, Func<string, MirrorSession> start, Func<string, Task>? prepare = null)
+    async Task StartWindowAsync(DeviceRow? r, string what, Func<string, MirrorSession> start, Func<string, Task>? prepare = null, bool unlock = false)
     {
         if (r is not { CanMirror: true }) { SetStatus(Loc.T("Select one available device first."), StatusKind.Warn); return; }
         if (_s.Demo) { SetStatus(Loc.F("Demo mode: would open {0} of {1}.", what, r.Name), StatusKind.Ok); return; }
-        var serial = await _s.Directory!.ConnectAsync(r);
-        if (serial == null) { SetStatus(Loc.F("Couldn't connect to {0}.", r.Name), StatusKind.Error); return; }
-        if (prepare != null) await prepare(serial);
-        var session = start(serial);
-        // Second screens and app windows get a toolbar of their own.
-        if (session.Kind is SessionKind.Screen or SessionKind.App) MirrorStarted?.Invoke(session, r);
-        SetStatus(Loc.F("Opening {0} of {1}…", what, r.Name), StatusKind.Ok);
+        IsBusy = true;
+        var connected = false;
+        try
+        {
+            if (r.State == DeviceState.Available) SetStatus(Loc.F("Connecting to {0}…", r.Name));
+            var serial = await _s.Directory!.ConnectAsync(r);
+            if (serial == null) { SetStatus(Loc.F("Couldn't connect to {0}.", r.Name), StatusKind.Error); return; }
+            connected = r.State == DeviceState.Available;
+            string? note = null;
+            if (unlock && _s.Unlock!.IsReady(r.Sn))
+            {
+                SetStatus(Loc.F("Unlocking {0}…", r.Name));
+                var res = await _s.Unlock.UnlockAsync(serial, r.Sn!, r.Name, wakeIfUnlocked: !Options(r).ScreenOff);
+                if (!res.Ok) note = res.Message;
+            }
+            if (prepare != null) await prepare(serial);
+            var session = start(serial);
+            // Second screens and app windows get a toolbar of their own.
+            if (session.Kind is SessionKind.Screen or SessionKind.App) MirrorStarted?.Invoke(session, r);
+            if (note != null) SetStatus(Loc.F("Opening {0} of {1}, but: {2}", what, r.Name, note), StatusKind.Warn);
+            else SetStatus(Loc.F("Opening {0} of {1}…", what, r.Name), StatusKind.Ok);
+        }
+        finally { IsBusy = false; }
+        if (connected) await RefreshListAsync();
     }
 
     [RelayCommand]
@@ -756,7 +774,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Opens a second screen of a device (also from its mirror's toolbar).</summary>
     public Task OpenSecondScreenAsync(DeviceRow? r) =>
-        StartWindowAsync(r, Loc.T("a second screen"), serial => _s.Mirrors!.StartScreen(serial, r!.Name, Options(r!)));
+        StartWindowAsync(r, Loc.T("a second screen"), serial => _s.Mirrors!.StartScreen(serial, r!.Name, Options(r!)), unlock: true);
 
     [RelayCommand]
     Task CameraBack() => OpenCameraAsync(One, false);
@@ -775,7 +793,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Opens one app of a device in a window of its own (from the app manager).</summary>
     public Task OpenAppWindowAsync(DeviceRow r, string package) =>
-        StartWindowAsync(r, package, serial => _s.Mirrors!.StartApp(serial, r.Name, package, Options(r)));
+        StartWindowAsync(r, package, serial => _s.Mirrors!.StartApp(serial, r.Name, package, Options(r)), unlock: true);
 
     [RelayCommand]
     async Task SendFiles()

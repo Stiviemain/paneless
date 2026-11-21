@@ -475,6 +475,7 @@
   "Opening a second screen (it gets a toolbar of its own).": "Ouverture d’un second écran (il a sa propre barre d’outils).",
   "Opening the back camera (Alt+← / Alt+→ in its window turn the picture)…": "Ouverture de la caméra arrière (Alt+← / Alt+→ dans sa fenêtre font pivoter l’image)…",
   "Opening {0} in a window of its own (a separate screen of the device, so its own screen stays as it is).": "Ouverture de {0} dans sa propre fenêtre (un écran séparé de l’appareil, son propre écran reste tel quel).",
+  "Opening {0} of {1}, but: {2}": "Ouverture de {0} de {1}, mais : {2}",
   "Opening {0} of {1}…": "Ouverture de {0} de {1}…",
   "Opens it on the device": "L’ouvre sur l’appareil",
   "Opens the app's settings page (storage, permissions, battery) on the device.": "Ouvre la page des paramètres de l’app (stockage, autorisations, batterie) sur l’appareil.",
