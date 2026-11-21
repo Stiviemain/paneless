@@ -30,6 +30,7 @@ A new layout with a navigation bar on the left, automation, overview pages, AI a
 - **German and French**, following Windows' language or chosen in Settings.
 - **Light and dark mode** in Settings, following the system theme by default and switching live.
 - Starting Paneless a second time brings the open window to the front.
+- **Fixes & polish:** safe restore from the notification area (`--tray` / close to tray), reliable shortcut conflict reporting, AI `list_groups` respects hidden (`Off`) devices and `read_log` still finds logs of recently crashed apps, live group/recipe updates on the Automation page, and toolbar spacing when arranging second screens and app windows.
 
 ## 1.0.0-beta.1 (2026-11-21)
 

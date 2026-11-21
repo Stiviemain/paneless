@@ -128,6 +128,7 @@ The interface is built with [Avalonia](https://avaloniaui.net/), a cross-platfor
 - A global shortcut per device (e.g. Ctrl+Alt+P).
 - **Automatic updates** from GitHub Releases: downloaded in the background and installed when you close Paneless. Can be turned off.
 - **Share scripts:** export one or all of your scripts as a file or to the clipboard; import from a file, the clipboard or a link (e.g. a GitHub Gist). Imported scripts are shown before they're added and ask before running.
+- **Light and dark mode**, following the system theme by default and switching live in Settings.
 - **English, German and French**, following Windows' language or chosen in Settings.
 
 ## Install
@@ -175,6 +176,7 @@ From then on, the device appears whenever Wireless debugging is on and it's on t
 | Find out why an app crashes | **Logs**, then **Crashes only** |
 | Get a list of all devices for Excel | **Inventory › Read devices › Export** |
 | Share a script | **Scripts**, select it, **Share** (to add one: **Import**) |
+| Switch light / dark mode | **Settings › Appearance** (follows the system theme by default) |
 | Change the language | **Settings › Language**, then restart Paneless |
 
 <p align="center"><img src="docs/images/device-settings.png" width="640" alt="Device settings"></p>
