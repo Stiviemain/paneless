@@ -1,0 +1,16 @@
+# build output
+releases/
+build-cache/
+bin/
+obj/
+.vs/
+*.user
+
+# personal data (lives in %LOCALAPPDATA%\Paneless, but never commit it if a copy lands here)
+known-devices.json
+settings.json
+unlock-codes.json
+*.log
+
+# machine-specific shortcuts
+*.lnk

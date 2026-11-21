@@ -1,0 +1,54 @@
+name: Release
+
+# Push a tag like v1.0.0-beta.2: builds the Windows installer and attaches it to a draft release.
+# Check the draft on GitHub, then publish it.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build installer
+        shell: powershell
+        run: .\build.ps1
+
+      - name: Collect files and checksums
+        id: files
+        shell: pwsh
+        run: |
+          $version = ([xml](Get-Content -Raw src/Paneless.App/Paneless.App.csproj)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          if ("v$version" -ne "${{ github.ref_name }}" -and "${{ github.event_name }}" -eq 'push') { throw "Tag ${{ github.ref_name }} doesn't match <Version> $version" }
+          New-Item -ItemType Directory dist | Out-Null
+          Copy-Item releases/PanelessApp-win-Setup.exe "dist/Paneless-$version-Setup.exe"
+          Copy-Item releases/PanelessApp-win-Portable.zip "dist/Paneless-$version-Portable.zip"
+          Get-ChildItem dist | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name } |
+            Set-Content dist/SHA256SUMS.txt -Encoding ascii
+          # Release notes: this version's section of CHANGELOG.md
+          $log = Get-Content -Raw CHANGELOG.md
+          $m = [regex]::Match($log, "(?ms)^## $([regex]::Escape($version)) .*?\r?\n(.*?)(?=^## |\z)")
+          $notes = if ($m.Success) { $m.Groups[1].Value.Trim() } else { "See CHANGELOG.md." }
+          $notes += "`n`n**Install:** download ``Paneless-$version-Setup.exe`` and run it (Windows 10/11, no admin rights). Checksums are in ``SHA256SUMS.txt``."
+          Set-Content notes.md $notes -Encoding utf8
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Draft release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $v = "${{ steps.files.outputs.version }}"
+          $extra = @()
+          if ($v -match '-') { $extra += '--prerelease' }   # e.g. 1.0.0-beta.1
+          gh release create "v$v" (Get-ChildItem dist).FullName --draft @extra --title "Paneless $v" --notes-file notes.md

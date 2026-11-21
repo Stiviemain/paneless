@@ -1,0 +1,29 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Paneless.App.ViewModels"
+        x:Class="Paneless.App.Views.PairWindow"
+        x:DataType="vm:PairViewModel"
+        Title="Pair a device" Icon="/Assets/Paneless.ico"
+        Width="520" SizeToContent="Height" CanResize="False"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+
+  <StackPanel Margin="24,20" Spacing="14">
+    <TextBlock Text="Pair a phone or tablet" FontSize="18" FontWeight="SemiBold" />
+    <TextBlock Classes="dim" TextWrapping="Wrap"
+               Text="On the device, open Settings › System › Developer options › Wireless debugging and tap 'Pair device with pairing code'. The address fills in below by itself. Then type the 6-digit code." />
+
+    <Grid ColumnDefinitions="*,16,170" RowDefinitions="Auto,Auto">
+      <TextBlock Classes="dim" FontSize="12" Text="Address (IP:port)" Margin="0,0,0,6" />
+      <TextBox Grid.Row="1" Text="{Binding Address}" PlaceholderText="192.168.2.40:41234" />
+      <TextBlock Grid.Column="2" Classes="dim" FontSize="12" Text="Pairing code" Margin="0,0,0,6" />
+      <TextBox x:Name="CodeBox" Grid.Column="2" Grid.Row="1" Text="{Binding Code}" MaxLength="6" PlaceholderText="123456" />
+    </Grid>
+
+    <TextBlock Text="{Binding Status}" Foreground="{Binding StatusBrush}" TextWrapping="Wrap" MinHeight="40" />
+
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button Content="Cancel" Command="{Binding CancelCommand}" IsCancel="True" />
+      <Button Classes="accent" Content="Pair" MinWidth="90" Command="{Binding PairCommand}" IsDefault="True" FontWeight="SemiBold" />
+    </StackPanel>
+  </StackPanel>
+</Window>

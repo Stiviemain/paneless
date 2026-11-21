@@ -1,0 +1,318 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Paneless.App.ViewModels"
+        xmlns:app="using:Paneless.App"
+        x:Class="Paneless.App.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Title="{Binding Title}"
+        Icon="/Assets/Paneless.ico"
+        Width="1000" Height="660" MinWidth="820" MinHeight="480"
+        WindowStartupLocation="CenterScreen">
+
+  <Window.KeyBindings>
+    <KeyBinding Gesture="F5" Command="{Binding RefreshCommand}" />
+  </Window.KeyBindings>
+
+  <Window.Styles>
+    <Style Selector="Path.icon">
+      <Setter Property="Stroke" Value="{StaticResource TextBrush}" />
+      <Setter Property="StrokeThickness" Value="1.7" />
+      <Setter Property="StrokeLineCap" Value="Round" />
+      <Setter Property="StrokeJoin" Value="Round" />
+      <Setter Property="Width" Value="18" />
+      <Setter Property="Height" Value="18" />
+      <Setter Property="Stretch" Value="Uniform" />
+    </Style>
+    <Style Selector="Path.chevron">
+      <Setter Property="Stroke" Value="{StaticResource DimBrush}" />
+      <Setter Property="StrokeThickness" Value="1.8" />
+      <Setter Property="StrokeLineCap" Value="Round" />
+      <Setter Property="StrokeJoin" Value="Round" />
+      <Setter Property="Width" Value="16" />
+      <Setter Property="Height" Value="16" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <!-- Group headings: the whole row is one button that collapses/expands the group. -->
+    <Style Selector="Button.grouphead">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="0" />
+      <Setter Property="Padding" Value="12,0" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="VerticalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.grouphead:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource HoverBrush}" />
+    </Style>
+    <Style Selector="Button.link">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="10,4" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="{StaticResource DimBrush}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource HoverBrush}" />
+      <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+    </Style>
+    <Style Selector="TextBlock.label">
+      <Setter Property="Foreground" Value="{StaticResource DimBrush}" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+  </Window.Styles>
+
+  <DockPanel Margin="22,16,22,12">
+
+    <!-- header: who we are, what's around; search and the app-wide buttons on the right -->
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,16">
+      <Image Source="/Assets/Paneless.png" Width="50" Height="50" Margin="-4,0,12,0"
+             RenderOptions.BitmapInterpolationMode="HighQuality" VerticalAlignment="Center" />
+      <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+        <TextBlock Text="Paneless" FontSize="24" FontWeight="SemiBold" />
+        <TextBlock Classes="dim" Text="{Binding Summary}" TextTrimming="CharacterEllipsis" />
+      </StackPanel>
+      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+        <TextBox x:Name="SearchBox" Width="230" Text="{Binding Search}" PlaceholderText="Search devices  (Ctrl+F)">
+          <TextBox.InnerLeftContent>
+            <Path Classes="icon" Width="15" Height="15" Margin="10,0,0,0" Stroke="{StaticResource DimBrush}"
+                  Data="M10.5 4 A6.5 6.5 0 1 1 10.49 4 Z M15.2 15.2 L20 20" />
+          </TextBox.InnerLeftContent>
+        </TextBox>
+        <DropDownButton Content="+ Add device" ToolTip.Tip="Pair a new device, or connect one by its address">
+          <DropDownButton.Flyout>
+            <Flyout Placement="BottomEdgeAlignedRight">
+              <StackPanel Width="330" Spacing="10" Margin="4">
+                <TextBlock Classes="dim" FontSize="12" TextWrapping="Wrap"
+                           Text="Devices with Wireless debugging turned on show up in the list by themselves. The first time, pair them with a code." />
+                <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                        Content="Pair with a code…" Command="{Binding PairCommand}" />
+                <TextBlock Classes="label" Text="Not listed? Connect by address" Margin="0,6,0,0" />
+                <Grid ColumnDefinitions="*,8,Auto">
+                  <TextBox Text="{Binding ManualAddress}" PlaceholderText="IP:port, e.g. 192.168.2.40:37123">
+                    <TextBox.KeyBindings>
+                      <KeyBinding Gesture="Enter" Command="{Binding ConnectCommand}" />
+                    </TextBox.KeyBindings>
+                  </TextBox>
+                  <Button Grid.Column="2" Content="Connect" Command="{Binding ConnectCommand}" />
+                </Grid>
+              </StackPanel>
+            </Flyout>
+          </DropDownButton.Flyout>
+        </DropDownButton>
+        <Button Content="Scripts" Command="{Binding OpenScriptsCommand}" ToolTip.Tip="Your saved adb commands and the built-in ones" />
+        <Button Padding="10,7" ToolTip.Tip="Support Paneless">
+          <TextBlock Text="♥" Foreground="#ea4aaa" FontSize="15" />
+          <Button.Flyout>
+            <Flyout Placement="BottomEdgeAlignedRight">
+              <StackPanel Width="290" Spacing="10" Margin="4">
+                <TextBlock Text="Support Paneless" FontWeight="SemiBold" FontSize="15" />
+                <TextBlock Classes="dim" FontSize="12" TextWrapping="Wrap"
+                           Text="Paneless is free and open source. If it saves you time, you can support its development. Thank you!" />
+                <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Tag="{x:Static app:AppLinks.KoFi}" Click="OpenLink">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="☕" />
+                    <TextBlock Text="Buy me a coffee on Ko-fi" />
+                  </StackPanel>
+                </Button>
+                <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Tag="{x:Static app:AppLinks.Repository}" Click="OpenLink">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="⭐" />
+                    <TextBlock Text="Star it or report a bug on GitHub" />
+                  </StackPanel>
+                </Button>
+              </StackPanel>
+            </Flyout>
+          </Button.Flyout>
+        </Button>
+      </StackPanel>
+    </Grid>
+
+    <!-- status line -->
+    <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto" Margin="0,10,0,0">
+      <TextBlock Text="{Binding StatusText}" Foreground="{Binding StatusBrush}" TextTrimming="CharacterEllipsis" />
+      <TextBlock Grid.Column="1" Classes="dim" FontSize="12" Text="{Binding Tip}" Margin="16,0,0,0" VerticalAlignment="Center"
+                 ToolTip.Tip="Drop files or APKs on a device or group to copy or install them." />
+    </Grid>
+
+    <!-- action bar: what to do with the selected devices; options for mirroring on the right -->
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,10">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <Button Classes="accent" MinWidth="104" Content="{Binding MirrorLabel}" Command="{Binding MirrorCommand}" FontWeight="SemiBold"
+                ToolTip.Tip="Mirror the selected devices (Enter or double-click)" />
+        <Button Content="Run script…" Command="{Binding RunScriptCommand}" ToolTip.Tip="Run a script on the selected devices" />
+        <Button Content="Groups…" Command="{Binding ManageGroupsCommand}"
+                ToolTip.Tip="Create, rename and order groups, and choose which devices are in each" />
+        <DropDownButton Content="Unlock">
+          <DropDownButton.Flyout>
+            <MenuFlyout Placement="BottomEdgeAlignedLeft">
+              <MenuItem Header="Unlock now" Command="{Binding UnlockNowCommand}" />
+              <MenuItem Header="Auto-unlock settings…" Command="{Binding AutoUnlockCommand}" />
+            </MenuFlyout>
+          </DropDownButton.Flyout>
+        </DropDownButton>
+        <DropDownButton Content="More">
+          <DropDownButton.Flyout>
+            <MenuFlyout Placement="BottomEdgeAlignedLeft">
+              <MenuItem Header="Device settings…" Command="{Binding DeviceSettingsCommand}" />
+              <MenuItem Header="Apps…" Command="{Binding AppsCommand}" />
+              <MenuItem Header="Send files or apps…" Command="{Binding SendFilesCommand}" />
+              <Separator />
+              <MenuItem Header="Open a second screen" Command="{Binding SecondScreenCommand}" />
+              <MenuItem Header="Back camera" Command="{Binding CameraBackCommand}" />
+              <MenuItem Header="Front camera" Command="{Binding CameraFrontCommand}" />
+              <Separator />
+              <MenuItem Header="Arrange all mirror windows" Command="{Binding ArrangeAllCommand}" />
+            </MenuFlyout>
+          </DropDownButton.Flyout>
+        </DropDownButton>
+        <TextBlock Classes="dim" Text="{Binding SelectionText}" VerticalAlignment="Center" Margin="6,0,0,0" />
+      </StackPanel>
+      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+        <DropDownButton Content="Mirror options" ToolTip.Tip="How new mirrors start">
+          <DropDownButton.Flyout>
+            <Flyout Placement="BottomEdgeAlignedRight">
+              <StackPanel Width="300" Spacing="8" Margin="4">
+                <TextBlock Classes="label" Text="For mirrors you start from now on" />
+                <CheckBox Content="Keep device screen off" IsChecked="{Binding ScreenOff}"
+                          ToolTip.Tip="Mirror while the device's own screen stays dark. With auto-unlock it lights up only for a moment to unlock. If it turns on again, press Alt+O in the mirror window." />
+                <CheckBox Content="Keep awake" IsChecked="{Binding KeepAwake}" IsEnabled="{Binding KeepAwakeEnabled}"
+                          ToolTip.Tip="Stops the device's screen from timing out (and locking) while it's mirrored. Always on while the screen is kept off." />
+                <CheckBox Content="Play device audio on this computer" IsChecked="{Binding Audio}" />
+                <CheckBox Content="Mirror windows always on top" IsChecked="{Binding OnTop}" />
+                <Grid ColumnDefinitions="Auto,*" Margin="0,4,0,0">
+                  <TextBlock Text="Max size" VerticalAlignment="Center" Margin="0,0,12,0" />
+                  <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding MaxSizes}" SelectedItem="{Binding MaxSize}" />
+                </Grid>
+                <TextBlock Classes="label" TextWrapping="Wrap" Margin="0,4,0,0"
+                           Text="Quality (codec, bit rate, frame rate) and per-device settings are in Settings." />
+                <Button Content="Settings…" Command="{Binding OpenSettingsCommand}" HorizontalAlignment="Left" />
+              </StackPanel>
+            </Flyout>
+          </DropDownButton.Flyout>
+        </DropDownButton>
+        <Button Padding="9,7" Command="{Binding RefreshCommand}" ToolTip.Tip="Refresh the list (F5)">
+          <Path Classes="icon" Data="M18.5 8.5 A7 7 0 1 0 19 13.5 M18.5 3.5 V8.5 H13.5" />
+        </Button>
+        <Button Padding="9,7" Command="{Binding OpenSettingsCommand}" ToolTip.Tip="Settings">
+          <Path Classes="icon" Data="M12 9 A3 3 0 1 1 11.99 9 Z M12 2.5 V5 M12 19 V21.5 M2.5 12 H5 M19 12 H21.5 M5.3 5.3 L7.1 7.1 M16.9 16.9 L18.7 18.7 M5.3 18.7 L7.1 16.9 M16.9 7.1 L18.7 5.3" />
+        </Button>
+      </StackPanel>
+    </Grid>
+
+    <!-- device list -->
+    <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1"
+            CornerRadius="8" ClipToBounds="True">
+      <DockPanel>
+        <Grid DockPanel.Dock="Top" Height="32" Background="{StaticResource HeaderBrush}"
+              ColumnDefinitions="2.2*,1.5*,0.9*,0.8*,1.3*,1.7*,1*">
+          <TextBlock Grid.Column="0" Classes="colhead" Text="Device" />
+          <TextBlock Grid.Column="1" Classes="colhead" Text="Status" />
+          <TextBlock Grid.Column="2" Classes="colhead" Text="Battery" />
+          <TextBlock Grid.Column="3" Classes="colhead" Text="Type" />
+          <TextBlock Grid.Column="4" Classes="colhead" Text="Model" />
+          <TextBlock Grid.Column="5" Classes="colhead" Text="Address" />
+          <TextBlock Grid.Column="6" Classes="colhead" Text="Auto-unlock" />
+        </Grid>
+        <Panel>
+          <ListBox x:Name="DeviceList" ItemsSource="{Binding Items}" SelectionMode="Multiple" Background="Transparent"
+                   DragDrop.AllowDrop="True">
+            <ListBox.ContextMenu>
+              <ContextMenu>
+                <MenuItem Header="Mirror" Command="{Binding MirrorCommand}" FontWeight="SemiBold" />
+                <MenuItem Header="Run a script…" Command="{Binding RunScriptCommand}" />
+                <MenuItem Header="Apps…" Command="{Binding AppsCommand}" />
+                <MenuItem Header="Send files or apps…" Command="{Binding SendFilesCommand}" />
+                <MenuItem Header="Open a second screen" Command="{Binding SecondScreenCommand}" />
+                <MenuItem Header="Camera">
+                  <MenuItem Header="Back camera" Command="{Binding CameraBackCommand}" />
+                  <MenuItem Header="Front camera" Command="{Binding CameraFrontCommand}" />
+                </MenuItem>
+                <Separator />
+                <MenuItem Name="MoveMenu" Header="Move to group" />
+                <MenuItem Header="Device settings…" Command="{Binding DeviceSettingsCommand}" />
+                <Separator />
+                <MenuItem Header="Unlock now" Command="{Binding UnlockNowCommand}" />
+                <MenuItem Header="Auto-unlock settings…" Command="{Binding AutoUnlockCommand}" />
+              </ContextMenu>
+            </ListBox.ContextMenu>
+            <ListBox.DataTemplates>
+
+              <DataTemplate DataType="vm:GroupHeaderViewModel">
+                <Grid Height="36" ColumnDefinitions="*,Auto,Auto" Background="{StaticResource HeaderBrush}">
+                  <Button Classes="grouphead" Command="{Binding ToggleCommand}" ToolTip.Tip="Click to collapse or expand. Right-click for more.">
+                    <Button.ContextMenu>
+                      <ContextMenu>
+                        <MenuItem Header="Select all in this group" Command="{Binding SelectAllCommand}" />
+                        <MenuItem Header="Mirror all" Command="{Binding MirrorAllCommand}" />
+                        <MenuItem Header="Run a script on this group…" Command="{Binding RunScriptCommand}" />
+                        <MenuItem Header="Send files or apps to this group…" Command="{Binding SendFilesCommand}" />
+                        <MenuItem Header="Arrange this group's mirror windows" Command="{Binding ArrangeCommand}" />
+                        <MenuItem Header="Group settings…" Command="{Binding SettingsCommand}" IsVisible="{Binding IsUserGroup}" />
+                        <Separator IsVisible="{Binding IsUserGroup}" />
+                        <MenuItem Header="Rename…" Command="{Binding RenameCommand}" IsVisible="{Binding IsUserGroup}" />
+                        <MenuItem Header="Move up" Command="{Binding MoveUpCommand}" IsVisible="{Binding IsUserGroup}" />
+                        <MenuItem Header="Move down" Command="{Binding MoveDownCommand}" IsVisible="{Binding IsUserGroup}" />
+                        <MenuItem Header="Delete group" Command="{Binding DeleteCommand}" IsVisible="{Binding IsUserGroup}" />
+                        <Separator />
+                        <MenuItem Header="Manage groups…" Command="{Binding ManageCommand}" />
+                      </ContextMenu>
+                    </Button.ContextMenu>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Panel Width="16">
+                        <Path Classes="chevron" Data="M4 6 L8 10 L12 6" IsVisible="{Binding !IsCollapsed}" />
+                        <Path Classes="chevron" Data="M6 4 L10 8 L6 12" IsVisible="{Binding IsCollapsed}" />
+                      </Panel>
+                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                      <TextBlock Text="{Binding CountText}" Classes="dim" FontSize="12" VerticalAlignment="Center" Margin="4,1,0,0" />
+                    </StackPanel>
+                  </Button>
+                  <Button Grid.Column="1" Classes="link" Content="Mirror all" Command="{Binding MirrorAllCommand}"
+                          IsVisible="{Binding CanMirrorAll}" ToolTip.Tip="Mirror every device of this group that's on the network" />
+                  <Button Grid.Column="2" Classes="link" Margin="0,0,6,0" Padding="10,2" Content="⋯" FontSize="16" ToolTip.Tip="Group actions">
+                    <Button.Flyout>
+                      <MenuFlyout Placement="BottomEdgeAlignedRight">
+                        <MenuItem Header="Select all in this group" Command="{Binding SelectAllCommand}" />
+                        <MenuItem Header="Mirror all" Command="{Binding MirrorAllCommand}" />
+                        <MenuItem Header="Run a script on this group…" Command="{Binding RunScriptCommand}" />
+                        <MenuItem Header="Send files or apps to this group…" Command="{Binding SendFilesCommand}" />
+                        <MenuItem Header="Arrange this group's mirror windows" Command="{Binding ArrangeCommand}" />
+                        <MenuItem Header="Group settings…" Command="{Binding SettingsCommand}" IsVisible="{Binding IsUserGroup}" />
+                        <Separator IsVisible="{Binding IsUserGroup}" />
+                        <MenuItem Header="Rename…" Command="{Binding RenameCommand}" IsVisible="{Binding IsUserGroup}" />
+                        <MenuItem Header="Move up" Command="{Binding MoveUpCommand}" IsVisible="{Binding IsUserGroup}" />
+                        <MenuItem Header="Move down" Command="{Binding MoveDownCommand}" IsVisible="{Binding IsUserGroup}" />
+                        <MenuItem Header="Delete group" Command="{Binding DeleteCommand}" IsVisible="{Binding IsUserGroup}" />
+                        <Separator />
+                        <MenuItem Header="Manage groups…" Command="{Binding ManageCommand}" />
+                      </MenuFlyout>
+                    </Button.Flyout>
+                  </Button>
+                </Grid>
+              </DataTemplate>
+
+              <DataTemplate DataType="vm:DeviceItemViewModel">
+                <Grid Height="36" ColumnDefinitions="2.2*,1.5*,0.9*,0.8*,1.3*,1.7*,1*" Background="Transparent">
+                  <TextBlock Grid.Column="0" Classes="cell" Margin="{Binding NameMargin}" Text="{Binding Name}"
+                             Foreground="{Binding NameBrush}" FontWeight="SemiBold" />
+                  <TextBlock Grid.Column="1" Classes="cell" Text="{Binding StatusText}" Foreground="{Binding StatusBrush}" />
+                  <TextBlock Grid.Column="2" Classes="cell" Text="{Binding BatteryText}" Foreground="{Binding BatteryBrush}" />
+                  <TextBlock Grid.Column="3" Classes="cell" Text="{Binding Type}" />
+                  <TextBlock Grid.Column="4" Classes="cell" Text="{Binding Model}" />
+                  <TextBlock Grid.Column="5" Classes="cell" Text="{Binding Address}" />
+                  <TextBlock Grid.Column="6" Classes="cell" Text="{Binding UnlockText}" Foreground="{Binding UnlockBrush}" />
+                </Grid>
+              </DataTemplate>
+
+            </ListBox.DataTemplates>
+          </ListBox>
+          <TextBlock IsVisible="{Binding IsEmpty}" Text="{Binding EmptyText}" Classes="dim"
+                     TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center" VerticalAlignment="Center"
+                     Margin="24" />
+        </Panel>
+      </DockPanel>
+    </Border>
+  </DockPanel>
+</Window>

@@ -1,0 +1,18 @@
+name: Feature request
+description: An idea for Paneless
+labels: [enhancement]
+body:
+  - type: textarea
+    id: situation
+    attributes:
+      label: What are you trying to do?
+      description: The situation you're in, e.g. "I mirror 10 test phones and want to…"
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help?
+      description: What you'd like Paneless to do. Alternatives you've considered are welcome too.
+    validations:
+      required: true

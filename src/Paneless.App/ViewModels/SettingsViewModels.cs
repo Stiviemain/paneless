@@ -1,0 +1,316 @@
+using System.Collections.ObjectModel;
+using Avalonia.Media;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using Paneless.Core;
+
+namespace Paneless.App.ViewModels;
+
+/// <summary>One entry of a settings drop-down. Value null = "use the default".</summary>
+public sealed record Choice(string Label, object? Value)
+{
+    public override string ToString() => Label;
+}
+
+/// <summary>A labelled drop-down that writes its value straight into a profile or the global settings.</summary>
+public sealed partial class SettingRow : ObservableObject
+{
+    readonly Action<object?> _apply;
+
+    public SettingRow(string label, string? tip, IReadOnlyList<Choice> choices, object? current, Action<object?> apply)
+    {
+        Label = label;
+        Tip = tip;
+        Choices = choices;
+        _apply = apply;
+        Selected = choices.FirstOrDefault(c => Equals(c.Value, current)) ?? choices[0];
+        _ready = true;
+    }
+
+    readonly bool _ready;
+    public string Label { get; }
+    public string? Tip { get; }
+    public IReadOnlyList<Choice> Choices { get; }
+    [ObservableProperty] public partial Choice Selected { get; set; }
+    partial void OnSelectedChanged(Choice value) { if (_ready && value != null) _apply(value.Value); }
+}
+
+/// <summary>A script that can run when a device connects.</summary>
+public sealed partial class ScriptPick : ObservableObject
+{
+    public ScriptPick(AdbScript script, bool isChecked, string? inheritedFrom, Action changed)
+    {
+        Script = script;
+        _isChecked = isChecked;
+        InheritedFrom = inheritedFrom;
+        _changed = changed;
+    }
+
+    readonly Action _changed;
+    bool _isChecked;
+    public AdbScript Script { get; }
+    public string Name => Script.Name;
+    public string Category => Script.BuiltIn ? Script.Category : "My scripts";
+    /// <summary>Set when the group already runs it: shown ticked and greyed.</summary>
+    public string? InheritedFrom { get; }
+    public bool Editable => InheritedFrom == null;
+    public string Note => InheritedFrom != null ? $"from {InheritedFrom}" : Script.Confirm ? "asks first when run by hand" : "";
+    public bool IsChecked { get => _isChecked; set { if (SetProperty(ref _isChecked, value)) _changed(); } }
+}
+
+/// <summary>Option lists shared by the device, group and global settings.</summary>
+public static class SettingChoices
+{
+    public static readonly string[] Sizes = ["Full resolution", "1920 px", "1600 px", "1280 px", "1024 px"];
+    public static readonly (string Label, string Value)[] Codecs = [("H.264", "h264"), ("H.265 (sharper)", "h265"), ("AV1 (newest devices)", "av1")];
+    public static readonly int[] Bitrates = [2, 4, 8, 12, 16, 24, 32, 50];
+    public static readonly int[] Fps = [0, 30, 60, 90, 120];
+
+    public static string OnOff(bool b) => b ? "On" : "Off";
+    public static string Codec(string v) => Codecs.FirstOrDefault(c => c.Value == v).Label?.Split(' ')[0] ?? v;
+    public static string FpsText(int v) => v == 0 ? "No limit" : $"{v} fps";
+
+    /// <summary>The rows for the mirroring options. With <paramref name="inherited"/>, each row starts with "Default (…)".</summary>
+    public static List<SettingRow> MirrorRows(Func<DeviceProfile>? profile, EffectiveProfile? inherited, AppSettings? global, Action save)
+    {
+        var rows = new List<SettingRow>();
+        void Bool(string label, string? tip, bool? current, bool fallback, Action<bool?> set)
+        {
+            var choices = new List<Choice>();
+            if (inherited != null) choices.Add(new Choice($"Default ({OnOff(fallback)})", null));
+            choices.Add(new Choice("On", true));
+            choices.Add(new Choice("Off", false));
+            rows.Add(new SettingRow(label, tip, choices, inherited != null ? current : fallback, v => { set((bool?)v); save(); }));
+        }
+        void Pick<T>(string label, string? tip, IEnumerable<(string Label, T Value)> options, T? current, string fallbackLabel, Action<T?> set) where T : notnull
+        {
+            var choices = new List<Choice>();
+            if (inherited != null) choices.Add(new Choice($"Default ({fallbackLabel})", null));
+            choices.AddRange(options.Select(o => new Choice(o.Label, o.Value)));
+            rows.Add(new SettingRow(label, tip, choices, current, v => { set(v is T t ? t : default); save(); }));
+        }
+
+        var p = profile?.Invoke();
+        var g = global;
+        var e = inherited;
+        Bool("Keep device screen off", "The device's own screen stays dark while it's mirrored.", p?.ScreenOff, e?.ScreenOff ?? g!.ScreenOff,
+            v => { if (p != null) p.ScreenOff = v; else g!.ScreenOff = v ?? false; });
+        Bool("Keep awake", "The device doesn't time out and lock while it's mirrored.", p?.KeepAwake, e?.KeepAwake ?? g!.KeepAwake,
+            v => { if (p != null) p.KeepAwake = v; else g!.KeepAwake = v ?? false; });
+        Bool("Play device audio here", null, p?.Audio, e?.Audio ?? g!.Audio,
+            v => { if (p != null) p.Audio = v; else g!.Audio = v ?? false; });
+        Bool("Mirror window always on top", null, p?.OnTop, e?.OnTop ?? g!.OnTop,
+            v => { if (p != null) p.OnTop = v; else g!.OnTop = v ?? false; });
+        Pick("Max size", "Longer side of the picture. Smaller is smoother on slow Wi-Fi.", Sizes.Select(s => (s, s)),
+            p != null ? p.MaxSize : g!.MaxSize, e?.MaxSize ?? "", v => { if (p != null) p.MaxSize = v; else if (v != null) g!.MaxSize = v; });
+        Pick("Video codec", "H.265 and AV1 look better at the same bit rate if the device can encode them.", Codecs.Select(c => (c.Label, c.Value)),
+            p != null ? p.VideoCodec : g!.VideoCodec, e != null ? Codec(e.VideoCodec) : "", v => { if (p != null) p.VideoCodec = v; else if (v != null) g!.VideoCodec = v; });
+        Pick("Bit rate", "Higher is sharper but needs a stronger Wi-Fi connection.", Bitrates.Select(b => ($"{b} Mbit/s", (object)b)),
+            p != null ? p.BitrateMbps : g!.BitrateMbps, e != null ? $"{e.BitrateMbps} Mbit/s" : "", v => { if (p != null) p.BitrateMbps = (int?)v; else if (v is int i) g!.BitrateMbps = i; });
+        Pick("Frame rate limit", "Lower saves battery and Wi-Fi.", Fps.Select(f => (FpsText(f), (object)f)),
+            p != null ? p.MaxFps : g!.MaxFps, e != null ? FpsText(e.MaxFps) : "", v => { if (p != null) p.MaxFps = (int?)v; else if (v is int i) g!.MaxFps = i; });
+        return rows;
+    }
+}
+
+/// <summary>Settings of one device or one group (the window opened with "Device settings…" / "Group settings…").</summary>
+public sealed partial class ProfileEditorViewModel : ObservableObject
+{
+    readonly AppServices _s;
+    readonly DeviceGroup? _group;
+    readonly string? _deviceId;
+
+    /// <summary>For a device (<paramref name="deviceId"/> = serial number) or a group.</summary>
+    public ProfileEditorViewModel(AppServices services, string? deviceId, string? deviceName, DeviceGroup? group)
+    {
+        _s = services;
+        _deviceId = deviceId;
+        _group = deviceId == null ? group : null;
+        var memberOf = deviceId != null ? _s.Groups.GroupOf(deviceId) : null;
+
+        Title = deviceId != null ? $"Settings for {deviceName}" : $"Settings for the group {group!.Name}";
+        Subtitle = deviceId != null
+            ? memberOf != null ? $"Anything left on Default uses the group {memberOf.Name}'s setting, or else the one in Paneless settings." : "Anything left on Default uses the setting in Paneless settings."
+            : "These apply to every device in the group. A device's own settings win.";
+        IsDevice = deviceId != null;
+
+        // What "Default" means here: for a device, its group's settings over the global ones; for a group, the global ones.
+        var inherited = EffectiveProfile.Resolve(_s.Data.Settings, deviceId != null ? memberOf?.Profile : null, null);
+        Rows = new(SettingChoices.MirrorRows(Profile, inherited, null, Save));
+        AutoMirror = new SettingRow("Mirror by itself when it connects", "Opens the mirror as soon as the device is on the network and connected. Once per connection.",
+            [new Choice($"Default ({SettingChoices.OnOff(inherited.AutoMirror)})", null), new Choice("On", true), new Choice("Off", false)],
+            Profile().AutoMirror, v => { Profile().AutoMirror = (bool?)v; Save(); });
+
+        var p = Profile();
+        _loading = true;
+        PushTarget = p.PushTarget ?? "";
+        PushPlaceholder = $"Default: {inherited.PushTarget}";
+        Hotkey = p.Hotkey ?? "";
+        _loading = false;
+
+        // Only scripts that can run unattended: no values to fill in. Ticked ones first.
+        var fromGroup = deviceId != null ? memberOf?.Profile?.OnConnectScripts ?? [] : [];
+        var picks = new List<ScriptPick>();
+        foreach (var sc in _s.AllScripts().Where(sc => ScriptText.Placeholders(sc.Commands).All(ph => ph.Default != null) && ScriptText.Lines(sc.Commands).Count > 0))
+        {
+            var inheritedScript = fromGroup.Contains(sc.Id);
+            picks.Add(new ScriptPick(sc, inheritedScript || p.OnConnectScripts.Contains(sc.Id), inheritedScript ? memberOf!.Name : null, SaveScripts));
+        }
+        foreach (var pick in picks.OrderByDescending(x => x.IsChecked)) Scripts.Add(pick);
+    }
+
+    public string Title { get; }
+    public string Subtitle { get; }
+    public bool IsDevice { get; }
+    public ObservableCollection<SettingRow> Rows { get; }
+    public SettingRow AutoMirror { get; }
+    public ObservableCollection<ScriptPick> Scripts { get; } = new();
+    public string PushPlaceholder { get; }
+
+    [ObservableProperty] public partial string PushTarget { get; set; }
+    [ObservableProperty] public partial string Hotkey { get; set; }
+    [ObservableProperty] public partial string ScriptFilter { get; set; } = "";
+    [ObservableProperty] public partial string Message { get; set; } = "";
+    [ObservableProperty] public partial IBrush MessageBrush { get; set; } = Theme.Dim;
+
+    public IEnumerable<ScriptPick> ShownScripts => ScriptFilter.Trim() is { Length: > 0 } q
+        ? Scripts.Where(s => s.Name.Contains(q, StringComparison.OrdinalIgnoreCase) || s.Category.Contains(q, StringComparison.OrdinalIgnoreCase))
+        : Scripts;
+    partial void OnScriptFilterChanged(string value) => OnPropertyChanged(nameof(ShownScripts));
+
+    DeviceProfile Profile()
+    {
+        if (_deviceId != null) return _s.Profiles.GetOrCreate(_deviceId);
+        return _group!.Profile ??= new DeviceProfile();
+    }
+
+    void Save()
+    {
+        if (_deviceId != null) _s.Profiles.Save();
+        else _s.Groups.Save();
+        Message = "Saved. Applies the next time a mirror starts.";
+        MessageBrush = Theme.Green;
+    }
+
+    bool _loading;
+
+    partial void OnPushTargetChanged(string value)
+    {
+        if (_loading) return;
+        var v = value.Trim();
+        Profile().PushTarget = v.Length == 0 ? null : v.StartsWith('/') ? v : "/" + v;
+        Save();
+    }
+
+    partial void OnHotkeyChanged(string value)
+    {
+        if (_loading) return;
+        Profile().Hotkey = value.Length == 0 ? null : value;
+        Save();
+    }
+
+    void SaveScripts()
+    {
+        var p = Profile();
+        p.OnConnectScripts = Scripts.Where(s => s.IsChecked && s.Editable).Select(s => s.Script.Id).ToList();
+        Save();
+    }
+
+    [RelayCommand]
+    void ClearHotkey() => Hotkey = "";
+
+    [RelayCommand]
+    void ResetAll()
+    {
+        var p = Profile();
+        var keepHotkey = p.Hotkey;
+        p.ScreenOff = p.Audio = p.OnTop = p.KeepAwake = p.AutoMirror = null;
+        p.MaxSize = p.VideoCodec = p.PushTarget = null;
+        p.BitrateMbps = p.MaxFps = null;
+        p.OnConnectScripts.Clear();
+        p.Hotkey = keepHotkey;
+        foreach (var r in Rows) r.Selected = r.Choices[0];
+        AutoMirror.Selected = AutoMirror.Choices[0];
+        foreach (var s in Scripts.Where(s => s.Editable)) s.IsChecked = false;
+        PushTarget = "";
+        Save();
+        Message = "Everything is back to Default.";
+    }
+}
+
+/// <summary>Paneless settings: defaults for every device, start-up and tray, updates.</summary>
+public sealed partial class SettingsViewModel : ObservableObject
+{
+    readonly AppServices _s;
+
+    public SettingsViewModel(AppServices services)
+    {
+        _s = services;
+        var g = _s.Data.Settings;
+        Rows = new(SettingChoices.MirrorRows(null, null, g, Save));
+        _pushTarget = g.PushTarget;
+        _updateSource = g.UpdateSource;
+        _startWithSystem = Platform.Autostart.IsEnabled;
+    }
+
+    AppSettings G => _s.Data.Settings;
+    void Save() { _s.SaveSettings(); Saved?.Invoke(); }
+
+    /// <summary>Raised after every change (the main window refreshes its Mirror options).</summary>
+    public event Action? Saved;
+    /// <summary>Set by the app: checks the update source now and reports back.</summary>
+    public Func<Task<string>>? CheckUpdatesAsync { get; set; }
+
+    public ObservableCollection<SettingRow> Rows { get; }
+    public bool AutostartSupported => Platform.Autostart.IsSupported;
+
+    public bool AutoConnect { get => G.AutoConnect; set { G.AutoConnect = value; Save(); OnPropertyChanged(); } }
+    public bool CloseToTray { get => G.CloseToTray; set { G.CloseToTray = value; Save(); OnPropertyChanged(); } }
+
+    bool _startWithSystem;
+    public bool StartWithSystem
+    {
+        get => _startWithSystem;
+        set
+        {
+            if (_s.Demo) { _startWithSystem = value; OnPropertyChanged(); return; }
+            var ok = Platform.Autostart.Set(value);
+            _startWithSystem = Platform.Autostart.IsEnabled;
+            UpdateStatus = ok ? "" : "Couldn't change the start-up setting.";
+            OnPropertyChanged();
+        }
+    }
+
+    string _pushTarget;
+    public string PushTarget
+    {
+        get => _pushTarget;
+        set
+        {
+            _pushTarget = value;
+            var v = value.Trim();
+            if (v.Length > 0) { G.PushTarget = v.StartsWith('/') ? v : "/" + v; Save(); }
+            OnPropertyChanged();
+        }
+    }
+
+    string _updateSource;
+    public string UpdateSource
+    {
+        get => _updateSource;
+        set { _updateSource = value; G.UpdateSource = value.Trim(); Save(); OnPropertyChanged(); }
+    }
+
+    [ObservableProperty] public partial string UpdateStatus { get; set; } = "";
+    [ObservableProperty] public partial bool IsChecking { get; set; }
+
+    [RelayCommand]
+    async Task CheckUpdates()
+    {
+        if (CheckUpdatesAsync == null) return;
+        IsChecking = true;
+        UpdateStatus = "Checking…";
+        try { UpdateStatus = await CheckUpdatesAsync(); }
+        finally { IsChecking = false; }
+    }
+}

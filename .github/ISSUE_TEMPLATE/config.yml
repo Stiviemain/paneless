@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/Stiviemain/paneless/security/advisories/new
+    about: Please report security problems privately.
+  - name: scrcpy itself
+    url: https://github.com/Genymobile/scrcpy/issues
+    about: Problems that also happen with plain scrcpy belong there.

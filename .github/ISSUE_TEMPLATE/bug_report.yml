@@ -1,0 +1,48 @@
+name: Bug report
+description: Something doesn't work as it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Security problems: please don't use this form, see SECURITY.md.
+        **Don't paste unlock codes**, and check logs for device names, IPs and serial numbers before attaching them.
+  - type: input
+    id: version
+    attributes:
+      label: Paneless version
+      description: Shown in the window title, e.g. 1.0.0-beta.1
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: Windows 11 24H2
+  - type: input
+    id: device
+    attributes:
+      label: Device(s) and Android version
+      placeholder: Pixel 11 Pro, Android 17
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. …
+        2. …
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: From %TEMP%\paneless (the mirror window's log, errors.log or on-connect.log).
+      render: text

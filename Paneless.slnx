@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Paneless.App/Paneless.App.csproj" />
+    <Project Path="src/Paneless.Core/Paneless.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Paneless.Smoke/Paneless.Smoke.csproj" />
+  </Folder>
+</Solution>
