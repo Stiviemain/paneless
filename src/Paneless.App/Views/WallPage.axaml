@@ -42,8 +42,6 @@
       <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom" Margin="12,0,0,0">
         <Button Content="{Binding ShowHiddenText}" Command="{Binding ShowHiddenCommand}" IsVisible="{Binding !!HiddenCount}" />
         <ComboBox Width="160" ItemsSource="{Binding GroupChoices}" SelectedItem="{Binding GroupFilter}" />
-        <Slider Width="130" Minimum="{Binding MinTileWidth}" Maximum="{Binding MaxTileWidth}" Value="{Binding TileWidth}"
-                VerticalAlignment="Center" ToolTip.Tip="{l:T 'Picture size'}" />
         <ComboBox Width="90" ItemsSource="{Binding SecondChoices}" SelectedItem="{Binding Seconds}" ToolTip.Tip="{l:T 'Seconds between pictures'}">
           <ComboBox.ItemTemplate>
             <DataTemplate x:DataType="x:Int32">
@@ -83,6 +81,7 @@
                       <MenuItem Header="{l:T 'Larger'}" Command="{Binding Wall.LargerCommand}" CommandParameter="{Binding}" />
                       <MenuItem Header="{l:T 'Smaller'}" Command="{Binding Wall.SmallerCommand}" CommandParameter="{Binding}" />
                       <MenuItem Header="{l:T 'Same size as the others'}" Command="{Binding Wall.SameSizeCommand}" CommandParameter="{Binding}" IsEnabled="{Binding HasOwnSize}" />
+                      <MenuItem Header="{l:T 'Make all this size'}" Command="{Binding Wall.MakeAllThisSizeCommand}" CommandParameter="{Binding}" />
                     </MenuItem>
                     <MenuItem Header="{l:T 'Move'}">
                       <MenuItem Header="{l:T 'To the start'}" Command="{Binding Wall.MoveFirstCommand}" CommandParameter="{Binding}" />

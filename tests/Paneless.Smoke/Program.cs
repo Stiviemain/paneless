@@ -106,7 +106,9 @@ if (args.Contains("--groups"))
     wall.Move(["b", "a", "c"], "b", 99);
     Check(string.Join(",", wall.Sort(["a", "b", "c"])) == "a,c,b", "wall: moving past the end puts a tile last");
     wall.SetWidth("a", 5000); wall.Width = 300;
-    Check(wall.WidthOf("a") == WallLayout.MaxWidth && wall.WidthOf("b") == 300 && wall.HasOwnWidth("a") && !wall.HasOwnWidth("b"), "wall: own sizes are clamped, others follow the slider");
+    Check(wall.WidthOf("a") == WallLayout.MaxWidth && wall.WidthOf("b") == 300 && wall.HasOwnWidth("a") && !wall.HasOwnWidth("b"), "wall: own sizes are clamped, others use the shared size");
+    var wall2 = new WallLayout(); wall2.SetWidth("a", 500); wall2.SetWidth("b", 150); wall2.SetAllWidths(180);
+    Check(wall2.WidthOf("a") == 180 && wall2.WidthOf("b") == 180 && wall2.WidthOf("new") == 180 && !wall2.HasOwnWidth("a"), "wall: make all this size");
     wall.ClearWidth("a"); wall.Hide("b"); wall.Hide("b");
     Check(wall.WidthOf("a") == 300 && wall.Hidden.Count == 1 && wall.IsHidden("b"), "wall: same size again, hiding twice hides once");
     wall.ShowAll(); wall.ResetOrder();

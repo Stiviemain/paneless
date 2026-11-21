@@ -360,11 +360,12 @@ public partial class App : Application
             var first = wall.Tiles[0];
             wall.MoveLastCommand.Execute(first); log.AppendLine("moved first to the end: " + Order());
             wall.LargerCommand.Execute(first); log.AppendLine("made it larger: " + Order());
-            wall.TileWidth = 180; log.AppendLine("slider to 180: " + Order());
+            wall.SmallerCommand.Execute(wall.Tiles[0]); wall.SmallerCommand.Execute(wall.Tiles[0]);
+            wall.MakeAllThisSizeCommand.Execute(wall.Tiles[0]); log.AppendLine("made all the size of a smaller one: " + Order());
             wall.HideCommand.Execute(wall.Tiles[0]); log.AppendLine($"hid the first: {Order()} | hidden={wall.HiddenCount} button=\"{wall.ShowHiddenText}\"");
             await wall.ShowHiddenCommand.ExecuteAsync(null); log.AppendLine("show hidden: " + Order());
-            wall.SortByNameCommand.Execute(null); wall.SameSizeCommand.Execute(first); wall.TileWidth = 220;
-            log.AppendLine("sorted by name, same size, slider 220: " + Order());
+            wall.LargerCommand.Execute(first); wall.SameSizeCommand.Execute(first); wall.SortByNameCommand.Execute(null);
+            log.AppendLine("larger, then same size as the others, sorted by name: " + Order());
             await File.WriteAllTextAsync(path + ".wall.txt", log.ToString());
             await Task.Delay(500);
         }

@@ -1,13 +1,13 @@
 namespace Paneless.Core;
 
 /// <summary>How the Wall is laid out (saved in settings.json): the order the user dragged the pictures into, the size of
-/// every picture and of single ones the user resized, and devices hidden from the Wall. Devices are named by their
+/// pictures (one for all, plus single ones the user resized), and devices hidden from the Wall. Devices are named by their
 /// group id (serial number), which survives reconnects. Plain list logic, so it can be tested without a window.</summary>
 public sealed class WallLayout
 {
     public const int MinWidth = 120, MaxWidth = 640, DefaultWidth = 220;
 
-    /// <summary>Width of a picture the user didn't resize on its own.</summary>
+    /// <summary>Width of a picture the user didn't resize on its own (set by "Make all this size").</summary>
     public int Width { get; set; } = DefaultWidth;
     public List<string> Order { get; set; } = new();
     public Dictionary<string, int> Widths { get; set; } = new();
@@ -20,6 +20,13 @@ public sealed class WallLayout
 
     public void SetWidth(string id, double width) => Widths[id] = Clamp(width);
     public void ClearWidth(string id) => Widths.Remove(id);
+
+    /// <summary>One size for every picture: the default becomes this width and single sizes are forgotten.</summary>
+    public void SetAllWidths(double width)
+    {
+        Width = Clamp(width);
+        Widths.Clear();
+    }
 
     public bool IsHidden(string id) => Hidden.Contains(id);
     public void Hide(string id) { if (!Hidden.Contains(id)) Hidden.Add(id); }

@@ -51,7 +51,6 @@ public sealed partial class WallViewModel : ObservableObject
     CancellationTokenSource? _loop;
     readonly SemaphoreSlim _gate = new(4);
     readonly ConcurrentDictionary<string, byte> _capturing = new();
-    DispatcherTimer? _saveTimer;
 
     WallLayout Layout => _s.Data.Settings.Wall;
 
@@ -83,24 +82,6 @@ public sealed partial class WallViewModel : ObservableObject
     public bool IsEmpty => Tiles.Count == 0 && HiddenCount == 0;
     public bool AllHidden => Tiles.Count == 0 && HiddenCount > 0;
     public string ShowHiddenText => Loc.Count(HiddenCount, "Show {0} hidden device", "Show {0} hidden devices");
-
-    public double MinTileWidth => WallLayout.MinWidth;
-    public double MaxTileWidth => WallLayout.MaxWidth;
-
-    /// <summary>Width of every picture the user didn't resize on its own (the size slider).</summary>
-    public double TileWidth
-    {
-        get => Layout.Width;
-        set
-        {
-            var w = WallLayout.Clamp(value);
-            if (w == Layout.Width) return;
-            Layout.Width = w;
-            foreach (var t in Tiles) if (!t.HasOwnSize) t.Width = w;
-            OnPropertyChanged();
-            SaveSoon();
-        }
-    }
 
     partial void OnGroupFilterChanged(string value) => SyncTiles();
     partial void OnSecondsChanged(int value) { _s.Data.Settings.WallSeconds = value; _s.SaveSettings(); }
@@ -288,6 +269,15 @@ public sealed partial class WallViewModel : ObservableObject
         SaveLayout();
     }
 
+    /// <summary>Every picture (also of devices not on screen now) takes this one's size.</summary>
+    [RelayCommand]
+    void MakeAllThisSize(WallTile tile)
+    {
+        Layout.SetAllWidths(tile.Width);
+        foreach (var t in Tiles) { t.HasOwnSize = false; t.Width = Layout.WidthOf(t.Id); }
+        SaveLayout();
+    }
+
     [RelayCommand] void MoveFirst(WallTile tile) { MoveTile(tile, 0); SaveLayout(); }
     [RelayCommand] void MoveLeft(WallTile tile) { MoveTile(tile, Tiles.IndexOf(tile) - 1); SaveLayout(); }
     [RelayCommand] void MoveRight(WallTile tile) { MoveTile(tile, Tiles.IndexOf(tile) + 1); SaveLayout(); }
@@ -342,14 +332,6 @@ public sealed partial class WallViewModel : ObservableObject
     }
 
     public void SaveLayout() => _s.SaveSettings();
-
-    /// <summary>The size slider fires on every step: save once it rests.</summary>
-    void SaveSoon()
-    {
-        _saveTimer ??= new DispatcherTimer(TimeSpan.FromMilliseconds(600), DispatcherPriority.Background, (_, _) => { _saveTimer!.Stop(); _s.SaveSettings(); });
-        _saveTimer.Stop();
-        _saveTimer.Start();
-    }
 
     // ---------------------------------------------------------------- demo mode
 
