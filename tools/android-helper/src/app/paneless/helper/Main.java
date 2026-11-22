@@ -1,79 +1,94 @@
 package app.paneless.helper;
 
 import android.content.Context;
-import android.content.Intent;
-import android.content.pm.ApplicationInfo;
-import android.content.pm.PackageManager;
-import android.content.pm.ResolveInfo;
-import android.graphics.Bitmap;
-import android.graphics.Canvas;
-import android.graphics.drawable.Drawable;
 import android.os.Looper;
-import android.util.Base64;
 
-import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.util.List;
 
 /**
- * Paneless' helper on the device, started like scrcpy's server:
+ * Paneless' on-device helper, started like scrcpy's server:
  *   CLASSPATH=/data/local/tmp/paneless-helper.jar app_process / app.paneless.helper.Main apps
  *   CLASSPATH=... app_process / app.paneless.helper.Main icons <size> <package>...
- * "apps" prints every app with a launcher icon: package TAB name.
- * "icons" prints package TAB name TAB base64 PNG of its launcher icon (as the home screen draws it, size x size).
- * It only reads; nothing is installed or changed.
+ *   CLASSPATH=... app_process / app.paneless.helper.Main daemon <socketName>
+ *   CLASSPATH=... app_process / app.paneless.helper.Main version
+ * Nothing is installed on the device; the daemon exits cleanly when Paneless disconnects.
  */
 public final class Main {
     public static void main(String[] args) throws Exception {
-        if (args.length == 0) { System.err.println("usage: apps | icons <size> <package>..."); System.exit(2); }
-        PackageManager pm = systemContext().getPackageManager();
-        StringBuilder out = new StringBuilder();
-        if (args[0].equals("apps")) {
-            Intent launcher = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
-            List<ResolveInfo> found = pm.queryIntentActivities(launcher, 0);
-            java.util.Set<String> seen = new java.util.HashSet<>();
-            for (ResolveInfo ri : found) {
-                String pkg = ri.activityInfo.packageName;
-                if (!seen.add(pkg)) continue;
-                out.append(pkg).append('\t').append(clean(ri.activityInfo.applicationInfo.loadLabel(pm))).append('\n');
-            }
-        } else if (args[0].equals("icons") && args.length >= 2) {
+        if (args.length == 0) {
+            System.err.println("usage: version | apps | icons <size> <package>... | daemon <socket>");
+            System.exit(2);
+        }
+        if ("version".equals(args[0])) {
+            System.out.println(DaemonServer.PROTOCOL_VERSION);
+            System.exit(0);
+        }
+
+        exemptHiddenApis();
+        Context ctx = systemContext();
+        AppsModule apps = new AppsModule(ctx);
+
+        if ("apps".equals(args[0])) {
+            System.out.print(apps.listLauncherAppsTsv());
+            System.out.flush();
+            System.exit(0);
+        } else if ("icons".equals(args[0]) && args.length >= 2) {
             int size = Math.max(16, Math.min(512, Integer.parseInt(args[1])));
+            StringBuilder out = new StringBuilder();
             for (int i = 2; i < args.length; i++) {
                 String pkg = args[i];
-                try {
-                    ApplicationInfo ai = pm.getApplicationInfo(pkg, 0);
-                    Drawable icon = null;
-                    Intent launch = pm.getLaunchIntentForPackage(pkg);
-                    if (launch != null) { try { icon = pm.getActivityIcon(launch); } catch (Exception ignored) { } }
-                    if (icon == null) icon = pm.getApplicationIcon(ai);
-                    out.append(pkg).append('\t').append(clean(pm.getApplicationLabel(ai))).append('\t').append(png(icon, size)).append('\n');
-                } catch (Throwable e) {
-                    out.append(pkg).append('\t').append('\t').append('\n');   // not installed (or no icon): name and icon empty
-                    System.err.println(pkg + ": " + e);
-                    for (Throwable c = e.getCause(); c != null; c = c.getCause()) System.err.println("  caused by " + c);
+                AppsModule.IconInfo info = apps.loadIcon(pkg, size);
+                if (info != null) {
+                    out.append(pkg).append('\t').append(info.name).append('\t').append(info.pngBase64).append('\n');
+                } else {
+                    out.append(pkg).append('\t').append('\t').append('\n');
                 }
             }
-        } else { System.err.println("unknown command: " + args[0]); System.exit(2); }
-        System.out.print(out);
-        System.out.flush();
-        System.exit(0);   // the system context may have started threads
+            System.out.print(out);
+            System.out.flush();
+            System.exit(0);
+        } else if ("daemon".equals(args[0]) && args.length >= 2) {
+            DaemonServer server = new DaemonServer(ctx);
+            apps.register(server);
+            UiModule ui = new UiModule(server);
+            ui.register(server);
+            ClipboardModule clipboard = new ClipboardModule(server);
+            clipboard.register(server);
+            FilesModule files = new FilesModule(server);
+            files.register(server);
+            TasksModule tasks = new TasksModule(server);
+            tasks.register(server);
+            ScreenModule screen = new ScreenModule(server);
+            screen.register(server);
+            TelemetryModule telemetry = new TelemetryModule(server);
+            telemetry.register(server);
+            DeviceUtilsModule utils = new DeviceUtilsModule(server);
+            utils.register(server);
+            ControlsModule controls = new ControlsModule(server, ui);
+            controls.register(server);
+            server.run(args[1]);
+            System.exit(0);
+        } else {
+            System.err.println("unknown command: " + args[0]);
+            System.exit(2);
+        }
     }
 
-    static String clean(CharSequence s) {
-        return s == null ? "" : s.toString().replace('\t', ' ').replace('\n', ' ').replace('\r', ' ').trim();
-    }
-
-    static String png(Drawable d, int size) {
-        Bitmap bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
-        Canvas c = new Canvas(bmp);
-        d.setBounds(0, 0, size, size);
-        d.draw(c);   // an adaptive icon draws with the device's own icon shape
-        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        bmp.compress(Bitmap.CompressFormat.PNG, 100, bytes);
-        return Base64.encodeToString(bytes.toByteArray(), Base64.NO_WRAP);
+    /** Exempts this shell app_process from Android 9+ non-SDK hidden API restrictions where permitted. */
+    static void exemptHiddenApis() {
+        try {
+            Method forName = Class.class.getDeclaredMethod("forName", String.class);
+            Method getDeclaredMethod = Class.class.getDeclaredMethod("getDeclaredMethod", String.class, Class[].class);
+            Class<?> vmRuntimeClass = (Class<?>) forName.invoke(null, "dalvik.system.VMRuntime");
+            Method getRuntime = (Method) getDeclaredMethod.invoke(vmRuntimeClass, "getRuntime", null);
+            Method setExemptions = (Method) getDeclaredMethod.invoke(vmRuntimeClass, "setHiddenApiExemptions", new Class<?>[]{String[].class});
+            Object runtime = getRuntime.invoke(null);
+            setExemptions.invoke(runtime, (Object) new String[]{"L"});
+        } catch (Throwable ignored) {
+            // Shell UID already has broad access on most builds; proceed defensively.
+        }
     }
 
     /** The system context, as scrcpy gets it: app_process has no application of its own. */

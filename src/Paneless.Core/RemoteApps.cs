@@ -111,18 +111,18 @@ public sealed record LauncherApp(string Package, string Name);
 /// started like scrcpy's own server with app_process, it only reads, and nothing gets installed.</summary>
 public sealed partial class AdbClient
 {
-    const string HelperRemote = "/data/local/tmp/paneless-helper.jar";
+    internal const string HelperRemote = "/data/local/tmp/paneless-helper.jar";
     const string HelperRun = "CLASSPATH=" + HelperRemote + " app_process / app.paneless.helper.Main";
     readonly HashSet<string> _helperPushed = new();
     readonly SemaphoreSlim _helperLock = new(1, 1);
 
-    async Task<bool> PushHelperAsync(string serial)
+    internal async Task<bool> PushHelperAsync(string serial, bool force = false)
     {
-        lock (_helperPushed) if (_helperPushed.Contains(serial)) return true;
+        if (!force) lock (_helperPushed) if (_helperPushed.Contains(serial)) return true;
         await _helperLock.WaitAsync();
         try
         {
-            lock (_helperPushed) if (_helperPushed.Contains(serial)) return true;
+            if (!force) lock (_helperPushed) if (_helperPushed.Contains(serial)) return true;
             var local = Path.Combine(Path.GetTempPath(), "paneless", "paneless-helper.jar");
             Directory.CreateDirectory(Path.GetDirectoryName(local)!);
             using (var res = Assembly.GetExecutingAssembly().GetManifestResourceStream("Paneless.Core.paneless-helper.jar"))

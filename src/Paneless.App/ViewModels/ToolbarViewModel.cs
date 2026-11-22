@@ -36,12 +36,40 @@ public sealed partial class ToolbarViewModel : ObservableObject, IAsyncDisposabl
     public bool IsPrimary => !IsSecondary;
     /// <summary>Set by the main window: opens a second screen of this device.</summary>
     public Action? OpenSecondScreen { get; set; }
+    /// <summary>Set by the main window: pulls the phone's current foreground app into its own PC window.</summary>
+    public Action? PopOutCurrentApp { get; set; }
 
     [RelayCommand]
     void SecondScreen()
     {
         OpenSecondScreen?.Invoke();
         Hint = Loc.T("Opening a second screen (it gets a toolbar of its own).");
+    }
+
+    [RelayCommand]
+    void PopOutApp()
+    {
+        PopOutCurrentApp?.Invoke();
+        Hint = Loc.T("Opening the current app in its own window…");
+    }
+
+    [RelayCommand]
+    async Task MoveToPhone()
+    {
+        if (!IsSecondary || _s.Helpers == null) return;
+        var displayId = _session.DisplayId ?? await DisplayIdAsync();
+        if (displayId is not > 0) { Hint = Loc.T("Couldn't find this window's display."); return; }
+        var helper = await _s.Helpers.GetOrStartAsync(_session.Serial, _row.Type == "Watch");
+        var tasks = helper != null ? await helper.ListTasksAsync() : null;
+        var task = tasks?.FirstOrDefault(t => t.DisplayId == displayId && t.Visible)
+                   ?? tasks?.FirstOrDefault(t => t.DisplayId == displayId);
+        if (task == null) { Hint = Loc.T("No running app found on this window."); return; }
+        if (await helper!.MoveTaskToDisplayAsync(task.TaskId, 0))
+        {
+            Hint = Loc.F("Sent {0} back to the device.", task.Label);
+            MirrorManager.Stop(_session);
+        }
+        else Hint = Loc.T("Couldn't move the app back to the device.");
     }
 
     /// <summary>The virtual display of a second screen or app window, once scrcpy has created it.</summary>

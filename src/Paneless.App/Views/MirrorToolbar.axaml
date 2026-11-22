@@ -62,6 +62,14 @@
                 ToolTip.Tip="{l:T 'Open a second screen of this device: a separate, resizable screen next to its own (with a toolbar of its own)'}">
           <Path Classes="icon" Data="M2.5 6.5 H13.5 V15.5 H2.5 Z M15.5 9 H21.5 V18 H10.5 V17.5 M6 18.5 H10" />
         </Button>
+        <Button Classes="tool" Command="{Binding PopOutAppCommand}" IsVisible="{Binding IsPrimary}"
+                ToolTip.Tip="{l:T 'Pop out the current app into its own PC window'}">
+          <Path Classes="icon" Data="M5 19 H19 V12 M12 12 L19 5 M14 5 H19 V10" />
+        </Button>
+        <Button Classes="tool" Command="{Binding MoveToPhoneCommand}" IsVisible="{Binding IsSecondary}"
+                ToolTip.Tip="{l:T 'Send this app back to the device’s own screen and close this window'}">
+          <Path Classes="icon" Data="M8 4 H16 V20 H8 Z M4 12 H12 M9 9 L12 12 L9 15" />
+        </Button>
         <Border Classes="sep" IsVisible="{Binding IsPrimary}" />
         <Button Classes="tool" Command="{Binding BackCommand}" ToolTip.Tip="{l:T 'Back'}">
           <Path Classes="icon" Data="M16 5 L7 12 L16 19 Z" />

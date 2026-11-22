@@ -106,7 +106,13 @@ public sealed partial class InventoryViewModel : ObservableObject
                     try
                     {
                         var serial = await _s.Directory!.ConnectAsync(r);
-                        if (serial != null && await _s.Adb!.GetInventoryAsync(serial, r.Name) is { } inv) _s.Inventory[r.GroupId] = inv;
+                        if (serial != null)
+                        {
+                            var inv = _s.Helpers != null
+                                ? await _s.Helpers.ReadInventoryAsync(serial, r.Name, r.Type == "Watch")
+                                : await _s.Adb!.GetInventoryAsync(serial, r.Name);
+                            if (inv != null) _s.Inventory[r.GroupId] = inv;
+                        }
                     }
                     catch { }
                     finally { gate.Release(); }

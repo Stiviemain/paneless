@@ -92,6 +92,11 @@ public partial class App : Application
                     e.Cancel = true;
                     window.Hide();
                 };
+                desktop.ShutdownRequested += (_, _) =>
+                {
+                    if (services.Helpers != null)
+                        try { services.Helpers.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(2)); } catch { }
+                };
                 if (!demo)
                 {
                     SingleInstance.Listen(message => Dispatcher.UIThread.Post(() =>
@@ -297,6 +302,16 @@ public partial class App : Application
             await DockTestAsync(main, path);
             desktop.Shutdown();
             return;
+        }
+        else if (view == "files")
+        {
+            target = main.ShowFiles(AppServices.DemoRows()[0]);
+            await Task.Delay(500);
+        }
+        else if (view == "controls")
+        {
+            target = main.ShowControls(AppServices.DemoRows()[0]);
+            await Task.Delay(500);
         }
         else if (view is "toolbar" or "toolbar2")
         {

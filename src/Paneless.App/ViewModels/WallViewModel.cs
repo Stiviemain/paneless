@@ -68,6 +68,21 @@ public sealed partial class WallViewModel : ObservableObject
             foreach (var g in s.Groups.Groups) GroupChoices.Add(g.Name);
             GroupFilter = GroupChoices.Contains(keep) ? keep : GroupChoices[0];
         });
+        if (s.Helpers != null)
+            s.Helpers.EventReceived += ev =>
+            {
+                if (ev.Name != "screen_state" || _loop == null) return;
+                var on = ev.Data["on"]?.GetValue<bool>();
+                if (on == null) return;
+                Dispatcher.UIThread.Post(() =>
+                {
+                    var row = _main.NetworkRows.FirstOrDefault(r => r.Serial == ev.Serial);
+                    var tile = row != null ? Tiles.FirstOrDefault(t => t.Id == row.GroupId) : null;
+                    if (tile == null) return;
+                    tile.ScreenOff = !on.Value;
+                    if (on.Value && !IsPaused) _ = CaptureAsync(row!, tile, CancellationToken.None);
+                });
+            };
     }
 
     public ObservableCollection<WallTile> Tiles { get; } = new();
@@ -139,6 +154,10 @@ public sealed partial class WallViewModel : ObservableObject
         {
             _loop.Cancel();
             _loop = null;
+            if (_s.Helpers != null)
+                foreach (var serial in _s.Helpers.ConnectedSerials)
+                    if (_s.Helpers.TryGet(serial) is { } h && h.Supports("display_watch"))
+                        _ = Task.Run(async () => { try { await h.WatchDisplayAsync(false); } catch { } });
         }
     }
 
@@ -163,6 +182,33 @@ public sealed partial class WallViewModel : ObservableObject
             await _gate.WaitAsync(ct);
             try
             {
+                var width = (int)Math.Clamp(tile.Width * 2, 360, 1280);
+                // Fast path: on-device downscaled JPEG via persistent helper (~20 KB instead of ~3 MB PNG).
+                if (_s.Helpers != null && await _s.Helpers.GetOrStartAsync(serial, r.Type == "Watch", ct) is { } helper && helper.Supports("capture"))
+                {
+                    if (helper.Supports("display_watch")) _ = Task.Run(async () => { try { await helper.WatchDisplayAsync(true); } catch { } });
+                    var cap = await helper.CaptureJpegAsync(width, 0, 78, ct);
+                    if (cap != null)
+                    {
+                        if (cap.ScreenOff)
+                        {
+                            Dispatcher.UIThread.Post(() => tile.ScreenOff = true);
+                            return;
+                        }
+                        if (cap.Jpeg != null)
+                        {
+                            var fastBmp = await Task.Run(() => { using var ms = new MemoryStream(cap.Jpeg); return new Bitmap(ms); }, ct);
+                            Dispatcher.UIThread.Post(() =>
+                            {
+                                var old = tile.Image;
+                                tile.Image = fastBmp; tile.ScreenOff = false; tile.Status = DateTime.Now.ToString("T");
+                                old?.Dispose();
+                            });
+                            return;
+                        }
+                    }
+                }
+
                 if (await adb.IsScreenOnAsync(serial) == false)
                 {
                     Dispatcher.UIThread.Post(() => tile.ScreenOff = true);
@@ -171,7 +217,6 @@ public sealed partial class WallViewModel : ObservableObject
                 var png = await adb.ScreencapAsync(serial);
                 if (png == null) { Dispatcher.UIThread.Post(() => tile.Status = Loc.T("No picture")); return; }
                 // Sharp on high-DPI screens and in large tiles, without decoding the full-size picture.
-                var width = (int)Math.Clamp(tile.Width * 2, 360, 1280);
                 var bmp = await Task.Run(() => { using var ms = new MemoryStream(png); return Bitmap.DecodeToWidth(ms, width); }, ct);
                 Dispatcher.UIThread.Post(() =>
                 {
@@ -253,6 +298,12 @@ public sealed partial class WallViewModel : ObservableObject
 
     [RelayCommand]
     void Apps(WallTile tile) { if (RowOf(tile) is { } r) _main.ShowApps?.Invoke(r); }
+
+    [RelayCommand]
+    void Files(WallTile tile) { if (RowOf(tile) is { } r) _main.ShowFiles?.Invoke(r); }
+
+    [RelayCommand]
+    Task Locate(WallTile tile) => RowOf(tile) is { } r ? _main.LocateAsync(r) : Task.CompletedTask;
 
     [RelayCommand]
     void DeviceSettings(WallTile tile) { if (RowOf(tile) is { } r) _main.ShowDeviceSettings?.Invoke(r.GroupId, r.Name, null); }

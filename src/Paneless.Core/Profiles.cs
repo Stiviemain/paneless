@@ -43,17 +43,25 @@ public sealed class DeviceProfile
     public AssistantAccess? Assistant { get; set; }
     /// <summary>Global shortcut that mirrors this device, e.g. "Ctrl+Alt+P" (devices only, not groups).</summary>
     public string? Hotkey { get; set; }
+    /// <summary>Two-way text clipboard sync even when no mirror window is open.</summary>
+    public bool? ClipboardSync { get; set; }
+    /// <summary>Auto-save new photos and screenshots to this PC as they are taken.</summary>
+    public bool? AutoDownloadMedia { get; set; }
+    /// <summary>Opt-in: watch notifications to auto-copy 2FA codes to this PC's clipboard.</summary>
+    public bool? AutoCopyOtp { get; set; }
 
     public bool IsEmpty =>
         ScreenOff == null && Audio == null && OnTop == null && KeepAwake == null && LockOnClose == null && KeepScreensOn == null && MaxSize == null && VideoCodec == null
         && BitrateMbps == null && MaxFps == null && AutoMirror == null && PushTarget == null && OnConnectScripts.Count == 0
-        && string.IsNullOrEmpty(Hotkey) && Assistant == null;
+        && string.IsNullOrEmpty(Hotkey) && Assistant == null
+        && ClipboardSync == null && AutoDownloadMedia == null && AutoCopyOtp == null;
 }
 
 /// <summary>What actually applies to a device after combining device, group and global settings.</summary>
 public sealed record EffectiveProfile(
     bool ScreenOff, bool Audio, bool OnTop, bool KeepAwake, bool LockOnClose, string MaxSize, string VideoCodec, int BitrateMbps, int MaxFps,
-    bool AutoMirror, string PushTarget, IReadOnlyList<string> OnConnectScripts, string? Hotkey, AssistantAccess Assistant, bool KeepScreensOn = true)
+    bool AutoMirror, string PushTarget, IReadOnlyList<string> OnConnectScripts, string? Hotkey, AssistantAccess Assistant, bool KeepScreensOn = true,
+    bool ClipboardSync = false, bool AutoDownloadMedia = false, bool AutoCopyOtp = false)
 {
     public int? MaxSizePixels => int.TryParse(MaxSize.Split(' ')[0], out var px) ? px : null;
 
@@ -84,7 +92,10 @@ public sealed record EffectiveProfile(
             scripts,
             device?.Hotkey is { Length: > 0 } h ? h : null,
             device?.Assistant ?? group?.Assistant ?? global.AssistantDefaultAccess,
-            Pick(p => p.KeepScreensOn, global.KeepScreensOn));
+            Pick(p => p.KeepScreensOn, global.KeepScreensOn),
+            Pick(p => p.ClipboardSync, global.ClipboardSync),
+            Pick(p => p.AutoDownloadMedia, global.AutoDownloadMedia),
+            Pick(p => p.AutoCopyOtp, global.AutoCopyOtp));
     }
 }
 

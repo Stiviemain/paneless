@@ -7,12 +7,13 @@ using Paneless.Core;
 
 namespace Paneless.App.ViewModels;
 
-public sealed partial class AppItem(AppPackage p) : ObservableObject
+public sealed partial class AppItem(AppPackage p, string? meta = null) : ObservableObject
 {
     public string Package { get; } = p.Name;
+    public string Meta { get; } = meta ?? "";
     [ObservableProperty] public partial bool Disabled { get; set; } = p.Disabled;
     partial void OnDisabledChanged(bool value) => OnPropertyChanged(nameof(Note));
-    public string Note => Disabled ? Loc.T("disabled") : "";
+    public string Note => Disabled ? (Meta.Length > 0 ? $"{Meta} · {Loc.T("disabled")}" : Loc.T("disabled")) : Meta;
 }
 
 /// <summary>The apps of one device: open (also in a window of its own), stop, clear, disable, uninstall, install.</summary>
@@ -76,7 +77,23 @@ public sealed partial class AppsViewModel : ObservableObject
             {
                 _serial ??= await _s.Directory!.ConnectAsync(_row);
                 if (_serial == null) { Say(Loc.F("Couldn't connect to {0}.", _row.Name), StatusKind.Error); return; }
-                _all = (await _s.Adb!.GetPackagesAsync(_serial, ShowSystem)).Select(p => new AppItem(p)).ToList();
+                List<DetailedAppPackage>? detailed = null;
+                if (_s.Helpers != null && await _s.Helpers.GetOrStartAsync(_serial, _row.Type == "Watch") is { } helper && helper.Supports("apps_detail"))
+                    try { detailed = await helper.GetDetailedAppsAsync(ShowSystem); } catch { }
+                if (detailed != null)
+                {
+                    _all = detailed.Select(d =>
+                    {
+                        var parts = new List<string>();
+                        if (!string.IsNullOrEmpty(d.VersionName)) parts.Add("v" + d.VersionName);
+                        if (d.ApkSizeBytes > 0) parts.Add(d.ApkSizeBytes >= 1024 * 1024 ? $"{d.ApkSizeBytes / (1024.0 * 1024.0):0.#} MB" : $"{d.ApkSizeBytes / 1024.0:0} KB");
+                        return new AppItem(new AppPackage(d.Package, d.Disabled), string.Join(" · ", parts));
+                    }).ToList();
+                }
+                else
+                {
+                    _all = (await _s.Adb!.GetPackagesAsync(_serial, ShowSystem)).Select(p => new AppItem(p)).ToList();
+                }
             }
             Show();
             Say(Loc.F(ShowSystem ? "{0} apps including system apps. Double-click to open one." : "{0} apps you installed. Double-click to open one.", _all.Count));

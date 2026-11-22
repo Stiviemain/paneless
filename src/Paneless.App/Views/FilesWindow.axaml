@@ -1,0 +1,82 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="using:Paneless.App.Localization"
+        xmlns:vm="using:Paneless.App.ViewModels"
+        x:Class="Paneless.App.Views.FilesWindow"
+        x:DataType="vm:FilesViewModel"
+        Title="{Binding Title}" Icon="/Assets/Paneless.ico"
+        Width="900" Height="640" MinWidth="720" MinHeight="440"
+        WindowStartupLocation="CenterOwner">
+
+  <Window.Styles>
+    <Style Selector="ListBox#FileList ListBoxItem">
+      <Setter Property="Padding" Value="10,6" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
+    <Style Selector="ListBox#FileList ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource SelBrush}" />
+    </Style>
+  </Window.Styles>
+
+  <DockPanel Margin="20,18">
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+      <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+        <Button Content="{l:T 'Camera'}" Command="{Binding GoCameraCommand}" />
+        <Button Content="{l:T 'Screenshots'}" Command="{Binding GoScreenshotsCommand}" />
+        <Button Content="{l:T 'Downloads'}" Command="{Binding GoDownloadsCommand}" />
+        <Button Content="{l:T 'Storage'}" Command="{Binding GoStorageCommand}" />
+      </StackPanel>
+    </Grid>
+
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,10">
+      <Button Content="↑" Command="{Binding GoUpCommand}" IsEnabled="{Binding CanGoUp}" Margin="0,0,8,0" ToolTip.Tip="{l:T 'Up one folder'}" />
+      <TextBox Grid.Column="1" Text="{Binding CurrentPath}" IsReadOnly="True" FontFamily="Cascadia Mono, Consolas, Menlo, monospace" FontSize="12.5" />
+      <Button Grid.Column="2" Content="{l:T 'Refresh'}" Command="{Binding RefreshCommand}" Margin="8,0,0,0" />
+    </Grid>
+
+    <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto" Margin="0,12,0,0">
+      <TextBlock Text="{Binding Message}" Foreground="{Binding MessageBrush}" TextWrapping="Wrap" VerticalAlignment="Center" />
+      <Button Grid.Column="1" x:Name="CloseButton" Content="{l:T 'Close'}" MinWidth="90" IsCancel="True" Margin="12,0,0,0" />
+    </Grid>
+
+    <Grid ColumnDefinitions="*,16,210">
+      <Border Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
+        <Panel>
+          <ListBox x:Name="FileList" ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" Background="Transparent">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:DeviceFileItem">
+                <Grid ColumnDefinitions="48,*,Auto,Auto" ColumnSpacing="10">
+                  <Border Width="44" Height="44" CornerRadius="6" ClipToBounds="True" Background="{DynamicResource HeaderBrush}">
+                    <Panel>
+                      <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" IsVisible="{Binding HasThumbnail}" />
+                      <TextBlock Text="{Binding IconGlyph}" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding !HasThumbnail}" />
+                    </Panel>
+                  </Border>
+                  <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" FontWeight="Medium" />
+                    <TextBlock Text="{Binding DateText}" Classes="dim" FontSize="11.5" />
+                  </StackPanel>
+                  <TextBlock Grid.Column="2" Text="{Binding SizeText}" Classes="dim mono" FontSize="12" VerticalAlignment="Center" />
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsLoading}" VerticalAlignment="Top" />
+        </Panel>
+      </Border>
+
+      <StackPanel Grid.Column="2" Spacing="8">
+        <TextBlock Text="{l:T 'Actions'}" Classes="dim" FontSize="12" />
+        <Button Classes="accent" HorizontalAlignment="Stretch" Content="{l:T 'Save to PC…'}" Command="{Binding DownloadCommand}" />
+        <Button HorizontalAlignment="Stretch" Content="{l:T 'Open folder'}" Command="{Binding OpenFolderCommand}" />
+        <Button HorizontalAlignment="Stretch" Content="{l:T 'Upload files…'}" Command="{Binding UploadCommand}" />
+        <Button HorizontalAlignment="Stretch" Content="{l:T 'New folder…'}" Command="{Binding NewFolderCommand}" />
+        <Border Height="1" Background="{DynamicResource LineBrush}" Margin="0,6" />
+        <Button HorizontalAlignment="Stretch" Content="{l:T 'Delete…'}" Command="{Binding DeleteCommand}" />
+        <TextBlock Classes="dim" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0"
+                   Text="{l:T 'Double-click a folder to open it, or a file to save it to your PC. Tip: turn on Auto-save new photos in Settings to copy new shots automatically.'}" />
+      </StackPanel>
+    </Grid>
+  </DockPanel>
+</Window>

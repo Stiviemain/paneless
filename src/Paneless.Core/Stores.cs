@@ -49,6 +49,12 @@ public sealed class AppSettings
     public int WallSeconds { get; set; } = 5;
     /// <summary>Live wall: order, sizes and hidden devices.</summary>
     public WallLayout Wall { get; set; } = new();
+    /// <summary>Sync text clipboard two-way between this PC and connected devices (even without a mirror open).</summary>
+    public bool ClipboardSync { get; set; }
+    /// <summary>Automatically copy newly taken photos and screenshots from connected devices to Documents\Paneless\Media.</summary>
+    public bool AutoDownloadMedia { get; set; }
+    /// <summary>Opt-in: watch notifications via on-device accessibility to preview and auto-copy 2FA verification codes.</summary>
+    public bool AutoCopyOtp { get; set; }
 }
 
 public sealed class UnlockEntry

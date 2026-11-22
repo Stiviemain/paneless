@@ -38,7 +38,7 @@
 
     <Grid ColumnDefinitions="*,24,*">
       <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Spacing="10">
+        <StackPanel Spacing="10" Margin="0,0,14,0">
           <TextBlock Classes="section" Text="{l:T 'Mirroring (for every device)'}" />
           <ItemsControl ItemsSource="{Binding Rows}">
             <ItemsControl.ItemTemplate>
@@ -52,6 +52,17 @@
           </ItemsControl>
           <TextBlock Classes="label" Text="{l:T 'Folder on the device for files you drop on it'}" Margin="0,6,0,0" />
           <TextBox Text="{Binding PushTarget}" PlaceholderText="{l:T '/sdcard/Download/'}" />
+          <TextBlock Classes="section" Text="{l:T 'Background sync'}" Margin="0,12,0,4" />
+          <ItemsControl ItemsSource="{Binding SyncRows}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:SettingRow">
+                <Grid ColumnDefinitions="170,*" Margin="0,0,0,8" ToolTip.Tip="{Binding Tip}">
+                  <TextBlock Text="{Binding Label}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                  <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding Choices}" SelectedItem="{Binding Selected}" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
         </StackPanel>
       </ScrollViewer>
 

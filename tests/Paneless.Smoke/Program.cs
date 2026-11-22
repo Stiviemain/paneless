@@ -3,7 +3,7 @@
 using Paneless.Core;
 
 // --groups and --scripts-parse need no device and no scrcpy (they also run in CI).
-var offline = args.Contains("--groups") || args.Contains("--scripts-parse") || args.Contains("--automation") || args.Contains("--translations") || args.Contains("--assistants") || args.Contains("--remote-apps");
+var offline = args.Contains("--groups") || args.Contains("--scripts-parse") || args.Contains("--automation") || args.Contains("--translations") || args.Contains("--assistants") || args.Contains("--remote-apps") || args.Contains("--helper");
 var tools = ToolLocator.Find() ?? (offline ? new ToolPaths("adb", "scrcpy") : null);
 if (tools == null) { Console.WriteLine("scrcpy/adb not found"); return 1; }
 Console.WriteLine($"adb:    {tools.Adb}\nscrcpy: {tools.Scrcpy}\ndata:   {AppPaths.DataDir}");
@@ -518,6 +518,278 @@ if (args.Contains("--translations"))
     return 0;
 }
 
+if (args.Contains("--helper"))
+{
+    var okAll = true;
+    void Check(bool ok, string what) { if (!ok) okAll = false; Console.WriteLine($"{(ok ? "ok  " : "FAIL")} {what}"); }
+
+    // Pair two in-memory streams (client <-> fake daemon) to exercise the exact framing + DeviceHelperClient logic offline.
+    var c2s = System.Threading.Channels.Channel.CreateUnbounded<byte[]>();
+    var s2c = System.Threading.Channels.Channel.CreateUnbounded<byte[]>();
+    Stream MakeStream(System.Threading.Channels.ChannelReader<byte[]> r, System.Threading.Channels.ChannelWriter<byte[]> w) =>
+        new PipePairStream(r, w);
+
+    var serverStream = MakeStream(c2s.Reader, s2c.Writer);
+    var clientStream = MakeStream(s2c.Reader, c2s.Writer);
+
+    var serverTask = Task.Run(async () =>
+    {
+        try
+        {
+            while (true)
+            {
+                var frame = await HelperProtocol.ReadFrameAsync(serverStream, CancellationToken.None);
+                if (frame == null) break;
+                var id = frame.Header["id"]!.GetValue<long>();
+                var cmd = frame.Header["cmd"]!.ToString();
+                switch (cmd)
+                {
+                    case "ping":
+                        await HelperProtocol.WriteFrameAsync(serverStream, new System.Text.Json.Nodes.JsonObject
+                        {
+                            ["id"] = id, ["ok"] = true, ["version"] = HelperProtocol.ProtocolVersion, ["sdk"] = 37,
+                            ["commands"] = new System.Text.Json.Nodes.JsonArray(
+                                "ping", "apps", "echo_bin", "push_test", "fail_test",
+                                "ui_tree", "ui_action", "clipboard_get", "clipboard_set", "clipboard_watch",
+                                "files_ls", "files_thumb", "files_read", "files_write", "files_delete", "files_mkdir", "media_watch",
+                                "tasks_list", "task_move", "launch_intent",
+                                "capture", "screen_state", "display_watch",
+                                "inventory", "apps_detail", "telemetry_watch",
+                                "camera_info", "camera_watch", "locate",
+                                "sys_get", "sys_set", "media_state", "media_control", "notifications_watch"),
+                        }, null, CancellationToken.None);
+                        break;
+                    case "ui_tree":
+                        await HelperProtocol.WriteFrameAsync(serverStream, new System.Text.Json.Nodes.JsonObject
+                        {
+                            ["id"] = id, ["ok"] = true, ["displayId"] = 0, ["package"] = "com.example.app", ["count"] = 1,
+                            ["nodes"] = new System.Text.Json.Nodes.JsonArray(new System.Text.Json.Nodes.JsonObject { ["id"] = 1, ["text"] = "Save", ["clickable"] = true }),
+                        }, null, CancellationToken.None);
+                        break;
+                    case "ui_action":
+                        await HelperProtocol.WriteFrameAsync(serverStream, new System.Text.Json.Nodes.JsonObject
+                        {
+                            ["id"] = id, ["ok"] = true, ["performed"] = true, ["bounds"] = new System.Text.Json.Nodes.JsonArray(0, 0, 100, 40),
+                        }, null, CancellationToken.None);
+                        break;
+                    case "clipboard_get":
+                        await HelperProtocol.WriteFrameAsync(serverStream, new System.Text.Json.Nodes.JsonObject { ["id"] = id, ["ok"] = true, ["text"] = "clip-val" }, null, CancellationToken.None);
+                        break;
+                    case "clipboard_set":
+                        await HelperProtocol.WriteFrameAsync(serverStream, new System.Text.Json.Nodes.JsonObject { ["id"] = id, ["ok"] = true }, null, CancellationToken.None);
+                        break;
+                    case "clipboard_watch":
+                        await HelperProtocol.WriteFrameAsync(serverStream, new System.Text.Json.Nodes.JsonObject { ["id"] = id, ["ok"] = true, ["watching"] = frame.Header["enabled"]!.GetValue<bool>() }, null, CancellationToken.None);
+                        break;
+                    case "files_ls":
+                        await HelperProtocol.WriteFrameAsync(serverStream, new System.Text.Json.Nodes.JsonObject
+                        {
+                            ["id"] = id, ["ok"] = true, ["path"] = "/sdcard/DCIM/Camera",
+                            ["entries"] = new System.Text.Json.Nodes.JsonArray(new System.Text.Json.Nodes.JsonObject
+                            {
+                                ["name"] = "IMG_1.jpg", ["path"] = "/sdcard/DCIM/Camera/IMG_1.jpg", ["isDir"] = false, ["size"] = 5, ["modifiedMs"] = 1700000000000L, ["kind"] = "image",
+                            }),
+                        }, null, CancellationToken.None);
+                        break;
+                    case "files_thumb":
+                        await HelperProtocol.WriteFrameAsync(serverStream, new System.Text.Json.Nodes.JsonObject { ["id"] = id, ["ok"] = true, ["mime"] = "image/jpeg" }, [0xFF, 0xD8, 0xFF, 0xD9], CancellationToken.None);
+                        break;
+                    case "files_read":
+                        await HelperProtocol.WriteFrameAsync(serverStream, new System.Text.Json.Nodes.JsonObject { ["id"] = id, ["ok"] = true, ["totalSize"] = 5, ["offset"] = 0, ["eof"] = true }, "hello"u8.ToArray(), CancellationToken.None);
+                        break;
+                    case "tasks_list":
+                        await HelperProtocol.WriteFrameAsync(serverStream, new System.Text.Json.Nodes.JsonObject
+                        {
+                            ["id"] = id, ["ok"] = true,
+                            ["tasks"] = new System.Text.Json.Nodes.JsonArray(new System.Text.Json.Nodes.JsonObject
+                            {
+                                ["taskId"] = 77, ["displayId"] = 2, ["package"] = "com.example.chat", ["activity"] = ".Main", ["label"] = "Chat", ["visible"] = true,
+                            }),
+                        }, null, CancellationToken.None);
+                        break;
+                    case "task_move":
+                    case "launch_intent":
+                    case "display_watch":
+                    case "telemetry_watch":
+                    case "camera_watch":
+                    case "sys_set":
+                    case "media_control":
+                    case "notifications_watch":
+                        await HelperProtocol.WriteFrameAsync(serverStream, new System.Text.Json.Nodes.JsonObject { ["id"] = id, ["ok"] = true }, null, CancellationToken.None);
+                        break;
+                    case "capture":
+                        var off = frame.Header["displayId"]?.GetValue<int>() == 99;
+                        await HelperProtocol.WriteFrameAsync(serverStream, new System.Text.Json.Nodes.JsonObject
+                        {
+                            ["id"] = id, ["ok"] = true, ["screenOff"] = off, ["sourceWidth"] = 1080, ["sourceHeight"] = 2400,
+                        }, off ? null : [0xFF, 0xD8, 0xFF, 0xD9], CancellationToken.None);
+                        break;
+                    case "inventory":
+                        await HelperProtocol.WriteFrameAsync(serverStream, new System.Text.Json.Nodes.JsonObject
+                        {
+                            ["id"] = id, ["ok"] = true, ["manufacturer"] = "Google", ["model"] = "Pixel", ["androidVersion"] = "17", ["sdk"] = 37,
+                            ["securityPatch"] = "2026-11-05", ["serial"] = "SN99", ["batteryLevel"] = 84, ["charging"] = true, ["batteryHealthCode"] = 2,
+                            ["batteryTempC"] = 31.5, ["storageTotalMb"] = 100000L, ["storageFreeMb"] = 40000L, ["ramTotalMb"] = 12288L,
+                            ["screen"] = "1280x2856", ["ipAddress"] = "192.168.1.40", ["uptimeSeconds"] = 7200L,
+                        }, null, CancellationToken.None);
+                        break;
+                    case "apps_detail":
+                        await HelperProtocol.WriteFrameAsync(serverStream, new System.Text.Json.Nodes.JsonObject
+                        {
+                            ["id"] = id, ["ok"] = true,
+                            ["apps"] = new System.Text.Json.Nodes.JsonArray(new System.Text.Json.Nodes.JsonObject
+                            {
+                                ["package"] = "com.example.chat", ["label"] = "Chat", ["versionName"] = "2.1.0", ["versionCode"] = 210L, ["disabled"] = false, ["isSystem"] = false, ["apkSizeBytes"] = 5_000_000L,
+                            }),
+                        }, null, CancellationToken.None);
+                        break;
+                    case "camera_info":
+                        await HelperProtocol.WriteFrameAsync(serverStream, new System.Text.Json.Nodes.JsonObject { ["id"] = id, ["ok"] = true, ["backOrientation"] = 90, ["frontOrientation"] = 270 }, null, CancellationToken.None);
+                        break;
+                    case "locate":
+                        await HelperProtocol.WriteFrameAsync(serverStream, new System.Text.Json.Nodes.JsonObject { ["id"] = id, ["ok"] = true, ["flashed"] = true, ["vibrated"] = true, ["chimed"] = true }, null, CancellationToken.None);
+                        break;
+                    case "sys_get":
+                        await HelperProtocol.WriteFrameAsync(serverStream, new System.Text.Json.Nodes.JsonObject
+                        {
+                            ["id"] = id, ["ok"] = true, ["darkMode"] = true, ["brightness"] = 180, ["autoBrightness"] = false,
+                            ["autoRotate"] = true, ["dnd"] = false, ["wifi"] = true, ["bluetooth"] = true,
+                            ["volumes"] = new System.Text.Json.Nodes.JsonObject
+                            {
+                                ["music"] = new System.Text.Json.Nodes.JsonObject { ["current"] = 10, ["max"] = 15 },
+                                ["ring"] = new System.Text.Json.Nodes.JsonObject { ["current"] = 5, ["max"] = 7 },
+                            },
+                        }, null, CancellationToken.None);
+                        break;
+                    case "media_state":
+                        await HelperProtocol.WriteFrameAsync(serverStream, new System.Text.Json.Nodes.JsonObject
+                        {
+                            ["id"] = id, ["ok"] = true, ["playing"] = true, ["title"] = "Song", ["artist"] = "Band", ["album"] = "LP", ["package"] = "com.spotify.music",
+                        }, null, CancellationToken.None);
+                        break;
+                    case "apps":
+                        await HelperProtocol.WriteFrameAsync(serverStream, new System.Text.Json.Nodes.JsonObject
+                        {
+                            ["id"] = id, ["ok"] = true,
+                            ["apps"] = new System.Text.Json.Nodes.JsonArray(
+                                new System.Text.Json.Nodes.JsonObject { ["package"] = "com.example.b", ["name"] = "Beta" },
+                                new System.Text.Json.Nodes.JsonObject { ["package"] = "com.example.a", ["name"] = "Alpha" }),
+                        }, null, CancellationToken.None);
+                        break;
+                    case "echo_bin":
+                        await HelperProtocol.WriteFrameAsync(serverStream, new System.Text.Json.Nodes.JsonObject
+                        {
+                            ["id"] = id, ["ok"] = true, ["len"] = frame.Binary.Length,
+                        }, frame.Binary.Reverse().ToArray(), CancellationToken.None);
+                        break;
+                    case "push_test":
+                        await HelperProtocol.WriteFrameAsync(serverStream, new System.Text.Json.Nodes.JsonObject
+                        {
+                            ["event"] = "clipboard", ["text"] = "hello-from-phone",
+                        }, [1, 2, 3], CancellationToken.None);
+                        await HelperProtocol.WriteFrameAsync(serverStream, new System.Text.Json.Nodes.JsonObject
+                        {
+                            ["id"] = id, ["ok"] = true,
+                        }, null, CancellationToken.None);
+                        break;
+                    case "fail_test":
+                        await HelperProtocol.WriteFrameAsync(serverStream, new System.Text.Json.Nodes.JsonObject
+                        {
+                            ["id"] = id, ["ok"] = false, ["error"] = "simulated error",
+                        }, null, CancellationToken.None);
+                        break;
+                    case "shutdown":
+                        await HelperProtocol.WriteFrameAsync(serverStream, new System.Text.Json.Nodes.JsonObject
+                        {
+                            ["id"] = id, ["ok"] = true,
+                        }, null, CancellationToken.None);
+                        return;
+                }
+            }
+        }
+        finally { s2c.Writer.TryComplete(); }
+    });
+
+    await using var client = await DeviceHelperClient.FromStreamAsync("test-serial", clientStream);
+    Check(client.IsConnected && client.ProtocolVersion == HelperProtocol.ProtocolVersion && client.DeviceSdk == 37, "helper handshake version & sdk");
+    Check(client.Supports("apps") && client.Supports("echo_bin") && !client.Supports("nope"), "helper capabilities set");
+
+    var apps = await client.GetLauncherAppsAsync();
+    Check(apps != null && apps.Count == 2 && apps[0].Name == "Alpha" && apps[1].Name == "Beta", "helper apps RPC sorts by name");
+
+    var echo = await client.CallAsync("echo_bin", new System.Text.Json.Nodes.JsonObject { ["tag"] = "x" }, [10, 20, 30, 40]);
+    Check(echo.Ok && echo.Data["len"]?.GetValue<int>() == 4 && echo.Binary.SequenceEqual(new byte[] { 40, 30, 20, 10 }), "helper binary round-trip");
+
+    var gotEvent = new TaskCompletionSource<HelperEvent>();
+    client.EventReceived += ev => gotEvent.TrySetResult(ev);
+    var pushRes = await client.CallAsync("push_test");
+    var ev = await gotEvent.Task.WaitAsync(TimeSpan.FromSeconds(2));
+    Check(pushRes.Ok && ev.Name == "clipboard" && ev.Data["text"]?.ToString() == "hello-from-phone" && ev.Binary.SequenceEqual(new byte[] { 1, 2, 3 }), "helper push events delivered with binary");
+
+    var fail = await client.CallAsync("fail_test");
+    Check(!fail.Ok && fail.Error == "simulated error", "helper error responses propagated");
+
+    // Feature 1: UI tree + action
+    var tree = await client.GetUiTreeAsync();
+    var act = await client.PerformUiActionAsync("click", nodeId: 1);
+    Check(tree.Ok && tree.Data["count"]?.GetValue<int>() == 1 && act.Ok, "helper Feature 1: ui_tree & ui_action");
+
+    // Feature 2: Clipboard
+    Check(await client.GetClipboardAsync() == "clip-val" && await client.SetClipboardAsync("abc") && await client.WatchClipboardAsync(true), "helper Feature 2: clipboard get/set/watch");
+
+    // Feature 3: Files & thumbnails + download
+    var files = await client.ListFilesAsync("/sdcard/DCIM/Camera");
+    var thumb = await client.GetThumbnailAsync("/sdcard/DCIM/Camera/IMG_1.jpg");
+    var tmpFile = Path.Combine(Path.GetTempPath(), $"paneless-helper-test-{Guid.NewGuid():n}.txt");
+    var dlOk = await client.DownloadFileAsync("/sdcard/DCIM/Camera/IMG_1.jpg", tmpFile);
+    var dlText = dlOk && File.Exists(tmpFile) ? await File.ReadAllTextAsync(tmpFile) : "";
+    try { if (File.Exists(tmpFile)) File.Delete(tmpFile); } catch { }
+    Check(files is { Count: 1 } && thumb is { Length: 4 } && dlText == "hello", "helper Feature 3: files_ls, thumb & chunked download");
+
+    // Feature 4: Tasks & handoff
+    var tasks = await client.ListTasksAsync();
+    Check(tasks is [{ TaskId: 77, DisplayId: 2, Label: "Chat" }] && await client.MoveTaskToDisplayAsync(77, 0) && (await client.LaunchIntentAsync(uri: "https://example.com")).Ok, "helper Feature 4: tasks_list, task_move & launch_intent");
+
+    // Feature 5: Fast Wall capture & screenOff
+    var capOn = await client.CaptureJpegAsync(480, 0);
+    var capOff = await client.CaptureJpegAsync(480, 99);
+    Check(capOn is { ScreenOff: false, Jpeg.Length: 4 } && capOff is { ScreenOff: true, Jpeg: null }, "helper Feature 5: capture JPEG & screenOff");
+
+    // Feature 6: Telemetry inventory & detailed apps
+    var inv = await client.GetInventoryAsync("My Pixel");
+    var det = await client.GetDetailedAppsAsync();
+    Check(inv is { Manufacturer: "Google", BatteryLevel: 84, BatteryHealth: "Good", StorageFreeMb: 40000 } && det is [{ VersionName: "2.1.0", ApkSizeBytes: 5_000_000 }], "helper Feature 6: inventory & apps_detail");
+
+    // Feature 7: Camera orientations & locate
+    var cam = await client.GetCameraOrientationsAsync();
+    var loc = await client.LocateDeviceAsync();
+    Check(cam is { Back: 90, Front: 270 } && await client.WatchCameraOrientationAsync(true) && loc.Ok, "helper Feature 7: camera_info, camera_watch & locate");
+
+    // Feature 8: System controls, media & OTP extraction
+    var sys = await client.GetSystemStateAsync();
+    var media = await client.GetMediaStateAsync();
+    Check(sys is { DarkMode: true, Brightness: 180, MusicVolume: 10, MusicMax: 15 } && await client.SetSystemSettingAsync("darkMode", false), "helper Feature 8: sys_get & sys_set");
+    Check(media is { Playing: true, Title: "Song", Artist: "Band" } && await client.ControlMediaAsync("play_pause") && await client.WatchNotificationsAsync(true), "helper Feature 8: media_state, media_control & notifications_watch");
+    Check(OtpExtractor.Extract("Your Google verification code is 482910") == "482910"
+          && OtpExtractor.Extract("Ihr Sicherheitscode lautet: 918273.") == "918273"
+          && OtpExtractor.Extract("Code de vérification : 5512") == "5512"
+          && OtpExtractor.Extract("Order #123456 shipped today") == null
+          && OtpExtractor.Extract("Call me at 5551234") == null, "helper Feature 8: OtpExtractor EN/DE/FR + false-positive guard");
+
+    // EffectiveProfile resolution for new background sync settings
+    var effSync = EffectiveProfile.Resolve(new AppSettings { ClipboardSync = true }, new DeviceProfile { ClipboardSync = false, AutoDownloadMedia = true }, new DeviceProfile { AutoCopyOtp = true });
+    Check(!effSync.ClipboardSync && effSync.AutoDownloadMedia && effSync.AutoCopyOtp, "EffectiveProfile resolves ClipboardSync/AutoDownloadMedia/AutoCopyOtp");
+
+    // Check embedded jar is present in Paneless.Core.
+    var jarStream = typeof(DeviceHelperClient).Assembly.GetManifestResourceStream("Paneless.Core.paneless-helper.jar");
+    Check(jarStream is { Length: > 10000 }, $"embedded paneless-helper.jar present ({jarStream?.Length ?? 0} bytes)");
+    jarStream?.Dispose();
+
+    c2s.Writer.TryComplete();
+    await serverTask;
+    return okAll ? 0 : 1;
+}
+
 if (args.Contains("--scripts-parse"))
 {
     var vals = new Dictionary<string, string> { ["package"] = "com.example.app", ["evil"] = "x; reboot", ["dpi"] = "400" };
@@ -579,3 +851,37 @@ foreach (var (sn, e) in data.Unlock)
     code = null;
 }
 return 0;
+
+sealed class PipePairStream(
+    System.Threading.Channels.ChannelReader<byte[]> reader,
+    System.Threading.Channels.ChannelWriter<byte[]> writer) : Stream
+{
+    byte[] _buf = [];
+    int _pos;
+
+    public override bool CanRead => true;
+    public override bool CanSeek => false;
+    public override bool CanWrite => true;
+    public override long Length => throw new NotSupportedException();
+    public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+    public override void Flush() { }
+    public override Task FlushAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    public override int Read(byte[] buffer, int offset, int count) => ReadAsync(buffer.AsMemory(offset, count)).AsTask().GetAwaiter().GetResult();
+    public override void Write(byte[] buffer, int offset, int count) => writer.TryWrite(buffer.AsSpan(offset, count).ToArray());
+    public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) { writer.TryWrite(buffer.ToArray()); return ValueTask.CompletedTask; }
+    public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+    {
+        while (_pos >= _buf.Length)
+        {
+            if (!await reader.WaitToReadAsync(cancellationToken)) return 0;
+            if (reader.TryRead(out var next) && next.Length > 0) { _buf = next; _pos = 0; }
+        }
+        var n = Math.Min(buffer.Length, _buf.Length - _pos);
+        _buf.AsSpan(_pos, n).CopyTo(buffer.Span);
+        _pos += n;
+        return n;
+    }
+    public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+    public override void SetLength(long value) => throw new NotSupportedException();
+    protected override void Dispose(bool disposing) { writer.TryComplete(); base.Dispose(disposing); }
+}

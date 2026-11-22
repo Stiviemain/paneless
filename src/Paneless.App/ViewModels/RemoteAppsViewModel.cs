@@ -229,13 +229,27 @@ public sealed partial class RemoteAppsViewModel : ObservableObject
             png != null ? StatusKind.Ok : StatusKind.Warn);
     }
 
+    async Task<List<LauncherApp>?> LoadLauncherAppsAsync(string serial, bool isWatch)
+    {
+        if (_s.Helpers != null && await _s.Helpers.GetOrStartAsync(serial, isWatch) is { } helper)
+            try { if (await helper.GetLauncherAppsAsync() is { Count: > 0 } fast) return fast; } catch { }
+        return await _s.Adb!.GetLauncherAppsAsync(serial);
+    }
+
+    async Task<Dictionary<string, (string Name, byte[] Png)>> LoadAppIconsAsync(string serial, bool isWatch, int size, IEnumerable<string> packages)
+    {
+        if (_s.Helpers != null && await _s.Helpers.GetOrStartAsync(serial, isWatch) is { } helper)
+            try { var fast = await helper.GetAppIconsAsync(size, packages); if (fast.Count > 0) return fast; } catch { }
+        return await _s.Adb!.GetAppIconsAsync(serial, size, packages);
+    }
+
     async Task<byte[]?> ReadIconAsync(DeviceRow row, string package)
     {
         try
         {
             var serial = await _s.Directory!.ConnectAsync(row);
             if (serial == null) return null;
-            var icons = await _s.Adb!.GetAppIconsAsync(serial, 256, [package]);
+            var icons = await LoadAppIconsAsync(serial, row.Type == "Watch", 256, [package]);
             return icons.TryGetValue(package, out var i) ? i.Png : null;
         }
         catch { return null; }
@@ -354,10 +368,10 @@ public sealed partial class RemoteAppsViewModel : ObservableObject
             var serial = await _s.Directory!.ConnectAsync(row);
             if (generation != _loadGeneration) return;
             if (serial == null) { AddMessage = Loc.F("Couldn't connect to {0}.", row.Name); return; }
-            var apps = await _s.Adb!.GetLauncherAppsAsync(serial);
+            var apps = await LoadLauncherAppsAsync(serial, row.Type == "Watch");
             var namesKnown = apps != null;
             // The helper couldn't run: fall back to the package names of the apps you installed.
-            apps ??= (await _s.Adb.GetPackagesAsync(serial, false)).Select(p => new LauncherApp(p.Name, p.Name)).ToList();
+            apps ??= (await _s.Adb!.GetPackagesAsync(serial, false)).Select(p => new LauncherApp(p.Name, p.Name)).ToList();
             if (generation != _loadGeneration) return;
             _addAll = apps.Select(a =>
             {
@@ -396,7 +410,7 @@ public sealed partial class RemoteAppsViewModel : ObservableObject
                 if (batch.Count == 0) break;
                 first = false;
                 foreach (var a in batch) attempted.Add(a.Package);
-                var icons = await _s.Adb.GetAppIconsAsync(serial, 64, batch.Select(a => a.Package));
+                var icons = await LoadAppIconsAsync(serial, row.Type == "Watch", 64, batch.Select(a => a.Package));
                 if (generation != _loadGeneration) return;
                 foreach (var a in batch)
                 {
@@ -457,7 +471,7 @@ public sealed partial class RemoteAppsViewModel : ObservableObject
             {
                 try
                 {
-                    var icons = await _s.Adb!.GetAppIconsAsync(serial, 256, [package]);
+                    var icons = await LoadAppIconsAsync(serial, row.Type == "Watch", 256, [package]);
                     if (icons.TryGetValue(package, out var i)) { png = i.Png; if (name == null && i.Name.Length > 0) app.Name = i.Name; }
                 }
                 catch { }

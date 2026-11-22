@@ -118,6 +118,37 @@ public static class SettingChoices
             p != null ? p.MaxFps : g!.MaxFps, e != null ? FpsText(e.MaxFps) : "", v => { if (p != null) p.MaxFps = (int?)v; else if (v is int i) g!.MaxFps = i; });
         return rows;
     }
+
+    /// <summary>Opt-in background features powered by the on-device helper daemon (global, group or per-device).</summary>
+    public static List<SettingRow> SyncRows(Func<DeviceProfile>? profile, EffectiveProfile? inherited, AppSettings? global, Action save)
+    {
+        var rows = new List<SettingRow>();
+        void Bool(string label, string? tip, bool? current, bool fallback, Action<bool?> set)
+        {
+            var choices = new List<Choice>();
+            if (inherited != null) choices.Add(new Choice(Loc.F("Default ({0})", OnOff(fallback)), null));
+            choices.Add(new Choice(Loc.T("On"), true));
+            choices.Add(new Choice(Loc.T("Off"), false));
+            rows.Add(new SettingRow(label, tip, choices, inherited != null ? current : fallback, v => { set((bool?)v); save(); }));
+        }
+
+        var p = profile?.Invoke();
+        var g = global;
+        var e = inherited;
+        Bool(Loc.T("Sync clipboard automatically"),
+            Loc.T("Keeps plain-text clipboard in sync between this PC and the device even without a mirror open. Off on watches unless turned on per device."),
+            p?.ClipboardSync, e?.ClipboardSync ?? g!.ClipboardSync,
+            v => { if (p != null) p.ClipboardSync = v; else g!.ClipboardSync = v ?? false; });
+        Bool(Loc.T("Auto-save new photos & screenshots"),
+            Loc.T("Copies newly taken photos and screenshots to Documents\\Paneless\\Media automatically as you take them."),
+            p?.AutoDownloadMedia, e?.AutoDownloadMedia ?? g!.AutoDownloadMedia,
+            v => { if (p != null) p.AutoDownloadMedia = v; else g!.AutoDownloadMedia = v ?? false; });
+        Bool(Loc.T("Auto-copy 2FA codes from notifications"),
+            Loc.T("Opt-in: watches incoming notifications on the device to copy 2FA verification codes straight to your PC clipboard (uses on-device accessibility while connected)."),
+            p?.AutoCopyOtp, e?.AutoCopyOtp ?? g!.AutoCopyOtp,
+            v => { if (p != null) p.AutoCopyOtp = v; else g!.AutoCopyOtp = v ?? false; });
+        return rows;
+    }
 }
 
 /// <summary>Settings of one device or one group (the window opened with "Device settings…" / "Group settings…").</summary>
@@ -144,6 +175,7 @@ public sealed partial class ProfileEditorViewModel : ObservableObject
         // What "Default" means here: for a device, its group's settings over the global ones; for a group, the global ones.
         var inherited = EffectiveProfile.Resolve(_s.Data.Settings, deviceId != null ? memberOf?.Profile : null, null);
         Rows = new(SettingChoices.MirrorRows(Profile, inherited, null, Save));
+        SyncRows = new(SettingChoices.SyncRows(Profile, inherited, null, Save));
         AutoMirror = new SettingRow(Loc.T("Mirror by itself when it connects"), Loc.T("Opens the mirror as soon as the device is on the network and connected. Once per connection."),
             [new Choice(Loc.F("Default ({0})", SettingChoices.OnOff(inherited.AutoMirror)), null), new Choice(Loc.T("On"), true), new Choice(Loc.T("Off"), false)],
             Profile().AutoMirror, v => { Profile().AutoMirror = (bool?)v; Save(); });
@@ -170,6 +202,7 @@ public sealed partial class ProfileEditorViewModel : ObservableObject
     public string Subtitle { get; }
     public bool IsDevice { get; }
     public ObservableCollection<SettingRow> Rows { get; }
+    public ObservableCollection<SettingRow> SyncRows { get; }
     public SettingRow AutoMirror { get; }
     public ObservableCollection<ScriptPick> Scripts { get; } = new();
     public string PushPlaceholder { get; }
@@ -231,12 +264,14 @@ public sealed partial class ProfileEditorViewModel : ObservableObject
     {
         var p = Profile();
         var keepHotkey = p.Hotkey;
-        p.ScreenOff = p.Audio = p.OnTop = p.KeepAwake = p.AutoMirror = null;
+        p.ScreenOff = p.Audio = p.OnTop = p.KeepAwake = p.LockOnClose = p.KeepScreensOn = p.AutoMirror = null;
+        p.ClipboardSync = p.AutoDownloadMedia = p.AutoCopyOtp = null;
         p.MaxSize = p.VideoCodec = p.PushTarget = null;
         p.BitrateMbps = p.MaxFps = null;
         p.OnConnectScripts.Clear();
         p.Hotkey = keepHotkey;
         foreach (var r in Rows) r.Selected = r.Choices[0];
+        foreach (var r in SyncRows) r.Selected = r.Choices[0];
         AutoMirror.Selected = AutoMirror.Choices[0];
         foreach (var s in Scripts.Where(s => s.Editable)) s.IsChecked = false;
         PushTarget = "";
@@ -255,6 +290,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         _s = services;
         var g = _s.Data.Settings;
         Rows = new(SettingChoices.MirrorRows(null, null, g, Save));
+        SyncRows = new(SettingChoices.SyncRows(null, null, g, Save));
         _pushTarget = g.PushTarget;
         _updateSource = g.UpdateSource;
         _startLanguage = g.Language;
@@ -270,6 +306,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     public Func<Task<string>>? CheckUpdatesAsync { get; set; }
 
     public ObservableCollection<SettingRow> Rows { get; }
+    public ObservableCollection<SettingRow> SyncRows { get; }
     public bool AutostartSupported => Platform.Autostart.IsSupported;
 
     public bool AutoConnect { get => G.AutoConnect; set { G.AutoConnect = value; Save(); OnPropertyChanged(); } }

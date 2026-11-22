@@ -225,6 +225,13 @@ public sealed partial class MainViewModel : ObservableObject
             Rebuild();
             Automate();
             UpdateBatteries();
+            if (!_s.Demo && _s.Helpers != null)
+            {
+                var connected = _rows.Where(r => r.Serial != null && r.State is DeviceState.Connected or DeviceState.Mirroring)
+                    .Select(r => r.Serial!).ToHashSet();
+                _s.Helpers.PruneDisconnected(connected);
+                _s.Helpers.PruneIdleWatches();
+            }
         }
         catch (Exception ex) { SetStatus(Loc.T("Refresh failed: ") + ex.Message, StatusKind.Error); }
         finally { _refreshing = false; }
@@ -694,6 +701,8 @@ public sealed partial class MainViewModel : ObservableObject
     public Action? ShowSettings { get; set; }
     public Action<string?, string, DeviceGroup?>? ShowDeviceSettings { get; set; }
     public Action<DeviceRow>? ShowApps { get; set; }
+    public Action<DeviceRow>? ShowFiles { get; set; }
+    public Action<DeviceRow>? ShowControls { get; set; }
     public Func<Task<IReadOnlyList<string>>>? PickFilesAsync { get; set; }
     public Action<IReadOnlyList<MirrorSession>>? ArrangeWindows { get; set; }
     public Action<MirrorSession>? BringToFront { get; set; }
@@ -750,6 +759,54 @@ public sealed partial class MainViewModel : ObservableObject
         if (One is not { CanMirror: true } r) { SetStatus(Loc.T("Select one available device first."), StatusKind.Warn); return; }
         ShowApps?.Invoke(r);
     }
+
+    [RelayCommand]
+    void Files()
+    {
+        if (One is not { CanMirror: true } r) { SetStatus(Loc.T("Select one available device first."), StatusKind.Warn); return; }
+        ShowFiles?.Invoke(r);
+    }
+
+    [RelayCommand]
+    void QuickControls()
+    {
+        if (One is not { CanMirror: true } r) { SetStatus(Loc.T("Select one available device first."), StatusKind.Warn); return; }
+        ShowControls?.Invoke(r);
+    }
+
+    [RelayCommand]
+    public async Task LocateAsync(DeviceRow? target = null)
+    {
+        var r = target ?? One;
+        if (r is not { CanMirror: true }) { SetStatus(Loc.T("Select one available device first."), StatusKind.Warn); return; }
+        if (_s.Demo) { SetStatus(Loc.F("Demo mode: would flash and chime {0}.", r.Name), StatusKind.Ok); return; }
+        SetStatus(Loc.F("Locating {0} (flashing & chiming)…", r.Name));
+        var serial = await _s.Directory!.ConnectAsync(r);
+        if (serial == null || _s.Helpers == null) { SetStatus(Loc.F("Couldn't connect to {0}.", r.Name), StatusKind.Error); return; }
+        var helper = await _s.Helpers.GetOrStartAsync(serial, r.Type == "Watch");
+        if (helper == null || !helper.Supports("locate")) { SetStatus(Loc.F("Couldn't locate {0}.", r.Name), StatusKind.Error); return; }
+        var res = await helper.LocateDeviceAsync();
+        SetStatus(res.Ok ? Loc.F("Signalled {0}.", r.Name) : Loc.F("Couldn't locate {0}.", r.Name), res.Ok ? StatusKind.Ok : StatusKind.Warn);
+    }
+
+    [RelayCommand]
+    public async Task PopOutCurrentAppAsync(DeviceRow? target = null)
+    {
+        var r = target ?? One;
+        if (r is not { CanMirror: true }) { SetStatus(Loc.T("Select one available device first."), StatusKind.Warn); return; }
+        if (_s.Demo) { SetStatus(Loc.F("Demo mode: would pop out the current app of {0}.", r.Name), StatusKind.Ok); return; }
+        var serial = await _s.Directory!.ConnectAsync(r);
+        if (serial == null || _s.Helpers == null) { SetStatus(Loc.F("Couldn't connect to {0}.", r.Name), StatusKind.Error); return; }
+        var helper = await _s.Helpers.GetOrStartAsync(serial, r.Type == "Watch");
+        var tasks = helper != null ? await helper.ListTasksAsync() : null;
+        var current = tasks?.FirstOrDefault(t => t.DisplayId == 0 && t.Visible && !IsSystemLauncher(t.Package))
+                      ?? tasks?.FirstOrDefault(t => t.DisplayId == 0 && !IsSystemLauncher(t.Package));
+        if (current == null) { SetStatus(Loc.F("No open app found on {0}.", r.Name), StatusKind.Warn); return; }
+        await OpenAppWindowAsync(r, current.Package);
+    }
+
+    static bool IsSystemLauncher(string pkg) =>
+        pkg.Contains("launcher", StringComparison.OrdinalIgnoreCase) || pkg == "com.android.systemui";
 
     /// <summary>Starts a scrcpy window of another kind (app, second screen, camera) for one device.</summary>
     async Task<MirrorSession?> StartWindowAsync(DeviceRow? r, string what, Func<string, MirrorSession> start, Func<string, Task>? prepare = null,

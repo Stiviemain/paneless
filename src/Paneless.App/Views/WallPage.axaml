@@ -75,6 +75,8 @@
                     <Separator />
                     <MenuItem Header="{l:T 'Open a second screen'}" Command="{Binding Wall.SecondScreenCommand}" CommandParameter="{Binding}" />
                     <MenuItem Header="{l:T 'Apps…'}" Command="{Binding Wall.AppsCommand}" CommandParameter="{Binding}" />
+                    <MenuItem Header="{l:T 'Files &amp; photos…'}" Command="{Binding Wall.FilesCommand}" CommandParameter="{Binding}" />
+                    <MenuItem Header="{l:T 'Locate device'}" Command="{Binding Wall.LocateCommand}" CommandParameter="{Binding}" />
                     <MenuItem Header="{l:T 'Device settings…'}" Command="{Binding Wall.DeviceSettingsCommand}" CommandParameter="{Binding}" />
                     <Separator />
                     <MenuItem Header="{l:T 'Size'}">

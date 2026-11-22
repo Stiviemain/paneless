@@ -79,6 +79,8 @@ public partial class MainWindow : Window
             Vm.ShowSettings = () => ShowSettings();
             Vm.ShowDeviceSettings = (id, name, group) => ShowDeviceSettings(id, name, group);
             Vm.ShowApps = row => ShowApps(row);
+            Vm.ShowFiles = row => ShowFiles(row);
+            Vm.ShowControls = row => ShowControls(row);
             Vm.PickFilesAsync = PickFilesAsync;
             Vm.ArrangeWindows = sessions => { if (OperatingSystem.IsWindows()) WindowArranger.Arrange(sessions, TryGetPlatformHandle()?.Handle ?? 0); };
             // Remember where camera windows are, so one the device cuts off (e.g. when it rotates) reopens in place.
@@ -97,15 +99,63 @@ public partial class MainWindow : Window
                 };
                 track.Start();
 
-                // Follow how the phone is held: when a camera's device has been turned another way for ~2 s, reopen the
-                // camera turned to match (the window keeps its place).
+                // Follow how the phone is held: prefer instant helper sensor events while a camera window is open
+                // (automatically unregistered when the camera closes so idle battery stays 0%), with dumpsys fallback.
                 var asking = new HashSet<MirrorSession>();
                 var pending = new Dictionary<MirrorSession, (int Turn, int Seen)>();
+                var camWatched = new HashSet<string>();
+                var camOrient = new Dictionary<string, (int? Back, int? Front)>();
+                if (_services.Helpers != null)
+                {
+                    _services.Helpers.EventReceived += ev =>
+                    {
+                        if (ev.Name != "orientation") return;
+                        var rot = ev.Data["rotation"]?.GetValue<int>() ?? -1;
+                        if (rot is < 0 or > 3) return;
+                        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                        {
+                            if (!camOrient.TryGetValue(ev.Serial, out var orient)) return;
+                            foreach (var cam in mm.Sessions.Where(x => x.Kind == SessionKind.Camera && x.Serial == ev.Serial))
+                            {
+                                if (DateTime.UtcNow - cam.Started < TimeSpan.FromSeconds(2)) continue;
+                                var front = MirrorManager.IsFrontCamera(cam);
+                                var sensor = front ? orient.Front : orient.Back;
+                                if (sensor is not { } s) continue;
+                                var deg = rot * 90;
+                                var turn = front ? (s + deg) % 360 : (s - deg + 360) % 360;
+                                if (turn != MirrorManager.TurnOf(cam))
+                                    _ = Task.Run(() => mm.TurnCamera(cam, turn));
+                            }
+                        });
+                    };
+                }
                 var follow = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
                 follow.Tick += (_, _) =>
                 {
+                    var activeCamSerials = mm.Sessions.Where(x => x.Kind == SessionKind.Camera).Select(x => x.Serial).ToHashSet();
+                    // Immediately stop sensor listener when camera windows close (zero idle battery drain).
+                    foreach (var old in camWatched.Where(s => !activeCamSerials.Contains(s)).ToList())
+                    {
+                        camWatched.Remove(old);
+                        if (_services.Helpers?.TryGet(old) is { } h && h.Supports("camera_watch"))
+                            _ = Task.Run(async () => { try { await h.WatchCameraOrientationAsync(false); } catch { } });
+                    }
                     foreach (var cam in mm.Sessions.Where(x => x.Kind == SessionKind.Camera))
                     {
+                        if (_services.Helpers != null && !camWatched.Contains(cam.Serial))
+                        {
+                            camWatched.Add(cam.Serial);
+                            var s = cam.Serial;
+                            _ = Task.Run(async () =>
+                            {
+                                var h = await _services.Helpers.GetOrStartAsync(s);
+                                if (h == null || !h.Supports("camera_watch")) { Avalonia.Threading.Dispatcher.UIThread.Post(() => camWatched.Remove(s)); return; }
+                                var o = await h.GetCameraOrientationsAsync();
+                                if (o != null) Avalonia.Threading.Dispatcher.UIThread.Post(() => camOrient[s] = o.Value);
+                                await h.WatchCameraOrientationAsync(true);
+                            });
+                        }
+                        if (camOrient.ContainsKey(cam.Serial)) continue; // handled live via push events
                         if (asking.Contains(cam) || DateTime.UtcNow - cam.Started < TimeSpan.FromSeconds(3) || _services.Adb is not { } adb) continue;
                         asking.Add(cam);
                         _ = Task.Run(async () =>
@@ -223,11 +273,13 @@ public partial class MainWindow : Window
     public AssistantsViewModel? Assistants { get; private set; }
     public RemoteAppsViewModel? RemoteApps { get; private set; }
     McpServer? _mcp;
+    HelperCoordinator? _helperCoord;
 
     void SetUpPages(MainViewModel vm)
     {
         var s = _services!;
         var automation = new AutomationService(s, vm);
+        _helperCoord = new HelperCoordinator(s, vm);
         var tools = new AssistantTools(s, vm)
         {
             AskAsync = (title, message) => Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => AssistantConfirmWindow.AskAsync(title, message)),
@@ -284,7 +336,7 @@ public partial class MainWindow : Window
             }
         };
         PropertyChanged += (_, e) => { if (e.Property == IsVisibleProperty || e.Property == WindowStateProperty) UpdateActive(); };
-        Closed += (_, _) => { Wall?.SetActive(false); Logs?.Dispose(); _mcp?.Stop(); };
+        Closed += (_, _) => { Wall?.SetActive(false); Logs?.Dispose(); _mcp?.Stop(); _helperCoord?.Dispose(); };
     }
 
     /// <summary>Remote app windows: give each its own icon and taskbar button once it shows, remember where it is, and
@@ -387,7 +439,7 @@ public partial class MainWindow : Window
     {
         if (_settings != null) { _settings.Activate(); return _settings; }
         var vm = new SettingsViewModel(_services!);
-        vm.Saved += () => Vm?.SettingsChanged();
+        vm.Saved += () => { Vm?.SettingsChanged(); _ = _helperCoord?.SyncWatchersAsync(); };
         vm.CheckUpdatesAsync = async () => (await Updates.CheckAsync(_services!, interactive: true)).Message;
         _settings = new SettingsWindow { DataContext = vm };
         _settings.Closed += (_, _) => _settings = null;
@@ -417,6 +469,35 @@ public partial class MainWindow : Window
         var w = new AppsWindow { DataContext = vm };
         _apps[row.Key] = w;
         w.Closed += (_, _) => _apps.Remove(row.Key);
+        w.Show(this);
+        _ = vm.LoadAsync();
+        return w;
+    }
+
+    readonly Dictionary<string, FilesWindow> _files = new();
+
+    public FilesWindow ShowFiles(DeviceRow row)
+    {
+        if (_files.TryGetValue(row.Key, out var open)) { open.Activate(); return open; }
+        var vm = new FilesViewModel(_services!, Vm!, row);
+        var w = new FilesWindow { DataContext = vm };
+        w.AttachDialogs(vm);
+        _files[row.Key] = w;
+        w.Closed += (_, _) => _files.Remove(row.Key);
+        w.Show(this);
+        _ = vm.LoadAsync();
+        return w;
+    }
+
+    readonly Dictionary<string, QuickControlsWindow> _controls = new();
+
+    public QuickControlsWindow ShowControls(DeviceRow row)
+    {
+        if (_controls.TryGetValue(row.Key, out var open)) { open.Activate(); return open; }
+        var vm = new QuickControlsViewModel(_services!, row);
+        var w = new QuickControlsWindow { DataContext = vm };
+        _controls[row.Key] = w;
+        w.Closed += (_, _) => _controls.Remove(row.Key);
         w.Show(this);
         _ = vm.LoadAsync();
         return w;
@@ -470,6 +551,7 @@ public partial class MainWindow : Window
         vm.OpenScripts = () => ShowScripts([row.Key]);
         vm.OpenKeymapEditor = () => OpenKeymapEditor(session.Serial, row, vm);
         vm.OpenSecondScreen = () => _ = Vm?.OpenSecondScreenAsync(Vm.NetworkRows.FirstOrDefault(r => r.GroupId == row.GroupId) ?? row);
+        vm.PopOutCurrentApp = () => _ = Vm?.PopOutCurrentAppAsync(Vm.NetworkRows.FirstOrDefault(r => r.GroupId == row.GroupId) ?? row);
         vm.OpenCamera = () =>
         {
             _ = Vm?.OpenCameraAsync(Vm.NetworkRows.FirstOrDefault(r => r.GroupId == row.GroupId) ?? row, front: false);

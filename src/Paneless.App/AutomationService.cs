@@ -108,7 +108,14 @@ public sealed partial class AutomationService
             if (connected && needsInventory && (!_inventoryAt.TryGetValue(id, out var at) || now - at > TimeSpan.FromMinutes(15)))
             {
                 _inventoryAt[id] = now;
-                try { if (await _s.Adb!.GetInventoryAsync(row!.Serial!, name) is { } inv) _s.Inventory[id] = inv; } catch { }
+                try
+                {
+                    var inv = _s.Helpers != null
+                        ? await _s.Helpers.ReadInventoryAsync(row!.Serial!, name, row.Type == "Watch")
+                        : await _s.Adb!.GetInventoryAsync(row!.Serial!, name);
+                    if (inv != null) _s.Inventory[id] = inv;
+                }
+                catch { }
             }
             _s.Inventory.TryGetValue(id, out var info);
             var battery = connected ? _main.BatteryOf(row!.Serial!) : null;

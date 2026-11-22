@@ -38,8 +38,9 @@ public sealed class AssistantTools
         "Start with list_devices. Devices are named by their name or id. Some actions need the user's approval in Paneless, " +
         "and each device has a permission level the user set (read, screen, control, manage): if a tool is refused, tell the user " +
         "they can change it on the AI page in Paneless. If a device is locked or its screen is off, use unlock_device (uses the " +
-        "code saved in Paneless without revealing it) and lock_device when done. To operate a screen: take a screenshot, then tap " +
-        "or swipe using the pixel coordinates of that screenshot. Never guess coordinates without a recent screenshot.";
+        "code saved in Paneless without revealing it) and lock_device when done. To read or operate an app: prefer read_ui_tree + ui_action " +
+        "(fast semantic elements with text/labels/bounds, password fields redacted, works on virtual displays too), or fall back to " +
+        "screenshot + tap/swipe (using the pixel coordinates of the latest screenshot; never guess coordinates without a recent screenshot).";
 
     sealed record Tool(string Name, string Description, AssistantAccess Level, JsonObject Schema, Func<JsonObject, Task<ToolResult>> Run,
         bool Changes = false, bool Destructive = false, bool Idempotent = false);
@@ -175,6 +176,14 @@ public sealed class AssistantTools
         return control;
     }
 
+    async Task<DeviceHelperClient> HelperOf(DeviceRow r)
+    {
+        var serial = await SerialOf(r);
+        if (_s.Helpers == null) throw new RefusedException("Device helper isn't available.");
+        return await _s.Helpers.GetOrStartAsync(serial, r.Type == "Watch")
+               ?? throw new RefusedException($"Couldn't start the on-device helper on {r.Name}.");
+    }
+
     // ---------------------------------------------------------------- schema helpers
 
     static JsonObject Schema(params (string Name, string Type, string Description, bool Required)[] props)
@@ -248,7 +257,9 @@ public sealed class AssistantTools
             {
                 var r = FindDevice(a);
                 await Allow(t, [r], Localization.Loc.T("read device facts"));
-                var inv = _s.Demo ? DemoData.Inventory(r) : await _s.Adb!.GetInventoryAsync(await SerialOf(r), r.Name);
+                var inv = _s.Demo ? DemoData.Inventory(r)
+                    : _s.Helpers != null ? await _s.Helpers.ReadInventoryAsync(await SerialOf(r), r.Name, r.Type == "Watch")
+                    : await _s.Adb!.GetInventoryAsync(await SerialOf(r), r.Name);
                 if (inv == null) return ToolResult.Text("Couldn't read the device.", true);
                 _s.Inventory[r.GroupId] = inv;
                 return ToolResult.Json(AssistantFacts.Inventory(inv));
@@ -290,6 +301,53 @@ public sealed class AssistantTools
                 var text = string.Join('\n', lines.Select(x => x.Raw).TakeLast(n));
                 return ToolResult.Text(text.Length == 0 ? "(no matching lines)" : text);
             });
+
+        Add("read_ui_tree", "Reads the live semantic UI tree of a device's screen (or a virtual display): element ids, text, labels, resource ids, bounds, and interactive flags (password fields are redacted). Much faster and more accurate than taking a screenshot.",
+            AssistantAccess.Screen, Schema(DeviceArg,
+                ("display_id", "integer", "Display id (0 = main screen, or a virtual display id). Default 0.", false),
+                ("interactive_only", "boolean", "Only return clickable, editable, scrollable or checkable elements.", false),
+                ("max_nodes", "integer", "Maximum elements to return (default 300, max 800).", false)), async (t, a) =>
+            {
+                var r = FindDevice(a);
+                await Allow(t, [r], Localization.Loc.T("read the screen elements"));
+                if (_s.Demo) return ToolResult.Json(new JsonObject { ["displayId"] = 0, ["package"] = "com.example.demo", ["count"] = 1, ["nodes"] = new JsonArray(new JsonObject { ["id"] = 1, ["class"] = "Button", ["text"] = "Demo button", ["clickable"] = true }) });
+                var helper = await HelperOf(r);
+                var displayId = a["display_id"] != null ? (int)Num(a, "display_id") : 0;
+                var interactiveOnly = a["interactive_only"]?.GetValue<bool>() == true;
+                var maxNodes = a["max_nodes"] != null ? (int)Num(a, "max_nodes") : 300;
+                var res = await helper.GetUiTreeAsync(displayId, interactiveOnly, maxNodes);
+                if (!res.Ok) return ToolResult.Text(res.Error ?? "Couldn't read UI tree.", true);
+                var outObj = (JsonObject)res.Data.DeepClone();
+                outObj.Remove("id"); outObj.Remove("ok");
+                return ToolResult.Json(outObj);
+            });
+
+        Add("ui_action", "Performs a semantic UI action on an element from read_ui_tree (or matched by text, desc, or res_id): click, long_click, set_text, scroll_forward, scroll_backward, focus.",
+            AssistantAccess.Control, Schema(DeviceArg,
+                ("action", "string", "click, long_click, set_text, scroll_forward, scroll_backward, focus, or clear_focus.", true),
+                ("node_id", "integer", "Element id from the latest read_ui_tree call.", false),
+                ("text", "string", "Match element whose text contains this string.", false),
+                ("desc", "string", "Match element whose content description contains this string.", false),
+                ("res_id", "string", "Match element by resource id (e.g. send_button).", false),
+                ("index", "integer", "0-based match index when multiple elements match (default 0).", false),
+                ("value", "string", "Text to enter when action is set_text.", false),
+                ("display_id", "integer", "Display id (default 0).", false)), async (t, a) =>
+            {
+                var r = FindDevice(a);
+                var action = Str(a, "action").Trim().ToLowerInvariant();
+                var targetDesc = a["text"]?.ToString() ?? a["desc"]?.ToString() ?? a["res_id"]?.ToString() ?? (a["node_id"] != null ? "#" + a["node_id"] : "element");
+                await Allow(t, [r], Localization.Loc.F("{0} on {1}", action, targetDesc));
+                if (_s.Demo) return ToolResult.Text($"Demo mode: would run {action} on {targetDesc} ({r.Name}).");
+                var helper = await HelperOf(r);
+                var displayId = a["display_id"] != null ? (int)Num(a, "display_id") : 0;
+                var nodeId = a["node_id"] != null ? (int)Num(a, "node_id") : 0;
+                var index = a["index"] != null ? (int)Num(a, "index") : 0;
+                var res = await helper.PerformUiActionAsync(action, displayId, nodeId,
+                    a["text"]?.ToString(), a["desc"]?.ToString(), a["res_id"]?.ToString(), index, a["value"]?.ToString());
+                return res.Ok
+                    ? ToolResult.Text($"Performed {action} on {r.Name} ({res.Data["bounds"]}).")
+                    : ToolResult.Text(res.Error ?? $"Couldn't perform {action}.", true);
+            }, changes: true);
 
         Add("screenshot", "Takes a screenshot of a device's screen. Use its pixel coordinates for tap and swipe.",
             AssistantAccess.Screen, Schema(DeviceArg), async (t, a) =>
@@ -353,6 +411,27 @@ public sealed class AssistantTools
                 return ToolResult.Text($"Swiped on {r.Name}.");
             }, changes: true);
 
+        Add("get_clipboard", "Reads the current plain-text clipboard of a device.",
+            AssistantAccess.Read, Schema(DeviceArg), async (t, a) =>
+            {
+                var r = FindDevice(a);
+                await Allow(t, [r], Localization.Loc.T("read the clipboard"));
+                if (_s.Demo) return ToolResult.Text("Demo clipboard text");
+                var text = await (await HelperOf(r)).GetClipboardAsync();
+                return text == null ? ToolResult.Text($"Couldn't read clipboard of {r.Name}.", true) : ToolResult.Text(text.Length == 0 ? "(clipboard is empty)" : text);
+            });
+
+        Add("set_clipboard", "Sets the plain-text clipboard of a device.",
+            AssistantAccess.Control, Schema(DeviceArg, ("text", "string", "Text to put on the device's clipboard.", true)), async (t, a) =>
+            {
+                var r = FindDevice(a);
+                var text = Str(a, "text");
+                await Allow(t, [r], Localization.Loc.F("copy text to {0}'s clipboard", r.Name));
+                if (_s.Demo) return ToolResult.Text($"Demo mode: would copy {text.Length} characters to {r.Name}.");
+                var ok = await (await HelperOf(r)).SetClipboardAsync(text);
+                return ok ? ToolResult.Text($"Copied {text.Length} characters to {r.Name}'s clipboard.") : ToolResult.Text($"Couldn't set clipboard on {r.Name}.", true);
+            }, changes: true, idempotent: true);
+
         Add("type_text", "Types text into the focused field of a device, like a keyboard.",
             AssistantAccess.Control, Schema(DeviceArg, ("text", "string", "The text to type.", true)), async (t, a) =>
             {
@@ -377,6 +456,49 @@ public sealed class AssistantTools
                 await Allow(t, [r], Localization.Loc.F("press {0}", key));
                 await (await ControlOf(await SerialOf(r))).PressKeyAsync(code);
                 return ToolResult.Text($"Pressed {key} on {r.Name}.");
+            }, changes: true);
+
+        Add("list_running_apps", "Lists running app tasks across the device's main screen (display 0) and any virtual displays.",
+            AssistantAccess.Read, Schema(DeviceArg), async (t, a) =>
+            {
+                var r = FindDevice(a);
+                await Allow(t, [r], Localization.Loc.T("list running apps"));
+                if (_s.Demo) return ToolResult.Json(new JsonArray(new JsonObject { ["task_id"] = 42, ["display_id"] = 0, ["package"] = "com.android.settings", ["label"] = "Settings", ["visible"] = true }));
+                var tasks = await (await HelperOf(r)).ListTasksAsync();
+                if (tasks == null) return ToolResult.Text($"Couldn't read running apps on {r.Name}.", true);
+                return ToolResult.Json(new JsonArray(tasks.Select(x => (JsonNode)new JsonObject
+                {
+                    ["task_id"] = x.TaskId, ["display_id"] = x.DisplayId, ["package"] = x.Package, ["label"] = x.Label, ["visible"] = x.Visible,
+                }).ToArray()));
+            });
+
+        Add("move_app_to_display", "Moves a running app task (task_id from list_running_apps) to another display (0 = main screen, or a virtual display id).",
+            AssistantAccess.Control, Schema(DeviceArg,
+                ("task_id", "integer", "Task id from list_running_apps.", true),
+                ("display_id", "integer", "Target display id (0 = phone screen).", true)), async (t, a) =>
+            {
+                var r = FindDevice(a);
+                var taskId = (int)Num(a, "task_id");
+                var displayId = (int)Num(a, "display_id");
+                await Allow(t, [r], Localization.Loc.F("move app task #{0} to display {1}", taskId, displayId));
+                if (_s.Demo) return ToolResult.Text($"Demo mode: would move task {taskId} to display {displayId}.");
+                var ok = await (await HelperOf(r)).MoveTaskToDisplayAsync(taskId, displayId);
+                return ok ? ToolResult.Text($"Moved task {taskId} to display {displayId} on {r.Name}.") : ToolResult.Text($"Couldn't move task {taskId}.", true);
+            }, changes: true, idempotent: true);
+
+        Add("open_url", "Opens a web URL or app deep-link URI on a device (optionally on a specific display or in a specific app package).",
+            AssistantAccess.Control, Schema(DeviceArg,
+                ("uri", "string", "URL or deep-link URI, e.g. https://example.com", true),
+                ("package", "string", "Optional app package to handle the URI.", false),
+                ("display_id", "integer", "Optional target display id (default 0).", false)), async (t, a) =>
+            {
+                var r = FindDevice(a);
+                var uri = Str(a, "uri");
+                var displayId = a["display_id"] != null ? (int)Num(a, "display_id") : 0;
+                await Allow(t, [r], Localization.Loc.F("open {0}", uri));
+                if (_s.Demo) return ToolResult.Text($"Demo mode: would open {uri} on {r.Name}.");
+                var res = await (await HelperOf(r)).LaunchIntentAsync(a["package"]?.ToString(), uri, displayId);
+                return res.Ok ? ToolResult.Text($"Opened {uri} on {r.Name}.") : ToolResult.Text(res.Error ?? "Couldn't open URI.", true);
             }, changes: true);
 
         Add("open_app", "Opens an app on a device by its package name (see list_apps).",
@@ -418,6 +540,71 @@ public sealed class AssistantTools
                 var res = await _s.Unlock.UnlockAsync(serial, r.Sn!, r.Name);
                 return ToolResult.Text(res.Message, !res.Ok);
             }, changes: true, idempotent: true);
+
+        Add("get_device_controls", "Reads system toggle states (dark mode, DND, auto-rotate, Wi-Fi, Bluetooth, brightness, volumes) and currently playing media.",
+            AssistantAccess.Read, Schema(DeviceArg), async (t, a) =>
+            {
+                var r = FindDevice(a);
+                await Allow(t, [r], Localization.Loc.T("read device controls"));
+                if (_s.Demo) return ToolResult.Json(new JsonObject { ["dark_mode"] = true, ["dnd"] = false, ["brightness"] = 175, ["media_playing"] = false });
+                var h = await HelperOf(r);
+                var sys = await h.GetSystemStateAsync();
+                var media = await h.GetMediaStateAsync();
+                if (sys == null) return ToolResult.Text($"Couldn't read controls of {r.Name}.", true);
+                return ToolResult.Json(new JsonObject
+                {
+                    ["dark_mode"] = sys.DarkMode, ["dnd"] = sys.Dnd, ["auto_rotate"] = sys.AutoRotate,
+                    ["wifi"] = sys.Wifi, ["bluetooth"] = sys.Bluetooth, ["brightness"] = sys.Brightness,
+                    ["music_volume"] = sys.MusicVolume, ["music_max"] = sys.MusicMax,
+                    ["ring_volume"] = sys.RingVolume, ["ring_max"] = sys.RingMax,
+                    ["media"] = media == null ? null : new JsonObject { ["playing"] = media.Playing, ["title"] = media.Title, ["artist"] = media.Artist, ["package"] = media.Package },
+                });
+            });
+
+        Add("set_device_control", "Changes a system toggle or slider on a device: darkMode, dnd, autoRotate, wifi, bluetooth (boolean), brightness (0-255), or volume (integer + stream music/ring/alarm/notification).",
+            AssistantAccess.Control, Schema(DeviceArg,
+                ("setting", "string", "darkMode, dnd, autoRotate, wifi, bluetooth, brightness, or volume.", true),
+                ("value", "string", "true/false for toggles, or integer for brightness/volume.", true),
+                ("stream", "string", "For volume: music (default), ring, alarm, or notification.", false)), async (t, a) =>
+            {
+                var r = FindDevice(a);
+                var setting = Str(a, "setting").Trim();
+                var rawVal = Str(a, "value").Trim();
+                var stream = a["stream"]?.ToString();
+                await Allow(t, [r], Localization.Loc.F("set {0} to {1}", setting, rawVal));
+                if (_s.Demo) return ToolResult.Text($"Demo mode: would set {setting}={rawVal} on {r.Name}.");
+                JsonNode valNode = bool.TryParse(rawVal, out var b) ? b
+                    : int.TryParse(rawVal, out var i) ? i
+                    : throw new RefusedException($"Value for {setting} must be true/false or an integer.");
+                var ok = await (await HelperOf(r)).SetSystemSettingAsync(setting, valNode, stream);
+                return ok ? ToolResult.Text($"Set {setting} to {rawVal} on {r.Name}.") : ToolResult.Text($"Couldn't set {setting}.", true);
+            }, changes: true, idempotent: true);
+
+        Add("media_control", "Controls media playback on a device: play_pause, play, pause, next, previous, or stop.",
+            AssistantAccess.Control, Schema(DeviceArg,
+                ("action", "string", "play_pause, play, pause, next, previous, or stop.", true)), async (t, a) =>
+            {
+                var r = FindDevice(a);
+                var action = Str(a, "action").Trim().ToLowerInvariant();
+                await Allow(t, [r], Localization.Loc.F("media {0}", action));
+                if (_s.Demo) return ToolResult.Text($"Demo mode: would send media {action} to {r.Name}.");
+                var ok = await (await HelperOf(r)).ControlMediaAsync(action);
+                return ok ? ToolResult.Text($"Sent media {action} to {r.Name}.") : ToolResult.Text($"Couldn't send media {action}.", true);
+            }, changes: true);
+
+        Add("locate_device", "Physically locates a device by blinking its camera flashlight, vibrating, and playing a short alarm chime.",
+            AssistantAccess.Control, Schema(DeviceArg,
+                ("mode", "string", "all (default), flash, vibrate, or chime.", false)), async (t, a) =>
+            {
+                var r = FindDevice(a);
+                var mode = a["mode"]?.ToString()?.Trim().ToLowerInvariant() is { Length: > 0 } m ? m : "all";
+                await Allow(t, [r], Localization.Loc.F("locate {0} ({1})", r.Name, mode));
+                if (_s.Demo) return ToolResult.Text($"Demo mode: would locate {r.Name} ({mode}).");
+                var res = await (await HelperOf(r)).LocateDeviceAsync(mode);
+                return res.Ok
+                    ? ToolResult.Text($"Signalled {r.Name} (flash={res.Data["flashed"]}, vibrate={res.Data["vibrated"]}, chime={res.Data["chimed"]}).")
+                    : ToolResult.Text(res.Error ?? $"Couldn't locate {r.Name}.", true);
+            }, changes: true);
 
         Add("lock_device", "Turns the device's screen off and puts it to sleep (locks it).",
             AssistantAccess.Control, Schema(DeviceArg), async (t, a) =>
@@ -481,6 +668,37 @@ public sealed class AssistantTools
                 await Allow(t, rows, Localization.Loc.F("uninstall {0}", pkg));
                 return Results(await _main.Actions.ShellAsync("pm uninstall --user 0 " + ScriptText.ShellQuote(pkg), rows));
             }, changes: true, destructive: true);
+
+        Add("list_files", "Lists files and folders on a device (default /sdcard/Download).",
+            AssistantAccess.Read, Schema(DeviceArg,
+                ("path", "string", "Folder on the device (default /sdcard/Download).", false),
+                ("sort", "string", "\"name\" or \"date\" (default \"name\").", false)), async (t, a) =>
+            {
+                var r = FindDevice(a);
+                var path = a["path"]?.ToString() is { Length: > 0 } p ? p : "/sdcard/Download";
+                await Allow(t, [r], Localization.Loc.F("list files in {0}", path));
+                if (_s.Demo) return ToolResult.Json(new JsonArray(new JsonObject { ["name"] = "demo.txt", ["path"] = path + "/demo.txt", ["size"] = 128, ["kind"] = "doc" }));
+                var entries = await (await HelperOf(r)).ListFilesAsync(path, a["sort"]?.ToString() ?? "name");
+                if (entries == null) return ToolResult.Text($"Couldn't list {path} on {r.Name}.", true);
+                return ToolResult.Json(new JsonArray(entries.Select(e => (JsonNode)new JsonObject
+                {
+                    ["name"] = e.Name, ["path"] = e.Path, ["is_dir"] = e.IsDir, ["size"] = e.Size, ["kind"] = e.Kind,
+                }).ToArray()));
+            });
+
+        Add("pull_file", "Copies a file from a device to a folder or path on the user's PC.",
+            AssistantAccess.Manage, Schema(DeviceArg,
+                ("remote_path", "string", "Full path of the file on the device, e.g. /sdcard/DCIM/Camera/IMG_1.jpg.", true),
+                ("local_path", "string", "Destination file path on the PC.", true)), async (t, a) =>
+            {
+                var r = FindDevice(a);
+                var remote = Str(a, "remote_path");
+                var local = Str(a, "local_path");
+                await Allow(t, [r], Localization.Loc.F("copy {0} to the PC", Path.GetFileName(remote)));
+                if (_s.Demo) return ToolResult.Text($"Demo mode: would download {remote} to {local}.");
+                var ok = await (await HelperOf(r)).DownloadFileAsync(remote, local);
+                return ok ? ToolResult.Text($"Saved {remote} to {local}.") : ToolResult.Text($"Couldn't copy {remote} from {r.Name}.", true);
+            }, changes: true, idempotent: true);
 
         Add("copy_file", "Copies a file from the user's PC to a device or group (default folder: the device's drop folder, usually /sdcard/Download/).",
             AssistantAccess.Manage, Schema(DeviceOpt, GroupOpt, ("path", "string", "Full path of the file on the PC.", true), ("folder", "string", "Folder on the device.", false)), async (t, a) =>

@@ -9,6 +9,7 @@ public sealed class AppServices
     public DataStore Data { get; }
     public KeymapStore Keymaps { get; } = new();
     public AdbClient? Adb { get; }
+    public DeviceHelperManager? Helpers { get; }
     public DeviceDirectory? Directory { get; }
     public MirrorManager? Mirrors { get; }
     public UnlockService? Unlock { get; }
@@ -22,6 +23,7 @@ public sealed class AppServices
         Tools = ToolLocator.Find();
         if (Tools == null) return;
         Adb = new AdbClient(Tools.Adb);
+        Helpers = new DeviceHelperManager(Adb);
         Directory = new DeviceDirectory(Adb, Data);
         Mirrors = new MirrorManager(Tools);
         Unlock = new UnlockService(Adb, Data, SecretVault.ForThisOs());
