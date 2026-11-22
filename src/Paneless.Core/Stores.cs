@@ -17,6 +17,8 @@ public sealed class AppSettings
     public bool OnTop { get; set; }
     public bool KeepAwake { get; set; } = true;
     public bool LockOnClose { get; set; }
+    /// <summary>Keep second screens and app windows showing while the device is locked (scrcpy --keep-active).</summary>
+    public bool KeepScreensOn { get; set; } = true;
     public string MaxSize { get; set; } = "1920 px";
 
     public string VideoCodec { get; set; } = "h264";

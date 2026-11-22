@@ -53,6 +53,9 @@ public sealed class RemoteApp
         if (quality.MaxFps > 0) args.Add($"--max-fps={quality.MaxFps}");
         if (ScreenOff) args.Add("--turn-screen-off");
         if (OnTop) args.Add("--always-on-top");
+        // Android (e.g. 17 on Pixels) turns a virtual screen off a few seconds after the device's own screen goes off;
+        // simulated user activity keeps just this screen on (the device still locks and its own screen stays off).
+        if (quality.KeepScreensOn) args.Add("--keep-active");
         if (Window is { W: > 100, H: > 100 } p)
             args.AddRange([$"--window-x={Math.Max(0, p.X)}", $"--window-y={Math.Max(0, p.Y)}", $"--window-width={p.W}", $"--window-height={p.H}"]);
         return args;

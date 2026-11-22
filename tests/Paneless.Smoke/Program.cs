@@ -50,6 +50,10 @@ if (args.Contains("--groups"))
     Check(new DeviceProfile().IsEmpty && !devP.IsEmpty && !new DeviceProfile { LockOnClose = true }.IsEmpty, "empty profiles are dropped when saved");
     Check(EffectiveProfile.Resolve(global, new DeviceProfile { LockOnClose = true }, null).ToMirrorOptions().LockOnClose
           && !EffectiveProfile.Resolve(global, new DeviceProfile { LockOnClose = true }, new DeviceProfile { LockOnClose = false }).ToMirrorOptions().LockOnClose, "LockOnClose resolves device > group > global");
+    Check(EffectiveProfile.Resolve(new AppSettings(), null, null).ToMirrorOptions().KeepScreensOn
+          && !EffectiveProfile.Resolve(new AppSettings(), new DeviceProfile { KeepScreensOn = false }, null).ToMirrorOptions().KeepScreensOn
+          && EffectiveProfile.Resolve(new AppSettings { KeepScreensOn = false }, new DeviceProfile { KeepScreensOn = false }, new DeviceProfile { KeepScreensOn = true }).ToMirrorOptions().KeepScreensOn,
+          "keeping screens on while locked: on by default, device > group > global");
 
     // USB & Wi-Fi merging in DeviceDirectory.Merge + Wi-Fi IP parsing.
     var known = new Dictionary<string, KnownDevice> { ["SN123"] = new() { Name = "My Pixel", Model = "Pixel 11", Type = "Phone" } };
@@ -459,10 +463,11 @@ if (args.Contains("--remote-apps"))
     var app = new RemoteApp { Package = "com.example.chat", Name = "Chat" };
     var a = app.ScrcpyArgs("Chat – Pixel", quality);
     Check(a.Contains("--new-display=1080x1920") && a.Contains("--start-app=com.example.chat") && a.Contains("--flex-display") && a.Contains("--no-vd-system-decorations")
-          && a.Contains("--display-ime-policy=hide") && a.Contains("--turn-screen-off") && a.Contains("--video-bit-rate=200M") && a.Contains("--max-fps=60")
+          && a.Contains("--display-ime-policy=hide") && a.Contains("--turn-screen-off") && a.Contains("--video-bit-rate=200M") && a.Contains("--max-fps=60") && a.Contains("--keep-active")
           && !a.Any(x => x.StartsWith("--window-x")) && a[0] == "--window-title" && a[1] == "Chat – Pixel", "a phone app: tall screen, PC keyboard, device screen off");
     app.Shape = "tablet"; app.PcKeyboardOnly = false; app.ScreenOff = false; app.OnTop = true;
     a = app.ScrcpyArgs("t", quality);
+    Check(!app.ScrcpyArgs("t", quality with { KeepScreensOn = false }).Contains("--keep-active"), "a remote app keeps its screen on while the device is locked, unless switched off");
     Check(a.Contains("--new-display=1920x1200") && !a.Contains("--display-ime-policy=hide") && !a.Contains("--turn-screen-off") && a.Contains("--always-on-top"), "a tablet app: wide screen, options off");
     app.Window = new WindowPlace { X = -8, Y = 40, W = 500, H = 1000 };
     a = app.ScrcpyArgs("t", quality);

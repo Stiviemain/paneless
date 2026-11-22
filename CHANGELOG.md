@@ -2,7 +2,7 @@
 
 All notable changes to Paneless. Versions follow [Semantic Versioning](https://semver.org).
 
-## 1.0.0-beta.3 (2026-11-22)
+## 1.0.0-beta.4 (2026-11-22)
 
 Remote apps, a much more capable Wall, better USB support and a few fixes.
 
@@ -11,6 +11,7 @@ Remote apps, a much more capable Wall, better USB support and a few fixes.
 - The window has the app's name and icon and its own taskbar button, and remembers its size and place. Phone or tablet shape, or your own size; type with the PC keyboard only.
 - **Shortcuts** on the desktop and in the Start menu, with the app's icon and a small Paneless logo in the corner. They start Paneless by itself if it isn't running.
 - Add apps on the Remote apps page or from a device's app manager. Paneless reads the apps' names and real icons from the device.
+- **Remote apps, second screens and app windows keep showing when you lock the device.** Some devices (e.g. Pixels with Android 17) turned them black a few seconds after their own screen went off. The device still locks and its own screen stays off. Setting: *Keep app windows on when locked* (on by default; also per group or device).
 
 **Wall**
 - Screens that are off show "Screen off" and a Wake button instead of a black picture.

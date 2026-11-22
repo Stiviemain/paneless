@@ -3,7 +3,7 @@ using System.Diagnostics;
 namespace Paneless.Core;
 
 public sealed record MirrorOptions(bool ScreenOff, bool Audio, bool OnTop, bool KeepAwake, int? MaxSize,
-    string VideoCodec = "h264", int BitrateMbps = 8, int MaxFps = 0, bool LockOnClose = false);
+    string VideoCodec = "h264", int BitrateMbps = 8, int MaxFps = 0, bool LockOnClose = false, bool KeepScreensOn = true);
 
 /// <summary>Mirror: the device's screen (gets a toolbar). App: one app on its own virtual display.
 /// Screen: a second screen (virtual display). Camera: a camera. Recording: no window, writes a video file.</summary>
@@ -90,6 +90,7 @@ public sealed partial class MirrorManager(ToolPaths tools)
         var title = $"{name} – {package}";
         var args = new List<string> { "--window-title", title, "--new-display=1080x1920", "--flex-display", "--start-app=" + package, "--no-audio" };
         args.AddRange(Quality(o with { MaxSize = null }));
+        if (o.KeepScreensOn) args.Add("--keep-active");
         if (o.ScreenOff) args.Add("--turn-screen-off");
         if (o.OnTop) args.Add("--always-on-top");
         if ((o.KeepAwake || o.ScreenOff) && !HasDisplaySession(serial)) args.Add("--screen-off-timeout=3600");
@@ -116,6 +117,7 @@ public sealed partial class MirrorManager(ToolPaths tools)
         var title = $"{name} – second screen";
         var args = new List<string> { "--window-title", title, "--new-display=1600x1000", "--flex-display", "--no-audio" };
         args.AddRange(Quality(o with { MaxSize = null }));
+        if (o.KeepScreensOn) args.Add("--keep-active");
         if (o.ScreenOff) args.Add("--turn-screen-off");
         if (o.OnTop) args.Add("--always-on-top");
         if ((o.KeepAwake || o.ScreenOff) && !HasDisplaySession(serial)) args.Add("--screen-off-timeout=3600");

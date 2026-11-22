@@ -24,6 +24,8 @@ public sealed class DeviceProfile
     public bool? OnTop { get; set; }
     public bool? KeepAwake { get; set; }
     public bool? LockOnClose { get; set; }
+    /// <summary>Keep second screens and app windows showing while the device is locked.</summary>
+    public bool? KeepScreensOn { get; set; }
     /// <summary>"1920 px", "Full resolution", …</summary>
     public string? MaxSize { get; set; }
     /// <summary>h264, h265 or av1.</summary>
@@ -43,7 +45,7 @@ public sealed class DeviceProfile
     public string? Hotkey { get; set; }
 
     public bool IsEmpty =>
-        ScreenOff == null && Audio == null && OnTop == null && KeepAwake == null && LockOnClose == null && MaxSize == null && VideoCodec == null
+        ScreenOff == null && Audio == null && OnTop == null && KeepAwake == null && LockOnClose == null && KeepScreensOn == null && MaxSize == null && VideoCodec == null
         && BitrateMbps == null && MaxFps == null && AutoMirror == null && PushTarget == null && OnConnectScripts.Count == 0
         && string.IsNullOrEmpty(Hotkey) && Assistant == null;
 }
@@ -51,12 +53,12 @@ public sealed class DeviceProfile
 /// <summary>What actually applies to a device after combining device, group and global settings.</summary>
 public sealed record EffectiveProfile(
     bool ScreenOff, bool Audio, bool OnTop, bool KeepAwake, bool LockOnClose, string MaxSize, string VideoCodec, int BitrateMbps, int MaxFps,
-    bool AutoMirror, string PushTarget, IReadOnlyList<string> OnConnectScripts, string? Hotkey, AssistantAccess Assistant)
+    bool AutoMirror, string PushTarget, IReadOnlyList<string> OnConnectScripts, string? Hotkey, AssistantAccess Assistant, bool KeepScreensOn = true)
 {
     public int? MaxSizePixels => int.TryParse(MaxSize.Split(' ')[0], out var px) ? px : null;
 
     public MirrorOptions ToMirrorOptions() =>
-        new(ScreenOff, Audio, OnTop, KeepAwake || ScreenOff, MaxSizePixels, VideoCodec, BitrateMbps, MaxFps, LockOnClose);
+        new(ScreenOff, Audio, OnTop, KeepAwake || ScreenOff, MaxSizePixels, VideoCodec, BitrateMbps, MaxFps, LockOnClose, KeepScreensOn);
 
     public static EffectiveProfile Resolve(AppSettings global, DeviceProfile? group, DeviceProfile? device)
     {
@@ -81,7 +83,8 @@ public sealed record EffectiveProfile(
             PickS(p => p.PushTarget, global.PushTarget),
             scripts,
             device?.Hotkey is { Length: > 0 } h ? h : null,
-            device?.Assistant ?? group?.Assistant ?? global.AssistantDefaultAccess);
+            device?.Assistant ?? group?.Assistant ?? global.AssistantDefaultAccess,
+            Pick(p => p.KeepScreensOn, global.KeepScreensOn));
     }
 }
 

@@ -210,6 +210,7 @@ Use Android apps like programs on your PC, the way Windows' RemoteApp works over
 - **Remembers its window:** size and place, per app. Choose a phone or tablet shape, or your own size.
 - **PC keyboard only:** Android's on-screen keyboard stays out of the window (can be switched off per app).
 - The device is unlocked first if you saved its PIN.
+- **Keeps showing when you lock the device:** the app window stays live while the device is locked and its own screen is off (*Settings › Keep app windows on when locked*, on by default). Without it, some devices (e.g. Pixels with Android 17) turn the window black a few seconds after their screen goes off.
 
 What Android doesn't allow: apps that block screen capture (banking, some video apps) show a black window, an app can only be open in one place at a time (opening it on the PC takes it off the phone's screen), and there's no sound per app. A few apps don't like a second screen and jump back to the phone.
 

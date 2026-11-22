@@ -100,6 +100,10 @@ public static class SettingChoices
             v => { if (p != null) p.KeepAwake = v; else g!.KeepAwake = v ?? false; });
         Bool(Loc.T("Lock device when mirror closes"), Loc.T("Puts the device to sleep (and locks it) when its last mirror or second-screen window closes."), p?.LockOnClose, e?.LockOnClose ?? g!.LockOnClose,
             v => { if (p != null) p.LockOnClose = v; else g!.LockOnClose = v ?? false; });
+        Bool(Loc.T("Keep app windows on when locked"),
+            Loc.T("Second screens and app windows (also remote apps) stay visible while the device is locked. Without it, some devices turn them black a few seconds after their own screen goes off. The device still locks and its own screen stays off."),
+            p?.KeepScreensOn, e?.KeepScreensOn ?? g!.KeepScreensOn,
+            v => { if (p != null) p.KeepScreensOn = v; else g!.KeepScreensOn = v ?? true; });
         Bool(Loc.T("Play device audio here"), null, p?.Audio, e?.Audio ?? g!.Audio,
             v => { if (p != null) p.Audio = v; else g!.Audio = v ?? false; });
         Bool(Loc.T("Mirror window always on top"), null, p?.OnTop, e?.OnTop ?? g!.OnTop,
