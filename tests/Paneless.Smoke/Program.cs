@@ -471,8 +471,9 @@ if (args.Contains("--remote-apps"))
     Check(a.Contains("--new-display=1920x1200") && !a.Contains("--display-ime-policy=hide") && !a.Contains("--turn-screen-off") && a.Contains("--always-on-top"), "a tablet app: wide screen, options off");
     app.Window = new WindowPlace { X = -8, Y = 40, W = 500, H = 1000 };
     a = app.ScrcpyArgs("t", quality);
-    Check(a.Contains("--new-display=500x1000") && a.Contains("--render-fit=letterbox") && a.Contains("--window-x=0") && a.Contains("--window-y=40") && a.Contains("--window-width=500") && a.Contains("--window-height=1000"),
-          "a remembered window: same place and exact display size");
+    Check(a.Contains("--new-display=500x1000") && a.Contains("--render-fit=letterbox") && a.Contains("--window-x=0") && a.Contains("--window-y=40")
+          && !a.Any(x => x.StartsWith("--window-width") || x.StartsWith("--window-height")),
+          "a remembered window: same place and exact display size (no --window-width/height with --flex-display)");
     app.Window = null; app.Shape = "custom"; app.CustomWidth = 99999; app.CustomHeight = 801;
     Check(app.ScrcpyArgs("t", quality).Contains("--new-display=3840x800"), "a custom size is kept within limits and even");
     Check(RemoteApp.ShortcutFileName("Chat: \"work\" / home?") == "Chat   work    home.lnk" && RemoteApp.ShortcutFileName("...") == "App.lnk"

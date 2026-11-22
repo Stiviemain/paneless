@@ -55,8 +55,10 @@ public sealed class RemoteApp
         // Android (e.g. 17 on Pixels) turns a virtual screen off a few seconds after the device's own screen goes off;
         // simulated user activity keeps just this screen on (the device still locks and its own screen stays off).
         if (quality.KeepScreensOn) args.Add("--keep-active");
+        // scrcpy 5.x rejects --window-width/--window-height when --flex-display is on;
+        // --new-display=WxH above already restores the remembered size, so only pass position here.
         if (Window is { W: > 100, H: > 100 } p)
-            args.AddRange([$"--window-x={Math.Max(0, p.X)}", $"--window-y={Math.Max(0, p.Y)}", $"--window-width={p.W}", $"--window-height={p.H}"]);
+            args.AddRange([$"--window-x={Math.Max(0, p.X)}", $"--window-y={Math.Max(0, p.Y)}"]);
         return args;
     }
 
