@@ -61,11 +61,11 @@
       <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
     </Style>
     <Style Selector="Button.nav">
-      <Setter Property="Width" Value="80" />
-      <Setter Property="Height" Value="58" />
+      <Setter Property="Width" Value="82" />
+      <Setter Property="Height" Value="52" />
       <Setter Property="HorizontalAlignment" Value="Center" />
-      <Setter Property="HorizontalContentAlignment" Value="Center" />
-      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="VerticalContentAlignment" Value="Stretch" />
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="BorderThickness" Value="0" />
       <Setter Property="CornerRadius" Value="8" />
@@ -77,22 +77,74 @@
     <Style Selector="Button.nav.on /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="{DynamicResource SelBrush}" />
     </Style>
+    <Style Selector="Border.navpill">
+      <Setter Property="Width" Value="3" />
+      <Setter Property="Height" Value="20" />
+      <Setter Property="CornerRadius" Value="2" />
+      <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Margin" Value="1,0,0,0" />
+      <Setter Property="Opacity" Value="0" />
+    </Style>
+    <Style Selector="Button.nav.on Border.navpill">
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="Border.navsep">
+      <Setter Property="Height" Value="1" />
+      <Setter Property="Margin" Value="14,5" />
+      <Setter Property="Background" Value="{DynamicResource LineBrush}" />
+      <Setter Property="Opacity" Value="0.7" />
+    </Style>
     <Style Selector="Path.navicon">
-      <Setter Property="Stroke" Value="{DynamicResource TextBrush}" />
+      <Setter Property="Stroke" Value="{DynamicResource DimBrush}" />
       <Setter Property="StrokeThickness" Value="1.6" />
       <Setter Property="StrokeLineCap" Value="Round" />
       <Setter Property="StrokeJoin" Value="Round" />
-      <Setter Property="Width" Value="20" />
-      <Setter Property="Height" Value="20" />
+      <Setter Property="Width" Value="19" />
+      <Setter Property="Height" Value="19" />
       <Setter Property="Stretch" Value="Uniform" />
       <Setter Property="HorizontalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.nav:pointerover Path.navicon">
+      <Setter Property="Stroke" Value="{DynamicResource TextBrush}" />
+    </Style>
+    <Style Selector="Button.nav.on Path.navicon">
+      <Setter Property="Stroke" Value="{DynamicResource AccentBrush}" />
     </Style>
     <Style Selector="TextBlock.navlabel">
       <Setter Property="FontSize" Value="10.5" />
       <Setter Property="HorizontalAlignment" Value="Center" />
       <Setter Property="Foreground" Value="{DynamicResource DimBrush}" />
     </Style>
+    <Style Selector="Button.nav:pointerover TextBlock.navlabel">
+      <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+    </Style>
     <Style Selector="Button.nav.on TextBlock.navlabel">
+      <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.brand">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="6" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.brand:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+    </Style>
+    <Style Selector="Button.searchclear">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="6,2" />
+      <Setter Property="Margin" Value="0,0,4,0" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Foreground" Value="{DynamicResource DimBrush}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.searchclear:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
       <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
     </Style>
     <Style Selector="TextBlock.label">
@@ -103,79 +155,121 @@
 
   <Grid ColumnDefinitions="Auto,*">
 
-    <!-- navigation: the main areas of Paneless; Settings at the bottom -->
+    <!-- navigation: daily views on top, tools & system utilities (Logs, Settings) at the bottom -->
     <Border Background="{DynamicResource HeaderBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,1,0">
-      <DockPanel Width="84" Margin="0,14,0,12">
-        <Button DockPanel.Dock="Bottom" Classes="nav" Command="{Binding OpenSettingsCommand}" ToolTip.Tip="{l:T 'Settings'}">
-          <StackPanel Spacing="3">
-            <Path Classes="navicon" Data="M12 9 A3 3 0 1 1 11.99 9 Z M12 2.5 V5 M12 19 V21.5 M2.5 12 H5 M19 12 H21.5 M5.3 5.3 L7.1 7.1 M16.9 16.9 L18.7 18.7 M5.3 18.7 L7.1 16.9 M16.9 7.1 L18.7 5.3" />
-            <TextBlock Classes="navlabel" Text="{l:T 'Settings'}" />
-          </StackPanel>
+      <DockPanel Width="90" Margin="0,10,0,10">
+        <Button DockPanel.Dock="Top" Classes="brand" Margin="0,0,0,8" Command="{Binding GoCommand}" CommandParameter="Devices" ToolTip.Tip="Paneless">
+          <Image Source="/Assets/Paneless.png" Width="34" Height="34" RenderOptions.BitmapInterpolationMode="HighQuality" />
         </Button>
-        <StackPanel Spacing="4">
-          <Button Classes="nav" Classes.on="{Binding IsDevicesPage}" Command="{Binding GoCommand}" CommandParameter="Devices">
-            <StackPanel Spacing="3">
-              <Path Classes="navicon" Data="M7 3.5 H17 V20.5 H7 Z M10.5 17.5 H13.5" />
-              <TextBlock Classes="navlabel" Text="{l:T 'Devices'}" />
-            </StackPanel>
+
+        <StackPanel DockPanel.Dock="Bottom" Spacing="2">
+          <Border Classes="navsep" />
+          <Button Classes="nav" Classes.on="{Binding IsLogsPage}" Command="{Binding GoCommand}" CommandParameter="Logs" ToolTip.Tip="Ctrl+7">
+            <Panel>
+              <Border Classes="navpill" />
+              <StackPanel Spacing="3" VerticalAlignment="Center" Margin="4,0">
+                <Panel Width="26" Height="19" HorizontalAlignment="Center">
+                  <Path Classes="navicon" Data="M4 5.5 H20 M4 10 H16 M4 14.5 H20 M4 19 H13" />
+                  <Ellipse Width="7" Height="7" Fill="{DynamicResource AmberBrush}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-2,0,0"
+                           IsVisible="{Binding HasLogCrashes}" />
+                </Panel>
+                <TextBlock Classes="navlabel" Text="{l:T 'Logs'}" />
+              </StackPanel>
+            </Panel>
+          </Button>
+          <Button Classes="nav" Command="{Binding OpenSettingsCommand}" ToolTip.Tip="{l:T 'Settings'}">
+            <Panel>
+              <StackPanel Spacing="3" VerticalAlignment="Center" Margin="4,0">
+                <Path Classes="navicon" Data="M12 15 A3 3 0 1 0 12 9 A3 3 0 1 0 12 15 Z M19.4 15 A1.65 1.65 0 0 0 19.73 16.82 L19.79 16.88 A2 2 0 1 1 16.96 19.71 L16.9 19.65 A1.65 1.65 0 0 0 15.08 19.32 A1.65 1.65 0 0 0 14.08 20.83 V21 A2 2 0 1 1 10.08 21 V20.91 A1.65 1.65 0 0 0 9 19.4 A1.65 1.65 0 0 0 7.18 19.73 L7.12 19.79 A2 2 0 1 1 4.29 16.96 L4.35 16.9 A1.65 1.65 0 0 0 4.68 15.08 A1.65 1.65 0 0 0 3.17 14.08 H3 A2 2 0 1 1 3 10.08 H3.09 A1.65 1.65 0 0 0 4.6 9 A1.65 1.65 0 0 0 4.27 7.18 L4.21 7.12 A2 2 0 1 1 7.04 4.29 L7.1 4.35 A1.65 1.65 0 0 0 8.92 4.68 H9 A1.65 1.65 0 0 0 9.92 3.17 V3 A2 2 0 1 1 13.92 3 V3.09 A1.65 1.65 0 0 0 14.92 4.6 A1.65 1.65 0 0 0 16.74 4.27 L16.8 4.21 A2 2 0 1 1 19.63 7.04 L19.57 7.1 A1.65 1.65 0 0 0 19.24 8.92 V9 A1.65 1.65 0 0 0 20.75 9.92 H20.92 A2 2 0 1 1 20.92 13.92 H20.83 A1.65 1.65 0 0 0 19.32 14.92 Z" />
+                <TextBlock Classes="navlabel" Text="{l:T 'Settings'}" />
+              </StackPanel>
+            </Panel>
+          </Button>
+        </StackPanel>
+
+        <StackPanel Spacing="2">
+          <Button Classes="nav" Classes.on="{Binding IsDevicesPage}" Command="{Binding GoCommand}" CommandParameter="Devices" ToolTip.Tip="Ctrl+1">
+            <Panel>
+              <Border Classes="navpill" />
+              <StackPanel Spacing="3" VerticalAlignment="Center" Margin="4,0">
+                <Path Classes="navicon" Data="M7 3.5 H17 V20.5 H7 Z M10.5 17.5 H13.5" />
+                <TextBlock Classes="navlabel" Text="{l:T 'Devices'}" />
+              </StackPanel>
+            </Panel>
           </Button>
           <Button Classes="nav" Classes.on="{Binding IsRemoteAppsPage}" Command="{Binding GoCommand}" CommandParameter="RemoteApps"
                   ToolTip.Tip="{l:T 'Android apps in windows of their own, with shortcuts'}">
-            <StackPanel Spacing="3">
-              <Path Classes="navicon" Data="M3.5 5 H20.5 V19 H3.5 Z M3.5 8.5 H20.5 M9 11.5 H15 V16.5 H9 Z" />
-              <TextBlock Classes="navlabel" Text="{l:T 'Remote apps'}" TextWrapping="Wrap" TextAlignment="Center" />
-            </StackPanel>
+            <Panel>
+              <Border Classes="navpill" />
+              <StackPanel Spacing="3" VerticalAlignment="Center" Margin="4,0">
+                <Path Classes="navicon" Data="M3.5 5 H20.5 V19 H3.5 Z M3.5 8.5 H20.5 M9 11.5 H15 V16.5 H9 Z" />
+                <TextBlock Classes="navlabel" Text="{l:T 'Remote apps'}" TextWrapping="Wrap" TextAlignment="Center" />
+              </StackPanel>
+            </Panel>
           </Button>
-          <Button Classes="nav" Classes.on="{Binding IsWallPage}" Command="{Binding GoCommand}" CommandParameter="Wall">
-            <StackPanel Spacing="3">
-              <Path Classes="navicon" Data="M3.5 4.5 H10.5 V11 H3.5 Z M13.5 4.5 H20.5 V11 H13.5 Z M3.5 13 H10.5 V19.5 H3.5 Z M13.5 13 H20.5 V19.5 H13.5 Z" />
-              <TextBlock Classes="navlabel" Text="{l:T 'Wall'}" />
-            </StackPanel>
+          <Button Classes="nav" Classes.on="{Binding IsWallPage}" Command="{Binding GoCommand}" CommandParameter="Wall" ToolTip.Tip="Ctrl+3">
+            <Panel>
+              <Border Classes="navpill" />
+              <StackPanel Spacing="3" VerticalAlignment="Center" Margin="4,0">
+                <Path Classes="navicon" Data="M3.5 4.5 H10.5 V11 H3.5 Z M13.5 4.5 H20.5 V11 H13.5 Z M3.5 13 H10.5 V19.5 H3.5 Z M13.5 13 H20.5 V19.5 H13.5 Z" />
+                <TextBlock Classes="navlabel" Text="{l:T 'Wall'}" />
+              </StackPanel>
+            </Panel>
           </Button>
-          <Button Classes="nav" Classes.on="{Binding IsLogsPage}" Command="{Binding GoCommand}" CommandParameter="Logs">
-            <StackPanel Spacing="3">
-              <Path Classes="navicon" Data="M4 5.5 H20 M4 10 H16 M4 14.5 H20 M4 19 H13" />
-              <TextBlock Classes="navlabel" Text="{l:T 'Logs'}" />
-            </StackPanel>
+          <Border Classes="navsep" />
+          <Button Classes="nav" Classes.on="{Binding IsAutomationPage}" Command="{Binding GoCommand}" CommandParameter="Automation" ToolTip.Tip="Ctrl+4">
+            <Panel>
+              <Border Classes="navpill" />
+              <StackPanel Spacing="3" VerticalAlignment="Center" Margin="4,0">
+                <Path Classes="navicon" Data="M12 3.5 A8.5 8.5 0 1 1 11.99 3.5 Z M12 7.5 V12 L15 14" />
+                <TextBlock Classes="navlabel" Text="{l:T 'Automation'}" />
+              </StackPanel>
+            </Panel>
           </Button>
-          <Button Classes="nav" Classes.on="{Binding IsAutomationPage}" Command="{Binding GoCommand}" CommandParameter="Automation">
-            <StackPanel Spacing="3">
-              <Path Classes="navicon" Data="M12 3.5 A8.5 8.5 0 1 1 11.99 3.5 Z M12 7.5 V12 L15 14" />
-              <TextBlock Classes="navlabel" Text="{l:T 'Automation'}" />
-            </StackPanel>
-          </Button>
-          <Button Classes="nav" Classes.on="{Binding IsInventoryPage}" Command="{Binding GoCommand}" CommandParameter="Inventory">
-            <StackPanel Spacing="3">
-              <Path Classes="navicon" Data="M5 4.5 H19 V20 H5 Z M8 9 H16 M8 12.5 H16 M8 16 H12.5" />
-              <TextBlock Classes="navlabel" Text="{l:T 'Inventory'}" />
-            </StackPanel>
+          <Button Classes="nav" Classes.on="{Binding IsInventoryPage}" Command="{Binding GoCommand}" CommandParameter="Inventory" ToolTip.Tip="Ctrl+5">
+            <Panel>
+              <Border Classes="navpill" />
+              <StackPanel Spacing="3" VerticalAlignment="Center" Margin="4,0">
+                <Path Classes="navicon" Data="M5 4.5 H19 V20 H5 Z M8 9 H16 M8 12.5 H16 M8 16 H12.5" />
+                <TextBlock Classes="navlabel" Text="{l:T 'Inventory'}" />
+              </StackPanel>
+            </Panel>
           </Button>
           <Button Classes="nav" Classes.on="{Binding IsAssistantsPage}" Command="{Binding GoCommand}" CommandParameter="Assistants" ToolTip.Tip="{l:T 'AI assistants: Claude, Codex, Gemini and other MCP apps'}">
-            <StackPanel Spacing="3">
-              <Path Classes="navicon" Data="M12 3 L13.6 9.2 L20 10.8 L13.6 12.4 L12 18.8 L10.4 12.4 L4 10.8 L10.4 9.2 Z M18.5 16 L19.2 18.3 L21.5 19 L19.2 19.7 L18.5 22 L17.8 19.7 L15.5 19 L17.8 18.3 Z" />
-              <TextBlock Classes="navlabel" Text="{l:T 'AI'}" />
-            </StackPanel>
+            <Panel>
+              <Border Classes="navpill" />
+              <StackPanel Spacing="3" VerticalAlignment="Center" Margin="4,0">
+                <Panel Width="26" Height="19" HorizontalAlignment="Center">
+                  <Path Classes="navicon" Data="M12 3 L13.6 9.2 L20 10.8 L13.6 12.4 L12 18.8 L10.4 12.4 L4 10.8 L10.4 9.2 Z M18.5 16 L19.2 18.3 L21.5 19 L19.2 19.7 L18.5 22 L17.8 19.7 L15.5 19 L17.8 18.3 Z" />
+                  <Ellipse Width="7" Height="7" Fill="{DynamicResource GreenBrush}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-2,0,0"
+                           IsVisible="{Binding IsAiActive}" />
+                </Panel>
+                <TextBlock Classes="navlabel" Text="{l:T 'AI'}" />
+              </StackPanel>
+            </Panel>
           </Button>
         </StackPanel>
       </DockPanel>
     </Border>
 
-  <DockPanel Grid.Column="1" Margin="22,16,22,12">
+  <DockPanel Grid.Column="1" Margin="22,14,22,12">
 
-    <!-- header: who we are, what's around; search and the app-wide buttons on the right -->
-    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,16">
-      <Image Source="/Assets/Paneless.png" Width="50" Height="50" Margin="-4,0,12,0"
-             RenderOptions.BitmapInterpolationMode="HighQuality" VerticalAlignment="Center" />
-      <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
-        <TextBlock Text="Paneless" FontSize="24" FontWeight="SemiBold" />
-        <TextBlock Classes="dim" Text="{Binding Summary}" TextTrimming="CharacterEllipsis" />
+    <!-- header: Devices shows Paneless + summary; sub-pages show a slim utility strip so page titles sit cleanly on top -->
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+      <StackPanel VerticalAlignment="Center" Spacing="2" IsVisible="{Binding IsDevicesPage}">
+        <TextBlock Text="Paneless" FontSize="22" FontWeight="SemiBold" />
+        <TextBlock Classes="dim" FontSize="12.5" Text="{Binding Summary}" TextTrimming="CharacterEllipsis" />
       </StackPanel>
-      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-        <TextBox x:Name="SearchBox" Width="230" Text="{Binding Search}" PlaceholderText="{l:T 'Search devices  (Ctrl+F)'}">
+      <TextBlock Classes="small" VerticalAlignment="Center" Text="{Binding Summary}" TextTrimming="CharacterEllipsis" IsVisible="{Binding !IsDevicesPage}" />
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="12,0,0,0">
+        <TextBox x:Name="SearchBox" Width="236" Text="{Binding Search}" PlaceholderText="{l:T 'Search devices  (Ctrl+F)'}" IsVisible="{Binding IsDevicesPage}">
           <TextBox.InnerLeftContent>
             <Path Classes="icon" Width="15" Height="15" Margin="10,0,0,0" Stroke="{DynamicResource DimBrush}"
                   Data="M10.5 4 A6.5 6.5 0 1 1 10.49 4 Z M15.2 15.2 L20 20" />
           </TextBox.InnerLeftContent>
+          <TextBox.InnerRightContent>
+            <Button Classes="searchclear" Content="✕" Command="{Binding ClearSearchCommand}" IsVisible="{Binding HasSearch}" ToolTip.Tip="{l:T 'Clear'}" />
+          </TextBox.InnerRightContent>
         </TextBox>
         <DropDownButton Content="{l:T '+ Add device'}" ToolTip.Tip="{l:T 'Pair a new device, or connect one by its address'}">
           <DropDownButton.Flyout>
@@ -267,7 +361,10 @@
             </MenuFlyout>
           </DropDownButton.Flyout>
         </DropDownButton>
-        <TextBlock Classes="dim" Text="{Binding SelectionText}" VerticalAlignment="Center" Margin="6,0,0,0" />
+        <Border Background="{DynamicResource BadgeBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1"
+                CornerRadius="12" Padding="10,3" VerticalAlignment="Center" Margin="4,0,0,0" IsVisible="{Binding ShowSelectionBadge}">
+          <TextBlock Text="{Binding SelectionText}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource LinkBrush}" />
+        </Border>
       </StackPanel>
       <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
         <DropDownButton Content="{l:T 'Mirror options'}" ToolTip.Tip="{l:T 'How new mirrors start'}">
@@ -296,9 +393,6 @@
         </DropDownButton>
         <Button Padding="9,7" Command="{Binding RefreshCommand}" ToolTip.Tip="{l:T 'Refresh the list (F5)'}">
           <Path Classes="icon" Data="M18.5 8.5 A7 7 0 1 0 19 13.5 M18.5 3.5 V8.5 H13.5" />
-        </Button>
-        <Button Padding="9,7" Command="{Binding OpenSettingsCommand}" ToolTip.Tip="{l:T 'Settings'}">
-          <Path Classes="icon" Data="M12 9 A3 3 0 1 1 11.99 9 Z M12 2.5 V5 M12 19 V21.5 M2.5 12 H5 M19 12 H21.5 M5.3 5.3 L7.1 7.1 M16.9 16.9 L18.7 18.7 M5.3 18.7 L7.1 16.9 M16.9 7.1 L18.7 5.3" />
         </Button>
       </StackPanel>
     </Grid>
@@ -400,10 +494,10 @@
                   <TextBlock Grid.Column="0" Classes="cell" Margin="{Binding NameMargin}" Text="{Binding Name}"
                              Foreground="{Binding NameBrush}" FontWeight="SemiBold" />
                   <TextBlock Grid.Column="1" Classes="cell" Text="{Binding StatusText}" Foreground="{Binding StatusBrush}" />
-                  <TextBlock Grid.Column="2" Classes="cell" Text="{Binding BatteryText}" Foreground="{Binding BatteryBrush}" />
+                  <TextBlock Grid.Column="2" Classes="cell mono" Text="{Binding BatteryText}" Foreground="{Binding BatteryBrush}" />
                   <TextBlock Grid.Column="3" Classes="cell" Text="{Binding Type}" />
                   <TextBlock Grid.Column="4" Classes="cell" Text="{Binding Model}" />
-                  <TextBlock Grid.Column="5" Classes="cell" Text="{Binding Address}" />
+                  <TextBlock Grid.Column="5" Classes="cell mono" Text="{Binding Address}" />
                   <TextBlock Grid.Column="6" Classes="cell" Text="{Binding UnlockText}" Foreground="{Binding UnlockBrush}" />
                 </Grid>
               </DataTemplate>

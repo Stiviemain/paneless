@@ -35,7 +35,22 @@ public partial class MainWindow : Window
         };
         KeyDown += (_, e) =>
         {
-            if (e.Key == Key.F && e.KeyModifiers.HasFlag(KeyModifiers.Control)) { SearchBox.Focus(); SearchBox.SelectAll(); e.Handled = true; }
+            var ctrlOnly = (e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Alt | KeyModifiers.Shift)) == KeyModifiers.Control;
+            if (!ctrlOnly || Vm == null) return;
+            if (e.Key == Key.F && Vm.IsDevicesPage) { SearchBox.Focus(); SearchBox.SelectAll(); e.Handled = true; return; }
+            if (e.Key == Key.OemComma) { Vm.OpenSettingsCommand.Execute(null); e.Handled = true; return; }
+            var page = e.Key switch
+            {
+                Key.D1 => "Devices",
+                Key.D2 => "RemoteApps",
+                Key.D3 => "Wall",
+                Key.D4 => "Automation",
+                Key.D5 => "Inventory",
+                Key.D6 => "Assistants",
+                Key.D7 => "Logs",
+                _ => null,
+            };
+            if (page != null) { Vm.Page = page; e.Handled = true; }
         };
         SearchBox.KeyDown += (_, e) =>
         {
@@ -239,6 +254,22 @@ public partial class MainWindow : Window
         vm.AddRemoteApp = RemoteApps.AddAsync;
         if (OperatingSystem.IsWindows()) TrackRemoteApps(vm);
         automation.Start();
+
+        // Subtle sidebar status dots: green on AI when active, amber on Logs when crashes were seen.
+        void SyncSidebarDots()
+        {
+            vm.IsAiActive = Assistants is { Enabled: true, Paused: false };
+            vm.HasLogCrashes = Logs is { HasCrashes: true };
+        }
+        Assistants.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(AssistantsViewModel.Enabled) or nameof(AssistantsViewModel.Paused)) SyncSidebarDots();
+        };
+        Logs.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(LogsViewModel.HasCrashes)) SyncSidebarDots();
+        };
+        SyncSidebarDots();
 
         // The wall takes pictures only while it's on screen; the inventory shows what it knows when opened.
         void UpdateActive() => Wall?.SetActive(vm.IsWallPage && IsVisible && WindowState != WindowState.Minimized);

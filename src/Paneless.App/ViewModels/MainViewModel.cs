@@ -113,12 +113,22 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] public partial string MirrorLabel { get; set; } = Loc.T("Mirror");
     [ObservableProperty] public partial string Summary { get; set; } = Loc.T("Plug in a device via USB or turn on Wireless debugging");
     [ObservableProperty] public partial string SelectionText { get; set; } = "";
+    public bool ShowSelectionBadge => !string.IsNullOrEmpty(SelectionText);
+    partial void OnSelectionTextChanged(string value) => OnPropertyChanged(nameof(ShowSelectionBadge));
+
     [ObservableProperty] public partial string Search { get; set; } = "";
+    public bool HasSearch => !string.IsNullOrEmpty(Search);
+
+    [ObservableProperty] public partial bool IsAiActive { get; set; }
+    [ObservableProperty] public partial bool HasLogCrashes { get; set; }
 
     /// <summary>True while the list is being rebuilt: selection changes then come from the rebuild, not the user.</summary>
     public bool Syncing { get; private set; }
 
-    partial void OnSearchChanged(string value) => Rebuild();
+    partial void OnSearchChanged(string value) { OnPropertyChanged(nameof(HasSearch)); Rebuild(); }
+
+    [RelayCommand]
+    void ClearSearch() => Search = "";
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(MirrorCommand), nameof(PairCommand), nameof(AutoUnlockCommand),

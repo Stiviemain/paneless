@@ -10,6 +10,8 @@
           <SolidColorBrush x:Key="BgBrush" Color="#f4f5f7" />
           <SolidColorBrush x:Key="PanelBrush" Color="#ffffff" />
           <SolidColorBrush x:Key="HeaderBrush" Color="#ebedf2" />
+          <SolidColorBrush x:Key="CodeBrush" Color="#eceef3" />
+          <SolidColorBrush x:Key="BadgeBrush" Color="#e3edfc" />
           <SolidColorBrush x:Key="LineBrush" Color="#d8dce4" />
           <SolidColorBrush x:Key="SelBrush" Color="#dce7fb" />
           <SolidColorBrush x:Key="HoverBrush" Color="#e5e8ef" />
@@ -17,6 +19,7 @@
           <SolidColorBrush x:Key="DimBrush" Color="#5b606e" />
           <SolidColorBrush x:Key="AccentBrush" Color="#2563eb" />
           <SolidColorBrush x:Key="LinkBrush" Color="#1d56d8" />
+          <SolidColorBrush x:Key="GreenBrush" Color="#157f4b" />
           <SolidColorBrush x:Key="AmberBrush" Color="#b4690e" />
           <SolidColorBrush x:Key="RedBrush" Color="#c93434" />
         </ResourceDictionary>
@@ -24,6 +27,8 @@
           <SolidColorBrush x:Key="BgBrush" Color="#17181c" />
           <SolidColorBrush x:Key="PanelBrush" Color="#212228" />
           <SolidColorBrush x:Key="HeaderBrush" Color="#1b1c21" />
+          <SolidColorBrush x:Key="CodeBrush" Color="#131418" />
+          <SolidColorBrush x:Key="BadgeBrush" Color="#203252" />
           <SolidColorBrush x:Key="LineBrush" Color="#33353d" />
           <SolidColorBrush x:Key="SelBrush" Color="#263a5e" />
           <SolidColorBrush x:Key="HoverBrush" Color="#272830" />
@@ -31,6 +36,7 @@
           <SolidColorBrush x:Key="DimBrush" Color="#9a9ca6" />
           <SolidColorBrush x:Key="AccentBrush" Color="#4f8cff" />
           <SolidColorBrush x:Key="LinkBrush" Color="#8db4ff" />
+          <SolidColorBrush x:Key="GreenBrush" Color="#4cc38a" />
           <SolidColorBrush x:Key="AmberBrush" Color="#e8b75a" />
           <SolidColorBrush x:Key="RedBrush" Color="#f07272" />
         </ResourceDictionary>
@@ -107,9 +113,15 @@
       <Setter Property="TextTrimming" Value="CharacterEllipsis" />
       <Setter Property="Foreground" Value="{DynamicResource DimBrush}" />
     </Style>
+    <Style Selector="TextBlock.mono">
+      <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, Menlo, monospace" />
+      <Setter Property="FontSize" Value="12.5" />
+    </Style>
     <Style Selector="Button">
       <Setter Property="Padding" Value="14,7" />
       <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
     </Style>
 
     <!-- Device list rows: thin separators, soft selection instead of Fluent's solid accent fill. -->

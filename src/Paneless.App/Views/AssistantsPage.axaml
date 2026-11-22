@@ -10,6 +10,17 @@
       <Setter Property="FontSize" Value="12" />
       <Setter Property="IsReadOnly" Value="True" />
       <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="10,8,6,8" />
+    </Style>
+    <Style Selector="TextBox.code:pointerover /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="TextBox.code:focus /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
     </Style>
   </UserControl.Styles>
   <DockPanel>
@@ -43,10 +54,12 @@
               <Button Classes="accent" Content="{Binding App.AddLabel}" Command="{Binding AddCommand}" />
               <TextBlock Classes="small" Foreground="{DynamicResource GreenBrush}" Text="{Binding ConfiguredText}" VerticalAlignment="Center" IsVisible="{Binding IsAppConfigured}" />
             </StackPanel>
-            <Grid ColumnDefinitions="*,8,Auto">
-              <TextBox Classes="code" Text="{Binding Snippet, Mode=OneWay}" MaxHeight="150" />
-              <Button Grid.Column="2" Content="{l:T 'Copy'}" Command="{Binding CopyCommand}" VerticalAlignment="Top" />
-            </Grid>
+            <Border Background="{DynamicResource CodeBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="6" ClipToBounds="True">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBox Classes="code" Text="{Binding Snippet, Mode=OneWay}" MaxHeight="185" />
+                <Button Grid.Column="1" Content="{l:T 'Copy'}" Command="{Binding CopyCommand}" VerticalAlignment="Top" Margin="4,6,6,6" Padding="10,4" FontSize="12" />
+              </Grid>
+            </Border>
             <TextBlock Classes="small" Foreground="{DynamicResource AmberBrush}" Text="{Binding Message}" TextWrapping="Wrap" IsVisible="{Binding Message, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
             <TextBlock Classes="small" TextWrapping="Wrap" Text="{l:T 'ChatGPT and Gemini in a web browser can’t reach programs on your PC, so they can’t use Paneless.'}" />
           </StackPanel>
