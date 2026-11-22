@@ -51,6 +51,12 @@ public sealed class HelperCoordinator : IDisposable
         _s.Groups.Changed += () => _ = SyncWatchersAsync();
     }
 
+    /// <summary>True when at least one persistent background sync watcher is active on <paramref name="serial"/>.</summary>
+    public bool HasActiveWatchers(string serial) =>
+        (_clipboardWatched.TryGetValue(serial, out var cw) && cw)
+        || (_mediaWatched.TryGetValue(serial, out var mw) && mw)
+        || (_otpWatched.TryGetValue(serial, out var ow) && ow);
+
     /// <summary>Reconciles per-device background watchers with current settings and connected devices.</summary>
     public async Task SyncWatchersAsync()
     {

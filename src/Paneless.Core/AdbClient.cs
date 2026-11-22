@@ -47,6 +47,8 @@ public sealed partial class AdbClient(string adbPath)
 
     public Task<ProcessResult> ConnectAsync(string address) => RunAsync(TimeSpan.FromSeconds(10), "connect", address);
 
+    public Task<ProcessResult> DisconnectAsync(string address) => RunAsync(TimeSpan.FromSeconds(5), "disconnect", address);
+
     public Task<ProcessResult> PairAsync(string address, string code) => RunAsync(TimeSpan.FromSeconds(20), "pair", address, code);
 
     public Task<ProcessResult> TcpIpAsync(string serial, int port = 5555) =>

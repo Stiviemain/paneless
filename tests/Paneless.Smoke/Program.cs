@@ -140,6 +140,7 @@ if (args.Contains("--groups"))
     srcData.Settings.VideoCodec = "h265";
     srcData.Settings.Theme = "dark";
     srcData.Settings.ClipboardSync = true;
+    srcData.Settings.DisconnectInBackground = false;
     srcData.Known["SN1"] = new KnownDevice { Name = "Pixel 11 Pro", Model = "Pixel 11 Pro", Type = "Phone" };
     srcData.Unlock["SN1"] = new UnlockEntry { Secret = "TOP_SECRET_NEVER_EXPORT", Enabled = true };
     var srcScripts = new ScriptStore([new AdbScript { Id = "s1", Name = "Ping", Commands = "shell echo hi" }], persist: false);
@@ -172,7 +173,7 @@ if (args.Contains("--groups"))
     var dstRemote = new RemoteAppStore([], persist: false);
 
     SettingsBackup.ApplyTo(parsedOnly!, dstData, dstScripts, dstKeymaps, dstRecipes, dstSchedules, dstAlerts, dstGroups, dstProfiles, dstRemote);
-    Check(dstData.Settings.BitrateMbps == 24 && dstData.Settings.VideoCodec == "h265" && dstData.Settings.ClipboardSync
+    Check(dstData.Settings.BitrateMbps == 24 && dstData.Settings.VideoCodec == "h265" && dstData.Settings.ClipboardSync && !dstData.Settings.DisconnectInBackground
           && dstScripts.Mine.Count == 1 && dstData.Known.ContainsKey("KEEP") && dstGroups.Groups.Single().Name == "KeepGroup",
         "settings-only import updates settings/scripts without touching existing devices or groups");
 
@@ -200,12 +201,20 @@ if (args.Contains("--groups"))
     // 11d. Factory reset clears everything including unlock codes and restores default settings/alerts.
     dstData.Unlock["SN1"] = new UnlockEntry { Secret = "LOCAL_SECRET", Enabled = true };
     SettingsBackup.ResetToDefaults(dstData, dstScripts, dstKeymaps, dstRecipes, dstSchedules, dstAlerts, dstGroups, dstProfiles, dstRemote);
-    Check(dstData.Settings.BitrateMbps == 8 && dstData.Settings.VideoCodec == "h264" && !dstData.Settings.ClipboardSync
+    Check(dstData.Settings.BitrateMbps == 8 && dstData.Settings.VideoCodec == "h264" && !dstData.Settings.ClipboardSync && dstData.Settings.DisconnectInBackground
           && dstData.Known.Count == 0 && dstData.Unlock.Count == 0
           && dstScripts.Mine.Count == 0 && dstKeymaps.Data.Profiles.Count == 0 && dstRecipes.All.Count == 0
           && dstSchedules.All.Count == 0 && dstGroups.Groups.Count == 0 && dstProfiles.All.Count == 0
           && dstRemote.All.Count == 0 && dstAlerts.Data.Rules.Count == Enum.GetValues<AlertKind>().Length,
         "ResetToDefaults restores defaults and clears devices, scripts, automation, remote apps and unlock codes");
+
+    // 12. Battery-friendly idle helper pruning for both watches (60 s) and phones/tablets (2 min).
+    Check(DeviceHelperManager.ShouldPruneIdle(isWatch: true, isPinned: false, TimeSpan.FromSeconds(65), TimeSpan.FromMinutes(2), TimeSpan.FromSeconds(60))
+          && !DeviceHelperManager.ShouldPruneIdle(isWatch: true, isPinned: true, TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(2), TimeSpan.FromSeconds(60))
+          && !DeviceHelperManager.ShouldPruneIdle(isWatch: false, isPinned: false, TimeSpan.FromSeconds(90), TimeSpan.FromMinutes(2), TimeSpan.FromSeconds(60))
+          && DeviceHelperManager.ShouldPruneIdle(isWatch: false, isPinned: false, TimeSpan.FromMinutes(3), TimeSpan.FromMinutes(2), TimeSpan.FromSeconds(60))
+          && !DeviceHelperManager.ShouldPruneIdle(isWatch: false, isPinned: true, TimeSpan.FromHours(1), TimeSpan.FromMinutes(2), TimeSpan.FromSeconds(60)),
+        "DeviceHelperManager.ShouldPruneIdle stops idle helpers on both phones and watches unless pinned");
 
     return okAll ? 0 : 1;
 }

@@ -145,6 +145,7 @@ public static class SettingsBackup
         target.MaxFps = Math.Max(0, source.MaxFps);
         target.PushTarget = string.IsNullOrWhiteSpace(source.PushTarget) ? "/sdcard/Download/" : source.PushTarget;
         target.AutoConnect = source.AutoConnect;
+        target.DisconnectInBackground = source.DisconnectInBackground;
         target.CloseToTray = source.CloseToTray;
         target.UpdateSource = source.UpdateSource ?? "";
         target.AutoUpdate = source.AutoUpdate;

@@ -215,7 +215,33 @@ public sealed partial class MainViewModel : ObservableObject
         _timer.Start();
     }
 
-    public async Task RefreshListAsync()
+    /// <summary>True when the main Paneless window is visible and not minimized.</summary>
+    public bool IsForeground { get; private set; } = true;
+    DateTime? _backgroundSince;
+    /// <summary>Set by MainWindow: returns true while a helper daemon on <c>serial</c> is needed by a background watcher or open tool window.</summary>
+    public Func<string, bool>? IsHelperPinned { get; set; }
+    /// <summary>Set by MainWindow: returns true while <c>row</c> has an open tool window, live logcat, active mirror or background sync watcher.</summary>
+    public Func<DeviceRow, bool>? IsDeviceBusyInUi { get; set; }
+
+    /// <summary>Tracks whether Paneless is in the foreground (visible & not minimized) vs background/tray.
+    /// Returning to the foreground immediately reconnects any Wi-Fi devices that went to sleep in the background.</summary>
+    public void SetForeground(bool active)
+    {
+        if (IsForeground == active) return;
+        IsForeground = active;
+        if (active)
+        {
+            _backgroundSince = null;
+            _connectTried.Clear();
+            if (Ready && !_s.Demo) _ = RefreshListAsync();
+        }
+        else
+        {
+            _backgroundSince = DateTime.UtcNow;
+        }
+    }
+
+    public async Task RefreshListAsync(bool forceBattery = false)
     {
         if (_refreshing || !Ready) return;
         _refreshing = true;
@@ -224,14 +250,15 @@ public sealed partial class MainViewModel : ObservableObject
             _rows = _s.Demo ? AppServices.DemoRows() : await _s.Directory!.GetRowsAsync(_s.Mirrors!.ActiveSerials);
             Rebuild();
             Automate();
-            UpdateBatteries();
+            UpdateBatteries(forceBattery);
             if (!_s.Demo && _s.Helpers != null)
             {
                 var connected = _rows.Where(r => r.Serial != null && r.State is DeviceState.Connected or DeviceState.Mirroring)
                     .Select(r => r.Serial!).ToHashSet();
                 _s.Helpers.PruneDisconnected(connected);
-                _s.Helpers.PruneIdleWatches();
+                _s.Helpers.PruneIdle(IsHelperPinned);
             }
+            if (!_s.Demo) DisconnectIdleInBackground();
         }
         catch (Exception ex) { SetStatus(Loc.T("Refresh failed: ") + ex.Message, StatusKind.Error); }
         finally { _refreshing = false; }
@@ -332,13 +359,25 @@ public sealed partial class MainViewModel : ObservableObject
     readonly System.Collections.Concurrent.ConcurrentDictionary<string, (BatteryInfo? Info, DateTime At)> _battery = new();
     readonly HashSet<string> _batteryBusy = new();
 
-    /// <summary>Reads the battery of each connected device every 30 seconds, in the background.</summary>
-    void UpdateBatteries()
+    /// <summary>How often to poll battery over ADB so idle phones can stay in Deep Doze:
+    /// 3 min while the Devices page is visible, 15 min in the background only if a Low Battery alert is on, else paused.</summary>
+    public static TimeSpan? BatteryPollInterval(bool isForeground, bool isDevicesPage, bool lowBatteryAlertEnabled) =>
+        isForeground && isDevicesPage ? TimeSpan.FromMinutes(3)
+        : lowBatteryAlertEnabled ? TimeSpan.FromMinutes(15)
+        : null;
+
+    /// <summary>Reads the battery of each connected device on a battery-friendly schedule.</summary>
+    void UpdateBatteries(bool force = false)
     {
+        var lowBatteryAlert = _s.Alerts.Data.Rules.Any(r => r.Enabled && r.Kind == AlertKind.LowBattery);
+        var interval = BatteryPollInterval(IsForeground, IsDevicesPage, lowBatteryAlert);
+        if (!force && interval == null) return;
+
         foreach (var r in _rows.Where(r => r.Serial != null && r.State is DeviceState.Connected or DeviceState.Mirroring))
         {
             var serial = r.Serial!;
-            if (_batteryBusy.Contains(serial) || (_battery.TryGetValue(serial, out var b) && DateTime.UtcNow - b.At < TimeSpan.FromSeconds(30))) continue;
+            if (_batteryBusy.Contains(serial)) continue;
+            if (!force && _battery.TryGetValue(serial, out var b) && DateTime.UtcNow - b.At < interval!.Value) continue;
             if (_s.Demo)
             {
                 var level = 35 + Math.Abs(serial.GetHashCode() % 64);
@@ -363,8 +402,22 @@ public sealed partial class MainViewModel : ObservableObject
 
     // ---------------------------------------------------------------- when devices connect
 
+    static readonly TimeSpan BackgroundIdleDisconnectDelay = TimeSpan.FromMinutes(5);
     readonly HashSet<string> _handledSerials = new();             // connections whose on-connect actions already ran
+    readonly HashSet<string> _sleptGroupIds = new();              // devices Paneless itself disconnected in background
+    readonly HashSet<string> _disconnectingSerials = new();       // in-flight background disconnects
     readonly Dictionary<string, DateTime> _connectTried = new();  // by device id: last automatic connect attempt
+
+    bool NeedsBackgroundConnection(DeviceRow r)
+    {
+        var p = _s.EffectiveFor(r.GroupId);
+        var isWatch = r.Type == "Watch";
+        var devP = _s.Profiles.Get(r.GroupId);
+        var wantSync = (p.ClipboardSync && (!isWatch || devP?.ClipboardSync == true))
+                    || (p.AutoDownloadMedia && (!isWatch || devP?.AutoDownloadMedia == true))
+                    || (p.AutoCopyOtp && (!isWatch || devP?.AutoCopyOtp == true));
+        return wantSync || p.AutoMirror || p.OnConnectScripts.Count > 0;
+    }
 
     /// <summary>Connects known devices by themselves, runs their on-connect scripts once per connection,
     /// and starts mirroring for devices set to mirror by themselves.</summary>
@@ -373,10 +426,15 @@ public sealed partial class MainViewModel : ObservableObject
         if (_s.Demo || _s.Directory == null) return;
         var connected = _rows.Where(r => r.Serial != null && r.State is DeviceState.Connected or DeviceState.Mirroring).ToList();
         _handledSerials.IntersectWith(connected.Select(r => r.Serial!));   // a device that left counts as new when it's back
+        // If a sleeping device completely left Wi-Fi (no longer seen via mDNS), forget its sleep marker so returning later runs on-connect actions.
+        var seenGroups = _rows.Select(r => r.GroupId).ToHashSet();
+        _sleptGroupIds.IntersectWith(seenGroups);
 
         if (S.AutoConnect && !IsBusy)
             foreach (var r in _rows.Where(r => r.State == DeviceState.Available && r.Sn != null))
             {
+                // While Paneless is in the background with battery-saving enabled, leave idle Wi-Fi devices sleeping in Available state.
+                if (!IsForeground && S.DisconnectInBackground && !NeedsBackgroundConnection(r)) continue;
                 if (_connectTried.TryGetValue(r.GroupId, out var t) && DateTime.UtcNow - t < TimeSpan.FromSeconds(30)) continue;
                 _connectTried[r.GroupId] = DateTime.UtcNow;
                 _ = AutoConnectAsync(r);
@@ -385,9 +443,47 @@ public sealed partial class MainViewModel : ObservableObject
         foreach (var r in connected)
         {
             if (!_handledSerials.Add(r.Serial!)) continue;
+            // Reconnecting after Paneless's own background sleep shouldn't re-run on-connect scripts or pop open AutoMirror.
+            if (_sleptGroupIds.Remove(r.GroupId)) continue;
             var p = _s.EffectiveFor(r.GroupId);
             if (p.OnConnectScripts.Count > 0) _ = RunOnConnectAsync(r, p.OnConnectScripts);
             if (p.AutoMirror && r.State == DeviceState.Connected) _ = MirrorRowsAsync([r]);
+        }
+    }
+
+    /// <summary>When Paneless has been minimized or in the notification area for 5 minutes, drops idle Wi-Fi ADB
+    /// connections so phones can enter Android Deep Doze. Reconnects automatically as soon as Paneless is opened
+    /// or any action/shortcut/MCP tool targets the device.</summary>
+    void DisconnectIdleInBackground()
+    {
+        if (IsForeground || !S.DisconnectInBackground || _s.Adb == null) return;
+        if (_backgroundSince is not { } bg || DateTime.UtcNow - bg < BackgroundIdleDisconnectDelay) return;
+
+        foreach (var r in _rows.Where(r => r.IsNetwork && r.Serial != null && r.State == DeviceState.Connected))
+        {
+            var serial = r.Serial!;
+            if (_disconnectingSerials.Contains(serial)) continue;
+            if (NeedsBackgroundConnection(r)) continue;
+            if (IsDeviceBusyInUi?.Invoke(r) == true) continue;
+            if (_s.Mirrors != null && _s.Mirrors.Sessions.Any(s => s.IsRunning && s.Serial == serial)) continue;
+            // Don't interrupt a recent helper/MCP call.
+            if (_s.Helpers?.TryGet(serial) is { } h && DateTime.UtcNow - h.LastUsed < TimeSpan.FromMinutes(2)) continue;
+
+            _disconnectingSerials.Add(serial);
+            _sleptGroupIds.Add(r.GroupId);
+            var connectAddr = r.ConnectAddr;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    if (_s.Helpers != null) await _s.Helpers.DisconnectAsync(serial);
+                    await _s.Adb.DisconnectAsync(serial);
+                    if (!string.IsNullOrEmpty(connectAddr) && !string.Equals(connectAddr, serial, StringComparison.OrdinalIgnoreCase))
+                        await _s.Adb.DisconnectAsync(connectAddr);
+                }
+                catch { }
+                finally { Dispatcher.UIThread.Post(() => _disconnectingSerials.Remove(serial)); }
+            });
         }
     }
 
@@ -666,7 +762,7 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanAct))]
     async Task RefreshAsync()
     {
-        await RefreshListAsync();
+        await RefreshListAsync(forceBattery: true);
         SetStatus(Loc.T("List refreshed."));
     }
 

@@ -316,6 +316,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     public bool AutostartSupported => Platform.Autostart.IsSupported;
 
     public bool AutoConnect { get => G.AutoConnect; set { G.AutoConnect = value; Save(); OnPropertyChanged(); } }
+    public bool DisconnectInBackground { get => G.DisconnectInBackground; set { G.DisconnectInBackground = value; Save(); OnPropertyChanged(); } }
     public bool CloseToTray { get => G.CloseToTray; set { G.CloseToTray = value; Save(); OnPropertyChanged(); } }
     public bool AutoUpdate { get => G.AutoUpdate; set { G.AutoUpdate = value; Save(); OnPropertyChanged(); } }
     public bool BetaUpdates { get => G.BetaUpdates; set { G.BetaUpdates = value; Save(); OnPropertyChanged(); } }
@@ -412,6 +413,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         _updateSource = G.UpdateSource;
         _startWithSystem = Platform.Autostart.IsEnabled;
         OnPropertyChanged(nameof(AutoConnect));
+        OnPropertyChanged(nameof(DisconnectInBackground));
         OnPropertyChanged(nameof(CloseToTray));
         OnPropertyChanged(nameof(AutoUpdate));
         OnPropertyChanged(nameof(BetaUpdates));

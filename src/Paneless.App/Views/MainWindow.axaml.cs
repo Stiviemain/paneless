@@ -324,7 +324,28 @@ public partial class MainWindow : Window
         SyncSidebarDots();
 
         // The wall takes pictures only while it's on screen; the inventory shows what it knows when opened.
-        void UpdateActive() => Wall?.SetActive(vm.IsWallPage && IsVisible && WindowState != WindowState.Minimized);
+        // Also track foreground/background state for battery-saving polling and idle Wi-Fi disconnect.
+        bool HasOpenWindowForKey(string key) => _apps.ContainsKey(key) || _files.ContainsKey(key) || _controls.ContainsKey(key);
+        vm.IsHelperPinned = serial =>
+        {
+            if (_helperCoord?.HasActiveWatchers(serial) == true) return true;
+            if (vm.IsWallPage && IsVisible && WindowState != WindowState.Minimized) return true;
+            if (s.Mirrors != null && s.Mirrors.Sessions.Any(x => x.IsRunning && x.Kind == SessionKind.Camera && x.Serial == serial)) return true;
+            var row = vm.NetworkRows.FirstOrDefault(r => r.Serial == serial);
+            return row != null && HasOpenWindowForKey(row.Key);
+        };
+        vm.IsDeviceBusyInUi = row =>
+            HasOpenWindowForKey(row.Key)
+            || (row.Serial != null && _helperCoord?.HasActiveWatchers(row.Serial) == true)
+            || (row.Serial != null && Logs is { IsRunning: true } && Logs.Device?.Serial == row.Serial);
+
+        void UpdateActive()
+        {
+            var foreground = IsVisible && WindowState != WindowState.Minimized;
+            vm.SetForeground(foreground);
+            Wall?.SetActive(vm.IsWallPage && foreground);
+        }
+        UpdateActive();
         vm.PropertyChanged += async (_, e) =>
         {
             if (e.PropertyName != nameof(MainViewModel.Page)) return;

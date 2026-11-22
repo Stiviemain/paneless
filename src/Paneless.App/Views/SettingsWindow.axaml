@@ -69,8 +69,14 @@
       <ScrollViewer Grid.Column="2" HorizontalScrollBarVisibility="Disabled">
         <StackPanel Spacing="10" Margin="0,0,14,0">
           <TextBlock Classes="section" Text="{l:T 'Connecting'}" />
-          <CheckBox Content="{l:T 'Connect to known devices by themselves'}" IsChecked="{Binding AutoConnect}"
-                    ToolTip.Tip="{l:T 'Devices you’ve paired before are connected as soon as they show up on the network. On Android 17, wireless debugging also turns itself back on when the device returns to a trusted Wi-Fi.'}" />
+          <CheckBox IsChecked="{Binding AutoConnect}"
+                    ToolTip.Tip="{l:T 'Devices you’ve paired before are connected as soon as they show up on the network. On Android 17, wireless debugging also turns itself back on when the device returns to a trusted Wi-Fi.'}">
+            <TextBlock Text="{l:T 'Connect to known devices by themselves'}" TextWrapping="Wrap" />
+          </CheckBox>
+          <CheckBox IsChecked="{Binding DisconnectInBackground}"
+                    ToolTip.Tip="{l:T 'Saves phone battery when Paneless is minimized or in the notification area by dropping idle Wi-Fi connections after 5 minutes (unless a mirror, app window, tool or background sync is active). Reconnects automatically when you open Paneless or launch a shortcut.'}">
+            <TextBlock Text="{l:T 'Disconnect idle Wi-Fi devices while in the background'}" TextWrapping="Wrap" />
+          </CheckBox>
 
           <TextBlock Classes="section" Text="{l:T 'Start-up and notification area'}" Margin="0,10,0,4" />
           <CheckBox Content="{l:T 'Start Paneless with Windows (in the notification area)'}" IsChecked="{Binding StartWithSystem}"

@@ -839,17 +839,33 @@ public sealed class DeviceHelperManager(AdbClient adb) : IAsyncDisposable
         return await _adb.GetInventoryAsync(serial, name);
     }
 
-    /// <summary>Closes idle watch daemons (called periodically from refresh) to protect small watch batteries.</summary>
-    public void PruneIdleWatches(TimeSpan? maxIdle = null)
+    /// <summary>Returns true when an idle helper daemon should be stopped to protect device battery.</summary>
+    public static bool ShouldPruneIdle(bool isWatch, bool isPinned, TimeSpan idleFor, TimeSpan phoneMaxIdle, TimeSpan watchMaxIdle)
     {
-        var limit = maxIdle ?? TimeSpan.FromSeconds(60);
+        if (isPinned) return false;
+        var limit = isWatch ? watchMaxIdle : phoneMaxIdle;
+        return idleFor > limit;
+    }
+
+    /// <summary>Closes idle helper daemons on both watches (default 60 s) and phones/tablets (default 2 min)
+    /// when no background sync watcher or live tool window is using them.</summary>
+    public void PruneIdle(Func<string, bool>? isPinned = null, TimeSpan? phoneMaxIdle = null, TimeSpan? watchMaxIdle = null)
+    {
+        var phoneLimit = phoneMaxIdle ?? TimeSpan.FromMinutes(2);
+        var watchLimit = watchMaxIdle ?? TimeSpan.FromSeconds(60);
         var now = DateTime.UtcNow;
         foreach (var (serial, client) in _clients)
         {
-            if (_isWatch.TryGetValue(serial, out var watch) && watch && now - client.LastUsed > limit)
+            var isWatch = _isWatch.TryGetValue(serial, out var w) && w;
+            var pinned = isPinned != null && isPinned(serial);
+            if (ShouldPruneIdle(isWatch, pinned, now - client.LastUsed, phoneLimit, watchLimit))
                 _ = DisconnectAsync(serial);
         }
     }
+
+    /// <summary>Closes idle watch daemons (compatibility wrapper around <see cref="PruneIdle"/>).</summary>
+    public void PruneIdleWatches(TimeSpan? maxIdle = null) =>
+        PruneIdle(isPinned: serial => !(_isWatch.TryGetValue(serial, out var w) && w), watchMaxIdle: maxIdle);
 
     public async Task DisconnectAsync(string serial)
     {

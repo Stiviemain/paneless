@@ -27,6 +27,9 @@ public sealed class AppSettings
     public string PushTarget { get; set; } = "/sdcard/Download/";
     /// <summary>Connect to devices that were paired before as soon as they show up on the network.</summary>
     public bool AutoConnect { get; set; } = true;
+    /// <summary>Disconnect idle Wi-Fi devices after 5 minutes when Paneless is minimized or in the notification area,
+    /// and reconnect automatically as soon as Paneless is opened or a shortcut/action uses the device.</summary>
+    public bool DisconnectInBackground { get; set; } = true;
     /// <summary>Closing the window keeps Paneless running in the notification area.</summary>
     public bool CloseToTray { get; set; }
     /// <summary>Extra Velopack update feed (a web address or folder). Empty = the GitHub releases of Paneless.</summary>
