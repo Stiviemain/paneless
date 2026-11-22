@@ -435,6 +435,18 @@ if (args.Contains("--assistants"))
     var withBom = McpConfig.Message("﻿{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"ping\"}\r");
     Check(withBom != null && System.Text.Json.Nodes.JsonNode.Parse(withBom)?["method"]?.ToString() == "ping"
           && McpConfig.Message("  ﻿ ") == null && McpConfig.Message("") == null, "MCP messages: a leading byte-order mark is ignored");
+
+    // Device facts for assistants: words and rounded numbers, no raw Android codes or display symbols.
+    Check(AssistantFacts.HealthName("11") == "Not available yet" && AssistantFacts.HealthName("2") == "Good" && AssistantFacts.HealthName("6") == "Failure"
+          && AssistantFacts.HealthName("99") == "99", "battery health codes become words (11 = not available yet)");
+    Check(AssistantFacts.Uptime(new TimeSpan(9, 7, 39, 14)) == "9 days, 7 hours" && AssistantFacts.Uptime(TimeSpan.FromHours(1)) == "1 hour"
+          && AssistantFacts.Uptime(new TimeSpan(0, 5, 12, 0)) == "5 hours, 12 minutes" && AssistantFacts.Uptime(TimeSpan.FromSeconds(30)) == "0 minutes", "uptime reads like a sentence");
+    var facts = AssistantFacts.Inventory(new DeviceInventory("Phone", "SN1", "Google", "Pixel", "17", 37, "2026-11-05", 96, false, "Not available yet", 26.7,
+        229510, 66192, 11646, "1280x2856", "192.168.2.141", new TimeSpan(9, 7, 39, 14), new DateTime(2026, 11, 22, 9, 27, 24)));
+    Check((double?)facts["storage_free_percent"] == 29 && (double?)facts["storage_free_gb"] == 64.6 && (double?)facts["ram_gb"] == 11.4
+          && (string?)facts["uptime"] == "9 days, 7 hours" && (string?)facts["collected_at"] == "2026-11-22 09:27", "device facts are rounded and readable");
+    Check(AssistantFacts.Inventory(new DeviceInventory("W", "S", "", "", "", 0, "", null, false, "", null, null, null, null, "", "", null, DateTime.Now))["model"] is null,
+          "missing device facts are left empty, not \"\"");
     return okAll ? 0 : 1;
 }
 

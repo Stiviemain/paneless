@@ -47,7 +47,7 @@ public sealed partial class AdbClient
             {
                 case "level": if (int.TryParse(val, out var lv)) level = lv; break;
                 case "status": charging = val == "2"; break;
-                case "health": health = val switch { "2" => "Good", "3" => "Overheat", "4" => "Dead", "5" => "Over voltage", "7" => "Cold", "1" => "Unknown", _ => val }; break;
+                case "health": health = AssistantFacts.HealthName(val); break;
                 case "temperature": if (int.TryParse(val, out var t)) temp = t / 10.0; break;
             }
         }

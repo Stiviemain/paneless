@@ -203,17 +203,25 @@ public sealed class AssistantTools
 
     void Register()
     {
-        Add("list_devices", "Lists the user's Android devices you may see: name, id, model, status, battery, group, and what you may do on each (allowed).",
+        Add("list_devices", "Lists the user's Android devices you may see: name, id, model, status, battery (percent, power), group, and what you may do on each (allowed). Devices that still need pairing can't be used until the user pairs them in Paneless.",
             AssistantAccess.Read, Schema(), (_, _) =>
             {
                 var arr = new JsonArray();
                 foreach (var r in _main.NetworkRows.Where(r => r.Sn != null && AccessOf(r.GroupId) != AssistantAccess.Off).OrderBy(r => r.Name, NaturalComparer.Instance))
+                {
+                    var battery = r.Serial != null ? _main.BatteryOf(r.Serial) : null;
                     arr.Add(new JsonObject
                     {
-                        ["name"] = r.Name, ["id"] = r.GroupId, ["model"] = r.Model, ["type"] = r.Type,
-                        ["status"] = r.State.ToString(), ["battery"] = r.Serial != null ? _main.BatteryOf(r.Serial)?.Text : null,
-                        ["group"] = _s.Groups.GroupOf(r.GroupId)?.Name, ["allowed"] = AccessOf(r.GroupId).ToString(),
+                        ["name"] = r.Name, ["id"] = r.GroupId,
+                        ["model"] = r.Model.Length > 0 ? r.Model : null, ["type"] = r.Type.Length > 0 ? r.Type : null,
+                        ["status"] = r.State.ToString(),
+                        ["battery_percent"] = battery?.Level,
+                        ["power"] = battery is not { } b ? null : b.Full ? "Full, plugged in" : b.Charging ? "Charging" : "On battery",
+                        ["group"] = _s.Groups.GroupOf(r.GroupId)?.Name,
+                        // An unpaired device can't run anything yet, whatever level the user set.
+                        ["allowed"] = r.NeedsPairing || r.State == DeviceState.Unauthorized ? "Nothing yet: the user has to pair it in Paneless first" : AccessOf(r.GroupId).ToString(),
                     });
+                }
                 return Task.FromResult(ToolResult.Json(arr));
             });
 
@@ -233,7 +241,7 @@ public sealed class AssistantTools
                 var inv = _s.Demo ? DemoData.Inventory(r) : await _s.Adb!.GetInventoryAsync(await SerialOf(r), r.Name);
                 if (inv == null) return ToolResult.Text("Couldn't read the device.", true);
                 _s.Inventory[r.GroupId] = inv;
-                return ToolResult.Json(System.Text.Json.JsonSerializer.SerializeToNode(inv)!);
+                return ToolResult.Json(AssistantFacts.Inventory(inv));
             });
 
         Add("list_apps", "Lists the installed app packages of a device (only apps the user installed, unless include_system is true).",
