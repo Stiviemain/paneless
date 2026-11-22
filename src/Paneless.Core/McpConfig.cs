@@ -29,6 +29,23 @@ public static class McpConfig
         return root.ToJsonString(Indented);
     }
 
+    /// <summary>True if a JSON settings file already has a "paneless" entry under "mcpServers".</summary>
+    public static bool HasJsonServer(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return false;
+        try
+        {
+            var root = JsonNode.Parse(json, documentOptions: new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true }) as JsonObject;
+            return root?["mcpServers"] is JsonObject servers && servers[ServerName] != null;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>True if a Codex config.toml already has a [mcp_servers.paneless] table.</summary>
+    public static bool HasCodexServer(string toml) =>
+        !string.IsNullOrWhiteSpace(toml) && toml.Replace("\r\n", "\n").Split('\n')
+            .Any(l => l.Trim() == $"[mcp_servers.{ServerName}]");
+
     /// <summary>Codex's config.toml: drops any [mcp_servers.paneless] table (and its sub-tables) and appends a fresh one.
     /// Everything else stays as it was.</summary>
     public static string WithCodexServer(string toml, string exe)

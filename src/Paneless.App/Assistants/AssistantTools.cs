@@ -41,7 +41,8 @@ public sealed class AssistantTools
         "code saved in Paneless without revealing it) and lock_device when done. To operate a screen: take a screenshot, then tap " +
         "or swipe using the pixel coordinates of that screenshot. Never guess coordinates without a recent screenshot.";
 
-    sealed record Tool(string Name, string Description, AssistantAccess Level, JsonObject Schema, Func<JsonObject, Task<ToolResult>> Run, bool Changes = false);
+    sealed record Tool(string Name, string Description, AssistantAccess Level, JsonObject Schema, Func<JsonObject, Task<ToolResult>> Run,
+        bool Changes = false, bool Destructive = false, bool Idempotent = false);
 
     readonly AppServices _s;
     readonly MainViewModel _main;
@@ -69,6 +70,13 @@ public sealed class AssistantTools
         ["name"] = t.Name,
         ["description"] = t.Description + $" (Needs the device permission \"{t.Level}\" in Paneless.)",
         ["inputSchema"] = t.Schema.DeepClone(),
+        ["annotations"] = new JsonObject
+        {
+            ["readOnlyHint"] = !t.Changes,
+            ["destructiveHint"] = t.Changes && t.Destructive,
+            ["idempotentHint"] = !t.Changes || t.Idempotent,
+            ["openWorldHint"] = false,
+        },
     }).ToArray());
 
     /// <summary>The assistant whose call is running (for the confirmation and the activity list).</summary>
@@ -193,10 +201,11 @@ public sealed class AssistantTools
     static ToolResult Results(IReadOnlyList<DeviceActions.DeviceResult> results) =>
         ToolResult.Json(new JsonArray(results.Select(r => (JsonNode)new JsonObject { ["device"] = r.Device, ["ok"] = r.Ok, ["output"] = r.Detail }).ToArray()));
 
-    void Add(string name, string description, AssistantAccess level, JsonObject schema, Func<Tool, JsonObject, Task<ToolResult>> run, bool changes = false)
+    void Add(string name, string description, AssistantAccess level, JsonObject schema, Func<Tool, JsonObject, Task<ToolResult>> run,
+        bool changes = false, bool destructive = false, bool idempotent = false)
     {
         Tool? self = null;
-        self = new Tool(name, description, level, schema, a => run(self!, a), changes);
+        self = new Tool(name, description, level, schema, a => run(self!, a), changes, destructive, idempotent);
         _tools.Add(self);
     }
 
@@ -408,7 +417,7 @@ public sealed class AssistantTools
                 }
                 var res = await _s.Unlock.UnlockAsync(serial, r.Sn!, r.Name);
                 return ToolResult.Text(res.Message, !res.Ok);
-            }, changes: true);
+            }, changes: true, idempotent: true);
 
         Add("lock_device", "Turns the device's screen off and puts it to sleep (locks it).",
             AssistantAccess.Control, Schema(DeviceArg), async (t, a) =>
@@ -418,7 +427,37 @@ public sealed class AssistantTools
                 if (_s.Demo) return ToolResult.Text($"Demo mode: would lock {r.Name}.");
                 var res = await _s.Adb!.ShellAsync(await SerialOf(r), "input keyevent KEYCODE_SLEEP", TimeSpan.FromSeconds(5));
                 return res.Ok ? ToolResult.Text($"Locked {r.Name}.") : ToolResult.Text($"Couldn't lock {r.Name}: {res.LastLine}", true);
-            }, changes: true);
+            }, changes: true, idempotent: true);
+
+        Add("list_remote_apps", "Lists the user's configured Remote apps (Android apps set up to open in their own PC windows).",
+            AssistantAccess.Read, Schema(), (_, _) =>
+            {
+                var arr = new JsonArray();
+                foreach (var app in _s.RemoteApps.All.Where(a => AccessOf(a.DeviceId) != AssistantAccess.Off))
+                {
+                    arr.Add(new JsonObject
+                    {
+                        ["id"] = app.Id, ["name"] = app.Name, ["package"] = app.Package,
+                        ["device"] = _main.DeviceNameFor(app), ["device_id"] = app.DeviceId,
+                        ["shape"] = app.Shape, ["open"] = _s.Mirrors?.RemoteAppSession(app.Id) != null,
+                    });
+                }
+                return Task.FromResult(ToolResult.Json(arr));
+            });
+
+        Add("open_remote_app", "Opens one of the user's configured Remote apps (see list_remote_apps) in its own PC window.",
+            AssistantAccess.Control, Schema(("app", "string", "Remote app name or id (from list_remote_apps).", true)), async (t, a) =>
+            {
+                var q = Str(a, "app").Trim();
+                var visibleApps = _s.RemoteApps.All.Where(x => AccessOf(x.DeviceId) != AssistantAccess.Off).ToList();
+                var app = visibleApps.FirstOrDefault(x => x.Id == q || string.Equals(x.Name, q, StringComparison.OrdinalIgnoreCase))
+                          ?? visibleApps.FirstOrDefault(x => x.Name.Contains(q, StringComparison.OrdinalIgnoreCase))
+                          ?? throw new RefusedException($"No remote app \"{q}\" found. Use list_remote_apps.");
+                var r = _main.RowFor(app) ?? throw new RefusedException($"{_main.DeviceNameFor(app)} isn't connected.");
+                await Allow(t, [r], Localization.Loc.F("open remote app \"{0}\"", app.Name));
+                var why = await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => _main.OpenRemoteAppAsync(app));
+                return why == null ? ToolResult.Text($"Opened {app.Name} on {r.Name}.") : ToolResult.Text(why, true);
+            }, changes: true, idempotent: true);
 
         Add("install_app", "Installs (or updates) an APK file from the user's PC on a device or a whole group.",
             AssistantAccess.Manage, Schema(DeviceOpt, GroupOpt, ("apk_path", "string", "Full path of the .apk file on the PC.", true)), async (t, a) =>
@@ -432,7 +471,7 @@ public sealed class AssistantTools
                     var res = await _s.Adb!.InstallAsync(serial, path);
                     return new DeviceActions.DeviceResult(r.Name, res.Ok, res.LastLine);
                 }));
-            }, changes: true);
+            }, changes: true, idempotent: true);
 
         Add("uninstall_app", "Uninstalls an app (by package name) from a device or a whole group.",
             AssistantAccess.Manage, Schema(DeviceOpt, GroupOpt, ("package", "string", "Package name.", true)), async (t, a) =>
@@ -441,7 +480,7 @@ public sealed class AssistantTools
                 var rows = FindTargets(a);
                 await Allow(t, rows, Localization.Loc.F("uninstall {0}", pkg));
                 return Results(await _main.Actions.ShellAsync("pm uninstall --user 0 " + ScriptText.ShellQuote(pkg), rows));
-            }, changes: true);
+            }, changes: true, destructive: true);
 
         Add("copy_file", "Copies a file from the user's PC to a device or group (default folder: the device's drop folder, usually /sdcard/Download/).",
             AssistantAccess.Manage, Schema(DeviceOpt, GroupOpt, ("path", "string", "Full path of the file on the PC.", true), ("folder", "string", "Folder on the device.", false)), async (t, a) =>
@@ -455,7 +494,7 @@ public sealed class AssistantTools
                     var res = await _s.Adb!.PushAsync(serial, path, a["folder"]?.ToString() is { Length: > 0 } f ? f : _s.EffectiveFor(r.GroupId).PushTarget);
                     return new DeviceActions.DeviceResult(r.Name, res.Ok, res.LastLine);
                 }));
-            }, changes: true);
+            }, changes: true, idempotent: true);
 
         Add("run_command", "Runs a shell command on a device or group (like \"adb shell <command>\") and returns its output.",
             AssistantAccess.Manage, Schema(DeviceOpt, GroupOpt, ("command", "string", "The command, without \"adb shell\".", true)), async (t, a) =>
@@ -464,7 +503,7 @@ public sealed class AssistantTools
                 var rows = FindTargets(a);
                 await Allow(t, rows, Localization.Loc.F("run the command: {0}", cmd));
                 return Results(await _main.Actions.ShellAsync(cmd, rows));
-            }, changes: true);
+            }, changes: true, destructive: true);
 
         Add("list_scripts", "Lists the saved scripts (the user's and the built-in ones) with their descriptions and fields.",
             AssistantAccess.Read, Schema(), (_, _) => Task.FromResult(ToolResult.Json(new JsonArray(_s.AllScripts().Select(sc => (JsonNode)new JsonObject
@@ -483,7 +522,7 @@ public sealed class AssistantTools
                 var rows = FindTargets(a);
                 await Allow(t, rows, Localization.Loc.F("run the script \"{0}\"", script.Name));
                 return Results(await _main.Actions.RunScriptAsync(script, rows, values));
-            }, changes: true);
+            }, changes: true, destructive: true);
 
         Add("list_recipes", "Lists the provisioning recipes (sets of apps, files, scripts and commands).", AssistantAccess.Read, Schema(), (_, _) =>
             Task.FromResult(ToolResult.Json(new JsonArray(_s.Recipes.All.Select(r => (JsonNode)new JsonObject
@@ -499,7 +538,7 @@ public sealed class AssistantTools
                 var rows = FindTargets(a);
                 await Allow(t, rows, Localization.Loc.F("run the recipe \"{0}\"", recipe.Name));
                 return Results(await _main.Actions.RunRecipeAsync(recipe, rows));
-            }, changes: true);
+            }, changes: true, destructive: true);
 
         Add("reboot", "Restarts a device or every device of a group.",
             AssistantAccess.Manage, Schema(DeviceOpt, GroupOpt), async (t, a) =>
@@ -507,7 +546,7 @@ public sealed class AssistantTools
                 var rows = FindTargets(a);
                 await Allow(t, rows, Localization.Loc.T("restart the device"));
                 return Results(await _main.Actions.RebootAsync(rows));
-            }, changes: true);
+            }, changes: true, destructive: true);
     }
 
     /// <summary>Screenshot pixels to device pixels (the screen's current orientation).</summary>

@@ -228,26 +228,50 @@ Works with:
 | App | How to connect |
 |---|---|
 | [Claude Desktop](https://claude.ai/download) | **Add to Claude Desktop**, then restart it |
-| [Claude Code](https://claude.com/claude-code) | run the command shown once in a terminal |
+| [Claude Code](https://claude.com/claude-code) | run the command shown once in a terminal (`claude mcp list` verifies) |
 | [Codex](https://developers.openai.com/codex) (CLI, editor extension, Codex in the ChatGPT desktop app) | **Add to Codex**, or run the command shown |
-| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | **Add to Gemini CLI**, then start a new session |
-| Other MCP apps (Cursor, VS Code, LM Studio, …) | copy the settings shown into the app's MCP settings |
+| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | **Add to Gemini CLI**, then start a new session (`/mcp` lists Paneless) |
+| [Cursor](https://cursor.com) | **Add to Cursor** (writes `~/.cursor/mcp.json`), then reload MCP servers |
+| Other MCP apps (VS Code, LM Studio, …) | copy the settings shown (in VS Code, use `Ctrl+Shift+P` › **MCP: Add Server**) |
 
 ChatGPT and Gemini in a web browser can't reach programs on your PC, so they can't use Paneless.
 
 1. In Paneless, open the **AI** page and switch on **AI assistants may use Paneless**.
-2. Pick your app under **Connect an assistant** and follow the step shown.
+2. Pick your app under **Connect an assistant** and follow the step shown. *(If you use the portable zip, keep the folder in one place—its path is saved in your AI app's config.)*
 3. Decide what assistants may do, for all devices or per group and device:
 
 | Level | Assistants may… |
 |---|---|
 | Nothing | not see the device at all |
-| Read | see status, battery, apps and the log |
+| Read | see status, battery, apps, remote apps and the log |
 | See | also take screenshots |
-| Control | also tap, swipe, type, open apps, and unlock/lock using your saved code (never revealed to the assistant) |
+| Control | also tap, swipe, type, open apps / remote apps, and unlock/lock using your saved code (never revealed to the assistant) |
 | Manage | also install and remove apps, copy files, run scripts, recipes and commands, restart |
 
-By default assistants may only **read**, and Paneless asks you before one changes anything, naming the app that asks (*Allow once*, *Allow for 15 minutes* or *Don't allow*). **Pause** refuses everything until you resume, and the page lists what each assistant did. Paneless never gives an assistant your unlock codes.
+By default assistants may only **read**, and Paneless asks you before one changes anything, naming the app that asks (*Allow once*, *Allow for 15 minutes* or *Don't allow*). **Pause** refuses everything until you resume, and the page lists what each assistant did. Paneless never gives an assistant your unlock codes, and marks every tool with standard MCP `readOnlyHint` / `destructiveHint` annotations.
+
+**What you can ask:**
+- *"Which of my devices have less than 20 % battery?"*
+- *"Unlock the Pixel, open Settings and turn on dark mode, then lock it again."*
+- *"Install `C:\Builds\app.apk` on the Test lab group."*
+- *"Why does my app crash on the tablet? Read its log."*
+
+<details>
+<summary><b>Manual MCP configuration (stdio)</b></summary>
+
+Paneless runs as a standard local `stdio` MCP server (`Paneless.exe --mcp`). Most MCP clients accept:
+
+```json
+{
+  "mcpServers": {
+    "paneless": {
+      "command": "C:\\Users\\<you>\\AppData\\Local\\PanelessApp\\current\\Paneless.exe",
+      "args": ["--mcp"]
+    }
+  }
+}
+```
+</details>
 
 <p align="center"><img src="docs/images/ai.png" width="760" alt="AI assistants page"></p>
 

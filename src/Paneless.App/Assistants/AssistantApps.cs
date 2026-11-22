@@ -22,7 +22,7 @@ public static class AssistantApps
             Loc.T("Adds Paneless to Claude Desktop’s settings. Restart Claude Desktop afterwards (quit it from the notification area)."),
             true, Loc.T("Add to Claude Desktop"), JsonSettings),
         new("claude-code", "Claude Code",
-            Loc.T("Run this once in a terminal; Claude Code then has Paneless in every project."),
+            Loc.T("Run this once in a terminal; Claude Code then has Paneless in every project (run “claude mcp list” to verify)."),
             false, "", exe => $"claude mcp add {ServerName} --scope user -- \"{exe}\" --mcp"),
         new("codex", Loc.T("Codex (also in the ChatGPT desktop app)"),
             Loc.T("Adds Paneless to Codex’s settings, which the Codex CLI, its editor extension and Codex in the ChatGPT desktop app share. Or run this command once in a terminal."),
@@ -30,8 +30,11 @@ public static class AssistantApps
         new("gemini-cli", "Gemini CLI",
             Loc.T("Adds Paneless to Gemini CLI’s settings. Start a new Gemini CLI session afterwards; /mcp lists Paneless."),
             true, Loc.T("Add to Gemini CLI"), JsonSettings),
-        new("other", Loc.T("Other MCP apps (Cursor, VS Code, LM Studio, …)"),
-            Loc.T("Most apps that support MCP accept these settings: paste them into the app’s MCP settings. The program is Paneless.exe with --mcp."),
+        new("cursor", "Cursor",
+            Loc.T("Adds Paneless to Cursor’s global MCP settings (~/.cursor/mcp.json). Restart Cursor or reload MCP servers afterwards."),
+            true, Loc.T("Add to Cursor"), JsonSettings),
+        new("other", Loc.T("Other MCP apps (VS Code, LM Studio, …)"),
+            Loc.T("Most MCP apps accept these settings in their MCP config (command: Paneless.exe, args: [\"--mcp\"]). In VS Code, use Ctrl+Shift+P › “MCP: Add Server” instead of pasting into .vscode/mcp.json (which uses \"servers\" instead of \"mcpServers\")."),
             false, "", JsonSettings),
     ];
 
@@ -47,8 +50,25 @@ public static class AssistantApps
         "claude-desktop" => ClaudeDesktopConfigs(),
         "codex" => [Path.Combine(Environment.GetEnvironmentVariable("CODEX_HOME") is { Length: > 0 } ch ? ch : Path.Combine(Home, ".codex"), "config.toml")],
         "gemini-cli" => [Path.Combine(Home, ".gemini", "settings.json")],
+        "cursor" => [Path.Combine(Home, ".cursor", "mcp.json")],
         _ => [],
     };
+
+    /// <summary>True if Paneless is already registered in at least one of this app's config files.</summary>
+    public static bool IsConfigured(string appId)
+    {
+        foreach (var file in ConfigFiles(appId))
+        {
+            try
+            {
+                if (!File.Exists(file)) continue;
+                var text = File.ReadAllText(file);
+                if (appId == "codex" ? McpConfig.HasCodexServer(text) : McpConfig.HasJsonServer(text)) return true;
+            }
+            catch { }
+        }
+        return false;
+    }
 
     /// <summary>Claude Desktop: %APPDATA%\Claude, and the Store version's own copy of it.</summary>
     static List<string> ClaudeDesktopConfigs()

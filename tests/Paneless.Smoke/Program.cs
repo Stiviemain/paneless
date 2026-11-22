@@ -432,6 +432,8 @@ if (args.Contains("--assistants"))
     Check(toml.Contains($"command = '{exe}'") && toml.Contains("args = [\"--mcp\"]") && toml.Split("[mcp_servers.paneless]").Length == 2, "Codex TOML: one entry, path needs no escaping");
     Check(McpConfig.WithCodexServer(toml, exe) == toml, "Codex TOML: adding twice changes nothing");
     Check(McpConfig.WithCodexServer("", @"C:\it's\Paneless.exe").Contains("command = \"C:\\\\it's\\\\Paneless.exe\""), "Codex TOML: a path with ' is escaped");
+    Check(!McpConfig.HasJsonServer("{}") && McpConfig.HasJsonServer(McpConfig.WithJsonServer("{}", exe)), "HasJsonServer detects paneless entry");
+    Check(!McpConfig.HasCodexServer("") && McpConfig.HasCodexServer(toml), "HasCodexServer detects paneless table");
 
     Check(McpConfig.Friendly("claude-ai", null) == "Claude" && McpConfig.Friendly("claude-code", null) == "Claude Code"
           && McpConfig.Friendly("codex-mcp-client", null) == "Codex" && McpConfig.Friendly("gemini-cli-mcp-client", null) == "Gemini"

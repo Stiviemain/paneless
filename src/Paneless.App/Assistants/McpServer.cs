@@ -173,20 +173,24 @@ public static class McpBridge
     static NamedPipeClientStream? Connect()
     {
         var started = false;
-        var until = DateTime.UtcNow + TimeSpan.FromSeconds(25);
+        // If Paneless is already running and the pipe isn't listening, AI access is almost certainly turned off:
+        // don't hang for 25 s (clients would time out before seeing our helpful error message).
+        var alreadyRunning = SingleInstance.IsRunning;
+        var until = DateTime.UtcNow + TimeSpan.FromSeconds(alreadyRunning ? 2.5 : 25);
         while (DateTime.UtcNow < until)
         {
             var pipe = new NamedPipeClientStream(".", McpServer.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
-            try { pipe.Connect(800); return pipe; }
+            try { pipe.Connect(600); return pipe; }
             catch { pipe.Dispose(); }
             if (!started && !SingleInstance.IsRunning)
             {
                 // Paneless isn't open: start it quietly in the notification area.
                 started = true;
+                until = DateTime.UtcNow + TimeSpan.FromSeconds(25);
                 try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Environment.ProcessPath!, "--tray") { UseShellExecute = false }); }
                 catch { return null; }
             }
-            Thread.Sleep(500);
+            Thread.Sleep(400);
         }
         return null;
     }

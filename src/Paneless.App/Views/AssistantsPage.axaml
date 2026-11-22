@@ -39,7 +39,10 @@
             <TextBlock Classes="heading" Text="{l:T '1. Connect an assistant'}" />
             <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Apps}" SelectedItem="{Binding App}" />
             <TextBlock Classes="small" TextWrapping="Wrap" Text="{Binding App.Hint}" />
-            <Button Classes="accent" Content="{Binding App.AddLabel}" Command="{Binding AddCommand}" IsVisible="{Binding App.CanAdd}" />
+            <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding App.CanAdd}">
+              <Button Classes="accent" Content="{Binding App.AddLabel}" Command="{Binding AddCommand}" />
+              <TextBlock Classes="small" Foreground="{DynamicResource GreenBrush}" Text="{Binding ConfiguredText}" VerticalAlignment="Center" IsVisible="{Binding IsAppConfigured}" />
+            </StackPanel>
             <Grid ColumnDefinitions="*,8,Auto">
               <TextBox Classes="code" Text="{Binding Snippet, Mode=OneWay}" MaxHeight="150" />
               <Button Grid.Column="2" Content="{l:T 'Copy'}" Command="{Binding CopyCommand}" VerticalAlignment="Top" />

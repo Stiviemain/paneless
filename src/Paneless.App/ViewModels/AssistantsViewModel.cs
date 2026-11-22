@@ -196,19 +196,30 @@ public sealed partial class AssistantsViewModel : ObservableObject
     {
         Message = "";
         OnPropertyChanged(nameof(Snippet));
+        OnPropertyChanged(nameof(IsAppConfigured));
+        OnPropertyChanged(nameof(ConfiguredText));
     }
+
+    public bool IsAppConfigured => !_s.Demo && App.CanAdd && AssistantApps.IsConfigured(App.Id);
+    public string ConfiguredText => IsAppConfigured ? Loc.F("✓ Configured in {0}", App.Name) : "";
 
     /// <summary>The command or settings for the chosen app.</summary>
     public string Snippet => App.Snippet(Exe);
 
-    public string ExamplePrompts => Loc.T("Which of my devices have less than 20 % battery?\nInstall C:\\Builds\\app.apk on the Test lab group.\nOpen Settings on the Pixel and turn on dark mode.\nWhy does my app crash on the tablet? Read its log.");
+    public string ExamplePrompts => Loc.T("Which of my devices have less than 20 % battery?\nInstall C:\\Builds\\app.apk on the Test lab group.\nUnlock the Pixel, open Settings and turn on dark mode.\nWhy does my app crash on the tablet? Read its log.");
 
     [RelayCommand]
     async Task Copy()
     {
         if (CopyAsync != null) await CopyAsync(Snippet);
-        Message = Snippet.StartsWith('{') ? Loc.T("Copied. Paste it into the app’s MCP settings, then restart the app.")
-            : Loc.T("Copied. Run it once in a terminal.");
+        if (!Enabled)
+            Message = Snippet.StartsWith('{')
+                ? Loc.T("Copied. Turn on “AI assistants may use Paneless” above, then paste it into the app’s MCP settings and restart the app.")
+                : Loc.T("Copied. Turn on “AI assistants may use Paneless” above, then run it once in a terminal.");
+        else
+            Message = Snippet.StartsWith('{')
+                ? Loc.T("Copied. Paste it into the app’s MCP settings, then restart the app.")
+                : Loc.T("Copied. Run it once in a terminal.");
     }
 
     /// <summary>Adds Paneless to the chosen app's settings file (keeps everything else in it).</summary>
@@ -224,6 +235,8 @@ public sealed partial class AssistantsViewModel : ObservableObject
         try { await AssistantApps.AddAsync(App.Id, Exe); }
         catch (Exception ex) { Message = Loc.F("Couldn’t change the settings: {0}", ex.Message); return; }
         if (!Enabled) Enabled = true;
+        OnPropertyChanged(nameof(IsAppConfigured));
+        OnPropertyChanged(nameof(ConfiguredText));
         Message = Loc.F("Added. Restart {0}, then ask it about your devices.", App.Name);
     }
 
