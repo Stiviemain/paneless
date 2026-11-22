@@ -224,22 +224,33 @@ public final class TasksModule {
             }
         } catch (Throwable ignored) { }
 
-        // 1. Try switching the display's windowing mode directly to WINDOWING_MODE_FULLSCREEN (1).
+        // 1. Switch the virtual display's windowing mode directly to WINDOWING_MODE_FULLSCREEN (1).
+        //    Standard AOSP `wm set-display-windowing-mode -d <id> 1` works across Pixel, Xiaomi HyperOS,
+        //    and Samsung tablets (where force_desktop_mode_on_external_displays=1 defaults new displays to FREEFORM).
         boolean setDisplayMode = false;
         try {
-            Class<?> sm = Class.forName("android.os.ServiceManager");
-            IBinder wb = (IBinder) sm.getDeclaredMethod("getService", String.class).invoke(null, "window");
-            if (wb != null) {
-                Object wm = Class.forName("android.view.IWindowManager$Stub")
-                        .getDeclaredMethod("asInterface", IBinder.class).invoke(null, wb);
-                if (wm != null) {
-                    try {
-                        wm.getClass().getMethod("setWindowingMode", int.class, int.class).invoke(wm, displayId, 1);
-                        setDisplayMode = true;
-                    } catch (Throwable ignored) { }
-                }
-            }
+            Process p = new ProcessBuilder("wm", "set-display-windowing-mode", "-d", String.valueOf(displayId), "1")
+                    .redirectErrorStream(true).start();
+            p.getInputStream().readAllBytes();
+            setDisplayMode = p.waitFor() == 0;
         } catch (Throwable ignored) { }
+
+        if (!setDisplayMode) {
+            try {
+                Class<?> sm = Class.forName("android.os.ServiceManager");
+                IBinder wb = (IBinder) sm.getDeclaredMethod("getService", String.class).invoke(null, "window");
+                if (wb != null) {
+                    Object wm = Class.forName("android.view.IWindowManager$Stub")
+                            .getDeclaredMethod("asInterface", IBinder.class).invoke(null, wb);
+                    if (wm != null) {
+                        try {
+                            wm.getClass().getMethod("setWindowingMode", int.class, int.class).invoke(wm, displayId, 1);
+                            setDisplayMode = true;
+                        } catch (Throwable ignored) { }
+                    }
+                }
+            } catch (Throwable ignored) { }
+        }
 
         // 2. Find the app's task on this display and force fullscreen / full bounds if needed.
         int targetTaskId = -1;
@@ -247,7 +258,7 @@ public final class TasksModule {
         if (svc != null) {
             List<?> infos = null;
             try { infos = (List<?>) svc.getClass().getMethod("getAllRootTaskInfos").invoke(svc); } catch (Throwable ignored) { }
-            if (infos == null) {
+            if (infos == null || infos.isEmpty()) {
                 try { infos = (List<?>) svc.getClass().getMethod("getTasks", int.class).invoke(svc, 30); } catch (Throwable ignored) { }
             }
             if (infos != null) {
@@ -266,7 +277,7 @@ public final class TasksModule {
         }
 
         boolean resized = false;
-        if (targetTaskId > 0) {
+        if (targetTaskId > 0 && !setDisplayMode) {
             if (svc != null) {
                 try {
                     svc.getClass().getMethod("setTaskWindowingMode", int.class, int.class, boolean.class)
@@ -277,6 +288,7 @@ public final class TasksModule {
                 try {
                     Process p = new ProcessBuilder("am", "task", "resize", String.valueOf(targetTaskId), "0", "0", String.valueOf(w), String.valueOf(h))
                             .redirectErrorStream(true).start();
+                    p.getInputStream().readAllBytes();
                     resized = p.waitFor() == 0;
                 } catch (Throwable ignored) { }
             }

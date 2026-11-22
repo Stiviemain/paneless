@@ -460,6 +460,7 @@ public partial class MainWindow : Window
         if (_settings != null) { _settings.Activate(); return _settings; }
         var vm = new SettingsViewModel(_services!);
         vm.Saved += () => { Vm?.SettingsChanged(); _ = _helperCoord?.SyncWatchersAsync(); };
+        vm.Reloaded += () => { if (Vm != null) _ = Vm.RefreshCommand.ExecuteAsync(null); };
         vm.CheckUpdatesAsync = async () => (await Updates.CheckAsync(_services!, interactive: true)).Message;
         _settings = new SettingsWindow { DataContext = vm };
         _settings.Closed += (_, _) => _settings = null;

@@ -6,7 +6,7 @@
         x:Class="Paneless.App.Views.SettingsWindow"
         x:DataType="vm:SettingsViewModel"
         Title="{l:T 'Paneless settings'}" Icon="/Assets/Paneless.ico"
-        Width="820" Height="680" MinWidth="700" MinHeight="440"
+        Width="840" Height="720" MinWidth="700" MinHeight="440"
         WindowStartupLocation="CenterOwner">
 
   <Window.Styles>
@@ -100,6 +100,19 @@
             <Button Content="{l:T 'Check for updates now'}" Command="{Binding CheckUpdatesCommand}" IsEnabled="{Binding !IsChecking}" />
             <TextBlock Text="{Binding UpdateStatus}" Classes="dim" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="220" />
           </StackPanel>
+
+          <TextBlock Classes="section" Text="{l:T 'Backup and reset'}" Margin="0,10,0,4" />
+          <CheckBox IsChecked="{Binding ExportIncludeDevices}"
+                    ToolTip.Tip="{l:T 'When unchecked, only Paneless settings, scripts and automation are exported. Unlock codes are never exported.'}">
+            <TextBlock Text="{l:T 'Also include saved devices, groups, device settings and remote apps'}" TextWrapping="Wrap" />
+          </CheckBox>
+          <WrapPanel Orientation="Horizontal" Margin="0,2,0,0">
+            <Button Content="{l:T 'Export settings…'}" Command="{Binding ExportSettingsCommand}" Margin="0,0,8,8" />
+            <Button Content="{l:T 'Import settings…'}" Command="{Binding ImportSettingsCommand}" Margin="0,0,8,8" />
+            <Button Content="{l:T 'Reset to defaults…'}" Command="{Binding ResetToDefaultsCommand}" Margin="0,0,8,8" />
+          </WrapPanel>
+          <TextBlock Text="{Binding BackupStatus}" Foreground="{Binding BackupStatusBrush}"
+                     IsVisible="{Binding HasBackupStatus}" FontSize="12" TextWrapping="Wrap" />
 
           <TextBlock Classes="section" Text="{l:T 'Support Paneless'}" Margin="0,10,0,4" />
           <TextBlock Classes="label" TextWrapping="Wrap"

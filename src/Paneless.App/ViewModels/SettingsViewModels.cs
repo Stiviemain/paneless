@@ -302,8 +302,14 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     /// <summary>Raised after every change (the main window refreshes its Mirror options).</summary>
     public event Action? Saved;
+    /// <summary>Raised after importing a backup or resetting to defaults (the main window refreshes devices & pages).</summary>
+    public event Action? Reloaded;
     /// <summary>Set by the app: checks the update source now and reports back.</summary>
     public Func<Task<string>>? CheckUpdatesAsync { get; set; }
+    /// <summary>Set by the window: file pickers and confirmation dialog for backup & reset.</summary>
+    public Func<string, Task<string?>>? PickSaveFileAsync { get; set; }
+    public Func<Task<string?>>? PickOpenFileAsync { get; set; }
+    public Func<string, string, Task<bool>>? ConfirmAsync { get; set; }
 
     public ObservableCollection<SettingRow> Rows { get; }
     public ObservableCollection<SettingRow> SyncRows { get; }
@@ -384,6 +390,39 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] public partial string UpdateStatus { get; set; } = "";
     [ObservableProperty] public partial bool IsChecking { get; set; }
 
+    [ObservableProperty] public partial bool ExportIncludeDevices { get; set; } = true;
+    [ObservableProperty] public partial string BackupStatus { get; set; } = "";
+    [ObservableProperty] public partial IBrush BackupStatusBrush { get; set; } = Paneless.App.Theme.Dim;
+    public bool HasBackupStatus => BackupStatus.Length > 0;
+    partial void OnBackupStatusChanged(string value) => OnPropertyChanged(nameof(HasBackupStatus));
+
+    void SetBackupStatus(string text, StatusKind kind = StatusKind.Info)
+    {
+        BackupStatus = text;
+        BackupStatusBrush = Paneless.App.Theme.For(kind);
+    }
+
+    void ReloadFromStore()
+    {
+        Rows.Clear();
+        foreach (var r in SettingChoices.MirrorRows(null, null, G, Save)) Rows.Add(r);
+        SyncRows.Clear();
+        foreach (var r in SettingChoices.SyncRows(null, null, G, Save)) SyncRows.Add(r);
+        _pushTarget = G.PushTarget;
+        _updateSource = G.UpdateSource;
+        _startWithSystem = Platform.Autostart.IsEnabled;
+        OnPropertyChanged(nameof(AutoConnect));
+        OnPropertyChanged(nameof(CloseToTray));
+        OnPropertyChanged(nameof(AutoUpdate));
+        OnPropertyChanged(nameof(BetaUpdates));
+        OnPropertyChanged(nameof(Theme));
+        OnPropertyChanged(nameof(Language));
+        OnPropertyChanged(nameof(LanguageChanged));
+        OnPropertyChanged(nameof(PushTarget));
+        OnPropertyChanged(nameof(UpdateSource));
+        OnPropertyChanged(nameof(StartWithSystem));
+    }
+
     [RelayCommand]
     async Task CheckUpdates()
     {
@@ -392,5 +431,141 @@ public sealed partial class SettingsViewModel : ObservableObject
         UpdateStatus = Loc.T("Checking…");
         try { UpdateStatus = await CheckUpdatesAsync(); }
         finally { IsChecking = false; }
+    }
+
+    [RelayCommand]
+    async Task ExportSettings()
+    {
+        if (PickSaveFileAsync == null) return;
+        var prefix = ExportIncludeDevices ? "paneless-backup" : "paneless-settings";
+        var path = await PickSaveFileAsync($"{prefix}-{DateTime.Now:yyyy-MM-dd}");
+        if (string.IsNullOrWhiteSpace(path)) return;
+        try
+        {
+            var json = SettingsBackup.ExportJson(
+                _s.Data.Settings,
+                _s.Scripts.Mine,
+                _s.Keymaps.Data,
+                _s.Recipes.All,
+                _s.Schedules.All,
+                _s.Alerts.Data,
+                includeDevices: ExportIncludeDevices,
+                knownDevices: _s.Data.Known,
+                groups: _s.Groups.Data,
+                profiles: _s.Profiles.All,
+                remoteApps: _s.RemoteApps.All);
+            await File.WriteAllTextAsync(path, json);
+            SetBackupStatus(
+                ExportIncludeDevices
+                    ? Loc.T("Settings and saved devices exported.")
+                    : Loc.T("Settings exported."),
+                StatusKind.Ok);
+        }
+        catch (Exception ex)
+        {
+            SetBackupStatus(Loc.F("Couldn't export settings: {0}", ex.Message), StatusKind.Error);
+        }
+    }
+
+    [RelayCommand]
+    async Task ImportSettings()
+    {
+        if (PickOpenFileAsync == null) return;
+        var path = await PickOpenFileAsync();
+        if (string.IsNullOrWhiteSpace(path)) return;
+        try
+        {
+            var json = await File.ReadAllTextAsync(path);
+            if (!SettingsBackup.TryParse(json, out var backup, out var error) || backup == null)
+            {
+                SetBackupStatus(error ?? Loc.T("This file doesn't look like a Paneless settings backup."), StatusKind.Error);
+                return;
+            }
+
+            var prompt = backup.IncludesDevices
+                ? Loc.F("Replace your Paneless settings, scripts, automation, saved devices ({0}), groups ({1}) and remote apps ({2}) with this backup? Unlock codes are kept as they are.",
+                    backup.KnownDevices?.Count ?? 0,
+                    backup.Groups?.Groups.Count ?? 0,
+                    backup.RemoteApps?.Count ?? 0)
+                : Loc.T("Replace your Paneless settings, scripts and automation with this backup? Your saved devices, groups and remote apps stay untouched.");
+
+            if (ConfirmAsync != null && !await ConfirmAsync(Loc.T("Import settings"), prompt)) return;
+
+            if (_s.Demo)
+            {
+                SetBackupStatus(Loc.T("Demo mode: backup looks valid (nothing was changed)."), StatusKind.Ok);
+                return;
+            }
+
+            SettingsBackup.ApplyTo(
+                backup,
+                _s.Data,
+                _s.Scripts,
+                _s.Keymaps,
+                _s.Recipes,
+                _s.Schedules,
+                _s.Alerts,
+                _s.Groups,
+                _s.Profiles,
+                _s.RemoteApps);
+
+            Paneless.App.Theme.Apply(G.Theme);
+            ReloadFromStore();
+            Saved?.Invoke();
+            Reloaded?.Invoke();
+
+            SetBackupStatus(
+                backup.IncludesDevices
+                    ? Loc.T("Settings and saved devices imported.")
+                    : Loc.T("Settings imported."),
+                StatusKind.Ok);
+        }
+        catch (Exception ex)
+        {
+            SetBackupStatus(Loc.F("Couldn't import settings: {0}", ex.Message), StatusKind.Error);
+        }
+    }
+
+    [RelayCommand]
+    async Task ResetToDefaults()
+    {
+        if (ConfirmAsync != null && !await ConfirmAsync(
+            Loc.T("Reset to factory defaults"),
+            Loc.T("Reset all Paneless settings, scripts, automation, saved devices, groups, remote apps and unlock codes back to factory defaults? This can't be undone.")))
+            return;
+
+        if (_s.Demo)
+        {
+            SetBackupStatus(Loc.T("Demo mode: nothing was reset."), StatusKind.Ok);
+            return;
+        }
+
+        try
+        {
+            SettingsBackup.ResetToDefaults(
+                _s.Data,
+                _s.Scripts,
+                _s.Keymaps,
+                _s.Recipes,
+                _s.Schedules,
+                _s.Alerts,
+                _s.Groups,
+                _s.Profiles,
+                _s.RemoteApps,
+                RemoteAppStore.IconDir);
+
+            if (Platform.Autostart.IsSupported && Platform.Autostart.IsEnabled)
+                Platform.Autostart.Set(false);
+
+            Paneless.App.Theme.Apply(G.Theme);
+            ReloadFromStore();
+            Saved?.Invoke();
+            Reloaded?.Invoke();
+            SetBackupStatus(Loc.T("Everything was reset to factory defaults."), StatusKind.Ok);
+        }
+        catch (Exception ex)
+        {
+            SetBackupStatus(Loc.F("Couldn't reset settings: {0}", ex.Message), StatusKind.Error);
+        }
     }
 }

@@ -134,6 +134,79 @@ if (args.Contains("--groups"))
     var parsedLock = UnlockService.ParseLockInfo(multiDisplayLock);
     Check(parsedLock.Locked == true && parsedLock.OnLockScreen, "UnlockService reads Display 0 focus even when virtual displays appear first");
 
+    // 11. SettingsBackup: export/import (settings-only vs with devices, never unlock codes) and factory reset.
+    var srcData = new DataStore(load: false, persist: false);
+    srcData.Settings.BitrateMbps = 24;
+    srcData.Settings.VideoCodec = "h265";
+    srcData.Settings.Theme = "dark";
+    srcData.Settings.ClipboardSync = true;
+    srcData.Known["SN1"] = new KnownDevice { Name = "Pixel 11 Pro", Model = "Pixel 11 Pro", Type = "Phone" };
+    srcData.Unlock["SN1"] = new UnlockEntry { Secret = "TOP_SECRET_NEVER_EXPORT", Enabled = true };
+    var srcScripts = new ScriptStore([new AdbScript { Id = "s1", Name = "Ping", Commands = "shell echo hi" }], persist: false);
+    var srcKeymaps = new KeymapStore(new KeymapData { Profiles = [new KeymapProfile { Id = "k1", Name = "FPS" }], ActiveProfile = new() { ["SN1"] = "k1" } }, persist: false);
+    var srcRecipes = new RecipeStore([new Recipe { Id = "r1", Name = "Setup" }], persist: false);
+    var srcSchedules = new ScheduleStore([new ScheduledTask { Id = "t1", Name = "Nightly" }], persist: false);
+    var srcAlerts = new AlertStore(new AlertData { Events = [new AlertEvent { Device = "Pixel", Text = "transient" }] }, persist: false);
+    var srcGroups = new GroupStore(new GroupData { Groups = [new DeviceGroup { Name = "Home", Members = ["SN1"] }] }, persist: false);
+    var srcProfiles = new ProfileStore(new Dictionary<string, DeviceProfile> { ["SN1"] = new() { BitrateMbps = 16 } }, persist: false);
+    var srcRemote = new RemoteAppStore([new RemoteApp { Id = "ra1", DeviceId = "SN1", Package = "com.example.app", Name = "Example" }], persist: false);
+
+    // 11a. App-settings-only export omits devices and never contains unlock secrets.
+    var onlySettingsJson = SettingsBackup.ExportJson(
+        srcData.Settings, srcScripts.Mine, srcKeymaps.Data, srcRecipes.All, srcSchedules.All, srcAlerts.Data,
+        includeDevices: false, srcData.Known, srcGroups.Data, srcProfiles.All, srcRemote.All);
+    Check(!onlySettingsJson.Contains("TOP_SECRET_NEVER_EXPORT") && !onlySettingsJson.Contains("Pixel 11 Pro"), "settings-only export omits devices and unlock codes");
+    Check(SettingsBackup.TryParse(onlySettingsJson, out var parsedOnly, out _) && parsedOnly != null && !parsedOnly.IncludesDevices && parsedOnly.KnownDevices == null && parsedOnly.Keymaps!.ActiveProfile.Count == 0,
+        "settings-only export parses cleanly");
+
+    // Import settings-only into a target that already has its own saved device: device stays untouched.
+    var dstData = new DataStore(load: false, persist: false);
+    dstData.Known["KEEP"] = new KnownDevice { Name = "Keep Tablet", Model = "Pad", Type = "Tablet" };
+    var dstScripts = new ScriptStore([], persist: false);
+    var dstKeymaps = new KeymapStore(new KeymapData(), persist: false);
+    var dstRecipes = new RecipeStore([], persist: false);
+    var dstSchedules = new ScheduleStore([], persist: false);
+    var dstAlerts = new AlertStore(new AlertData(), persist: false);
+    var dstGroups = new GroupStore(new GroupData { Groups = [new DeviceGroup { Name = "KeepGroup", Members = ["KEEP"] }] }, persist: false);
+    var dstProfiles = new ProfileStore(new Dictionary<string, DeviceProfile>(), persist: false);
+    var dstRemote = new RemoteAppStore([], persist: false);
+
+    SettingsBackup.ApplyTo(parsedOnly!, dstData, dstScripts, dstKeymaps, dstRecipes, dstSchedules, dstAlerts, dstGroups, dstProfiles, dstRemote);
+    Check(dstData.Settings.BitrateMbps == 24 && dstData.Settings.VideoCodec == "h265" && dstData.Settings.ClipboardSync
+          && dstScripts.Mine.Count == 1 && dstData.Known.ContainsKey("KEEP") && dstGroups.Groups.Single().Name == "KeepGroup",
+        "settings-only import updates settings/scripts without touching existing devices or groups");
+
+    // 11b. Full export (with devices) includes devices/groups/profiles/remote apps, still never unlock codes.
+    var withDevicesJson = SettingsBackup.ExportJson(
+        srcData.Settings, srcScripts.Mine, srcKeymaps.Data, srcRecipes.All, srcSchedules.All, srcAlerts.Data,
+        includeDevices: true, srcData.Known, srcGroups.Data, srcProfiles.All, srcRemote.All);
+    Check(!withDevicesJson.Contains("TOP_SECRET_NEVER_EXPORT"), "full export still never includes unlock codes");
+    Check(SettingsBackup.TryParse(withDevicesJson, out var parsedFull, out _) && parsedFull != null && parsedFull.IncludesDevices, "full export parses cleanly");
+    SettingsBackup.ApplyTo(parsedFull!, dstData, dstScripts, dstKeymaps, dstRecipes, dstSchedules, dstAlerts, dstGroups, dstProfiles, dstRemote);
+    Check(dstData.Known.ContainsKey("SN1") && !dstData.Known.ContainsKey("KEEP")
+          && dstGroups.Groups.Single().Name == "Home"
+          && dstProfiles.Get("SN1")?.BitrateMbps == 16
+          && dstRemote.All.Single().Package == "com.example.app"
+          && dstKeymaps.Data.ActiveProfile.GetValueOrDefault("SN1") == "k1",
+        "full import restores devices, groups, profiles, remote apps and keymap assignments");
+
+    // 11c. Invalid JSON / wrong schema / unsupported version rejected.
+    Check(!SettingsBackup.TryParse("", out _, out _)
+          && !SettingsBackup.TryParse("{not json", out _, out _)
+          && !SettingsBackup.TryParse("{\"App\":\"Other\",\"Version\":1,\"Settings\":{}}", out _, out _)
+          && !SettingsBackup.TryParse("{\"App\":\"Paneless\",\"Version\":99,\"Settings\":{}}", out _, out _),
+        "SettingsBackup.TryParse rejects empty, malformed, foreign and future-version files");
+
+    // 11d. Factory reset clears everything including unlock codes and restores default settings/alerts.
+    dstData.Unlock["SN1"] = new UnlockEntry { Secret = "LOCAL_SECRET", Enabled = true };
+    SettingsBackup.ResetToDefaults(dstData, dstScripts, dstKeymaps, dstRecipes, dstSchedules, dstAlerts, dstGroups, dstProfiles, dstRemote);
+    Check(dstData.Settings.BitrateMbps == 8 && dstData.Settings.VideoCodec == "h264" && !dstData.Settings.ClipboardSync
+          && dstData.Known.Count == 0 && dstData.Unlock.Count == 0
+          && dstScripts.Mine.Count == 0 && dstKeymaps.Data.Profiles.Count == 0 && dstRecipes.All.Count == 0
+          && dstSchedules.All.Count == 0 && dstGroups.Groups.Count == 0 && dstProfiles.All.Count == 0
+          && dstRemote.All.Count == 0 && dstAlerts.Data.Rules.Count == Enum.GetValues<AlertKind>().Length,
+        "ResetToDefaults restores defaults and clears devices, scripts, automation, remote apps and unlock codes");
+
     return okAll ? 0 : 1;
 }
 

@@ -1,19 +1,25 @@
 using Paneless.App.Localization;
 using System.Collections.ObjectModel;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Paneless.Core;
 
 namespace Paneless.App.ViewModels;
 
-public sealed partial class AppItem(AppPackage p, string? meta = null) : ObservableObject
+public sealed partial class AppItem(AppPackage p, string? label = null, string? meta = null) : ObservableObject
 {
     public string Package { get; } = p.Name;
+    public string Label { get; } = string.IsNullOrWhiteSpace(label) ? p.Name : label.Trim();
+    public bool HasSeparateLabel => !string.Equals(Label, Package, StringComparison.OrdinalIgnoreCase);
     public string Meta { get; } = meta ?? "";
+    public bool HasMeta => Meta.Length > 0;
+    [ObservableProperty] public partial Bitmap? Icon { get; set; }
+    internal bool HasRealIcon { get; set; }
     [ObservableProperty] public partial bool Disabled { get; set; } = p.Disabled;
-    partial void OnDisabledChanged(bool value) => OnPropertyChanged(nameof(Note));
-    public string Note => Disabled ? (Meta.Length > 0 ? $"{Meta} · {Loc.T("disabled")}" : Loc.T("disabled")) : Meta;
+    partial void OnDisabledChanged(bool value) => OnPropertyChanged(nameof(DisabledLabel));
+    public string DisabledLabel => Disabled ? Loc.T("disabled") : "";
 }
 
 /// <summary>The apps of one device: open (also in a window of its own), stop, clear, disable, uninstall, install.</summary>
@@ -22,8 +28,10 @@ public sealed partial class AppsViewModel : ObservableObject
     readonly AppServices _s;
     readonly MainViewModel _main;
     readonly DeviceRow _row;
+    readonly Dictionary<string, Bitmap> _iconCache = new(StringComparer.OrdinalIgnoreCase);
     List<AppItem> _all = [];
     string? _serial;
+    int _loadGeneration;
 
     public AppsViewModel(AppServices services, MainViewModel main, DeviceRow row)
     {
@@ -32,6 +40,9 @@ public sealed partial class AppsViewModel : ObservableObject
         _row = row;
         GroupName = _s.Groups.GroupOf(row.GroupId)?.Name;
     }
+
+    /// <summary>Cancels any in-flight icon loading when the window closes.</summary>
+    public void StopLoading() => _loadGeneration++;
 
     /// <summary>Set by the window.</summary>
     public Func<string, string, Task<bool>>? ConfirmAsync { get; set; }
@@ -62,44 +73,123 @@ public sealed partial class AppsViewModel : ObservableObject
 
     void Say(string text, StatusKind kind = StatusKind.Info) { Message = text; MessageBrush = Theme.For(kind); }
 
+    AppItem MakeItem(AppPackage pkg, string? label = null, string? meta = null)
+    {
+        var item = new AppItem(pkg, label, meta);
+        if (_iconCache.TryGetValue(pkg.Name, out var cached))
+        {
+            item.Icon = cached;
+            item.HasRealIcon = true;
+        }
+        else
+        {
+            item.Icon = RemoteAppIcons.LetterTile(item.Label, 64);
+        }
+        return item;
+    }
+
     public async Task LoadAsync()
     {
+        var generation = ++_loadGeneration;
         IsLoading = true;
         Say(Loc.T("Loading the app list…"));
         try
         {
             if (_s.Demo)
             {
-                string[] demo = ["com.whatsapp", "com.spotify.music", "org.mozilla.firefox", "com.google.android.youtube", "com.netflix.mediaclient", "de.db.navigator"];
-                _all = demo.Select(p => new AppItem(new AppPackage(p, p.Contains("netflix")))).ToList();
+                (string Pkg, string Label, string Meta, bool Disabled)[] demo =
+                [
+                    ("com.whatsapp", "WhatsApp", "v2.26.4 · 84 MB", false),
+                    ("com.spotify.music", "Spotify", "v9.0.18 · 61 MB", false),
+                    ("org.mozilla.firefox", "Firefox", "v136.0 · 112 MB", false),
+                    ("com.google.android.youtube", "YouTube", "v20.11 · 154 MB", false),
+                    ("com.netflix.mediaclient", "Netflix", "v8.141 · 73 MB", true),
+                    ("de.db.navigator", "DB Navigator", "v25.4 · 48 MB", false),
+                ];
+                _all = demo.Select(d => MakeItem(new AppPackage(d.Pkg, d.Disabled), d.Label, d.Meta))
+                    .OrderBy(a => a.Label, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                Show();
+                Say(Loc.F(ShowSystem ? "{0} apps including system apps. Double-click to open one." : "{0} apps you installed. Double-click to open one.", _all.Count));
+                return;
+            }
+
+            _serial ??= await _s.Directory!.ConnectAsync(_row);
+            if (generation != _loadGeneration) return;
+            if (_serial == null) { Say(Loc.F("Couldn't connect to {0}.", _row.Name), StatusKind.Error); return; }
+
+            List<DetailedAppPackage>? detailed = null;
+            DeviceHelperClient? helper = null;
+            if (_s.Helpers != null)
+            {
+                helper = await _s.Helpers.GetOrStartAsync(_serial, _row.Type == "Watch");
+                if (generation != _loadGeneration) return;
+                if (helper != null && helper.Supports("apps_detail"))
+                    try { detailed = await helper.GetDetailedAppsAsync(ShowSystem); } catch { }
+            }
+            if (generation != _loadGeneration) return;
+
+            if (detailed != null)
+            {
+                _all = detailed.Select(d =>
+                {
+                    var parts = new List<string>();
+                    if (!string.IsNullOrEmpty(d.VersionName)) parts.Add("v" + d.VersionName);
+                    if (d.ApkSizeBytes > 0) parts.Add(d.ApkSizeBytes >= 1024 * 1024 ? $"{d.ApkSizeBytes / (1024.0 * 1024.0):0.#} MB" : $"{d.ApkSizeBytes / 1024.0:0} KB");
+                    return MakeItem(new AppPackage(d.Package, d.Disabled), d.Label, string.Join(" · ", parts));
+                })
+                .OrderBy(a => a.Label, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(a => a.Package, StringComparer.OrdinalIgnoreCase)
+                .ToList();
             }
             else
             {
-                _serial ??= await _s.Directory!.ConnectAsync(_row);
-                if (_serial == null) { Say(Loc.F("Couldn't connect to {0}.", _row.Name), StatusKind.Error); return; }
-                List<DetailedAppPackage>? detailed = null;
-                if (_s.Helpers != null && await _s.Helpers.GetOrStartAsync(_serial, _row.Type == "Watch") is { } helper && helper.Supports("apps_detail"))
-                    try { detailed = await helper.GetDetailedAppsAsync(ShowSystem); } catch { }
-                if (detailed != null)
-                {
-                    _all = detailed.Select(d =>
-                    {
-                        var parts = new List<string>();
-                        if (!string.IsNullOrEmpty(d.VersionName)) parts.Add("v" + d.VersionName);
-                        if (d.ApkSizeBytes > 0) parts.Add(d.ApkSizeBytes >= 1024 * 1024 ? $"{d.ApkSizeBytes / (1024.0 * 1024.0):0.#} MB" : $"{d.ApkSizeBytes / 1024.0:0} KB");
-                        return new AppItem(new AppPackage(d.Package, d.Disabled), string.Join(" · ", parts));
-                    }).ToList();
-                }
-                else
-                {
-                    _all = (await _s.Adb!.GetPackagesAsync(_serial, ShowSystem)).Select(p => new AppItem(p)).ToList();
-                }
+                _all = (await _s.Adb!.GetPackagesAsync(_serial, ShowSystem))
+                    .Select(p => MakeItem(p))
+                    .OrderBy(a => a.Package, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
             }
+            if (generation != _loadGeneration) return;
             Show();
             Say(Loc.F(ShowSystem ? "{0} apps including system apps. Double-click to open one." : "{0} apps you installed. Double-click to open one.", _all.Count));
+            IsLoading = false;
+
+            // Load real app icons in the background (visible/filtered rows first so searching shows icons right away).
+            if (_all.Any(a => !a.HasRealIcon))
+                _ = LoadIconsAsync(_serial, generation);
         }
         catch (Exception ex) { Say(Loc.T("Couldn't read the app list: ") + ex.Message, StatusKind.Error); }
         finally { IsLoading = false; }
+    }
+
+    async Task LoadIconsAsync(string serial, int generation)
+    {
+        var first = true;
+        var attempted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        while (generation == _loadGeneration)
+        {
+            var visible = Apps.Where(a => !a.HasRealIcon && !attempted.Contains(a.Package)).Take(first ? 24 : 50).ToList();
+            var batch = visible.Count > 0 ? visible : _all.Where(a => !a.HasRealIcon && !attempted.Contains(a.Package)).Take(50).ToList();
+            if (batch.Count == 0) break;
+            first = false;
+            foreach (var a in batch) attempted.Add(a.Package);
+
+            Dictionary<string, (string Name, byte[] Png)>? icons = null;
+            if (_s.Helpers != null && await _s.Helpers.GetOrStartAsync(serial, _row.Type == "Watch") is { } h && h.Supports("icons"))
+                try { icons = await h.GetAppIconsAsync(64, batch.Select(a => a.Package)); } catch { }
+            icons ??= await _s.Adb!.GetAppIconsAsync(serial, 64, batch.Select(a => a.Package));
+            if (generation != _loadGeneration) return;
+
+            foreach (var a in batch)
+            {
+                if (icons.TryGetValue(a.Package, out var i) && RemoteAppIcons.FromPng(i.Png) is { } bmp)
+                {
+                    a.Icon = bmp;
+                    a.HasRealIcon = true;
+                    _iconCache[a.Package] = bmp;
+                }
+            }
+        }
     }
 
     void Show()
@@ -107,7 +197,10 @@ public sealed partial class AppsViewModel : ObservableObject
         var q = Filter.Trim();
         var keep = Selected?.Package;
         Apps.Clear();
-        foreach (var a in _all.Where(a => q.Length == 0 || a.Package.Contains(q, StringComparison.OrdinalIgnoreCase))) Apps.Add(a);
+        foreach (var a in _all.Where(a => q.Length == 0
+            || a.Label.Contains(q, StringComparison.OrdinalIgnoreCase)
+            || a.Package.Contains(q, StringComparison.OrdinalIgnoreCase)))
+            Apps.Add(a);
         Selected = Apps.FirstOrDefault(a => a.Package == keep);
     }
 
@@ -147,8 +240,9 @@ public sealed partial class AppsViewModel : ObservableObject
     async Task AddToRemoteApps()
     {
         if (_main.AddRemoteApp == null) return;
-        Say(Loc.F("Adding {0} to Remote apps…", Selected!.Package));
-        Say(await _main.AddRemoteApp(_row, Selected!.Package, null), StatusKind.Ok);
+        var a = Selected!;
+        Say(Loc.F("Adding {0} to Remote apps…", a.Label));
+        Say(await _main.AddRemoteApp(_row, a.Package, a.HasSeparateLabel ? a.Label : null), StatusKind.Ok);
     }
 
     [RelayCommand(CanExecute = nameof(HasSelected))]

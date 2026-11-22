@@ -27,5 +27,6 @@ public partial class AppsWindow : Window
                 return files.Select(f => f.TryGetLocalPath()).OfType<string>().ToList();
             };
         };
+        Closed += (_, _) => { if (DataContext is AppsViewModel vm) vm.StopLoading(); };
     }
 }

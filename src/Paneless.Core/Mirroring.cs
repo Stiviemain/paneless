@@ -251,7 +251,15 @@ public sealed partial class MirrorManager(ToolPaths tools)
             lock (writer) { if (!writerClosed) writer.WriteLine(e.Data); }
             // "[server] INFO: New display: 1080x1920/283 (id=163)"
             if (session != null && session.DisplayId == null && e.Data.Contains("New display") && DisplayIdRx.Match(e.Data) is { Success: true } m)
-                session.DisplayId = int.Parse(m.Groups[1].Value);
+            {
+                var displayId = int.Parse(m.Groups[1].Value);
+                session.DisplayId = displayId;
+                // On tablets with Desktop/Freeform mode (e.g. Xiaomi HyperOS, Samsung DeX), new virtual displays
+                // default to FREEFORM so apps open as tiny centered floating cards. Switching the virtual display
+                // immediately to WINDOWING_MODE_FULLSCREEN (1) makes every app fill the window edge-to-edge.
+                if (displayId > 0 && session.Kind is SessionKind.App or SessionKind.Screen)
+                    _ = EnsureDisplayFullscreenAsync(session, displayId);
+            }
         }
         p.OutputDataReceived += Append;
         p.ErrorDataReceived += Append;
@@ -290,6 +298,19 @@ public sealed partial class MirrorManager(ToolPaths tools)
     {
         try { await ProcessRunner.RunAsync(tools.Adb, ["-s", serial, "shell", "input", "keyevent", "KEYCODE_SLEEP"], TimeSpan.FromSeconds(5)); }
         catch { /* device already disconnected */ }
+    }
+
+    async Task EnsureDisplayFullscreenAsync(MirrorSession session, int displayId)
+    {
+        try
+        {
+            await ProcessRunner.RunAsync(tools.Adb, ["-s", session.Serial, "shell", "wm", "set-display-windowing-mode", "-d", displayId.ToString(), "1"], TimeSpan.FromSeconds(5));
+            // Re-apply once briefly after launch in case the virtual display's task area finished initializing late.
+            await Task.Delay(900);
+            if (session.IsRunning)
+                await ProcessRunner.RunAsync(tools.Adb, ["-s", session.Serial, "shell", "wm", "set-display-windowing-mode", "-d", displayId.ToString(), "1"], TimeSpan.FromSeconds(5));
+        }
+        catch { /* older Android builds without set-display-windowing-mode ignore this safely */ }
     }
 
     /// <summary>Opens the window's log. If the usual file is still held by a window that's closing, uses log-2, log-3, ….</summary>

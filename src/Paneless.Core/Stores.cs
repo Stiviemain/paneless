@@ -93,11 +93,24 @@ public static class JsonFile
 
 public sealed class DataStore
 {
-    public Dictionary<string, KnownDevice> Known { get; } = JsonFile.Load<Dictionary<string, KnownDevice>>("known-devices.json");
-    public AppSettings Settings { get; } = JsonFile.Load<AppSettings>("settings.json");
-    public Dictionary<string, UnlockEntry> Unlock { get; } = JsonFile.Load<Dictionary<string, UnlockEntry>>("unlock-codes.json");
+    readonly bool _persist;
 
-    public void SaveKnown() => JsonFile.Save("known-devices.json", Known);
-    public void SaveSettings() => JsonFile.Save("settings.json", Settings);
-    public void SaveUnlock() => JsonFile.Save("unlock-codes.json", Unlock);
+    public DataStore() : this(load: true, persist: true) { }
+
+    /// <summary>For isolated tests: starts empty in memory and never touches the data folder.</summary>
+    public DataStore(bool load, bool persist)
+    {
+        _persist = persist;
+        Known = load ? JsonFile.Load<Dictionary<string, KnownDevice>>("known-devices.json") : new();
+        Settings = load ? JsonFile.Load<AppSettings>("settings.json") : new();
+        Unlock = load ? JsonFile.Load<Dictionary<string, UnlockEntry>>("unlock-codes.json") : new();
+    }
+
+    public Dictionary<string, KnownDevice> Known { get; }
+    public AppSettings Settings { get; }
+    public Dictionary<string, UnlockEntry> Unlock { get; }
+
+    public void SaveKnown() { if (_persist) JsonFile.Save("known-devices.json", Known); }
+    public void SaveSettings() { if (_persist) JsonFile.Save("settings.json", Settings); }
+    public void SaveUnlock() { if (_persist) JsonFile.Save("unlock-codes.json", Unlock); }
 }

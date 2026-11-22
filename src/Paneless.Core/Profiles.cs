@@ -115,6 +115,13 @@ public sealed class ProfileStore
     public DeviceProfile? Get(string id) => _profiles.GetValueOrDefault(id);
     public DeviceProfile GetOrCreate(string id) => _profiles.TryGetValue(id, out var p) ? p : _profiles[id] = new DeviceProfile();
 
+    public void ReplaceAll(IReadOnlyDictionary<string, DeviceProfile> profiles)
+    {
+        _profiles.Clear();
+        foreach (var (k, v) in profiles) _profiles[k] = v;
+        Save();
+    }
+
     public void Save()
     {
         foreach (var k in _profiles.Where(kv => kv.Value.IsEmpty).Select(kv => kv.Key).ToList()) _profiles.Remove(k);

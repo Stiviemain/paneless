@@ -42,8 +42,11 @@ public sealed class KeymapData
 public sealed class KeymapStore
 {
     const string File = "keymaps.json";
-    public KeymapData Data { get; } = JsonFile.Load<KeymapData>(File);
-    public void Save() => JsonFile.Save(File, Data);
+    readonly bool _persist;
+    public KeymapStore() : this(JsonFile.Load<KeymapData>(File), persist: true) { }
+    public KeymapStore(KeymapData data, bool persist) { Data = data; _persist = persist; }
+    public KeymapData Data { get; }
+    public void Save() { if (_persist) JsonFile.Save(File, Data); }
 
     public KeymapProfile? ProfileFor(string? sn) =>
         sn != null && Data.ActiveProfile.TryGetValue(sn, out var id) ? Data.Profiles.FirstOrDefault(p => p.Id == id) : null;
