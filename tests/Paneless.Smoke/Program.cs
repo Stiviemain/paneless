@@ -462,7 +462,7 @@ if (args.Contains("--remote-apps"))
     var quality = new MirrorOptions(false, true, false, true, null, "h265", 300, 60);
     var app = new RemoteApp { Package = "com.example.chat", Name = "Chat" };
     var a = app.ScrcpyArgs("Chat – Pixel", quality);
-    Check(a.Contains("--new-display=1080x1920") && a.Contains("--start-app=com.example.chat") && a.Contains("--flex-display") && a.Contains("--no-vd-system-decorations")
+    Check(a.Contains("--new-display=1080x1920") && a.Contains("--start-app=com.example.chat") && a.Contains("--flex-display") && a.Contains("--render-fit=letterbox") && a.Contains("--no-vd-system-decorations")
           && a.Contains("--display-ime-policy=hide") && a.Contains("--turn-screen-off") && a.Contains("--video-bit-rate=200M") && a.Contains("--max-fps=60") && a.Contains("--keep-active")
           && !a.Any(x => x.StartsWith("--window-x")) && a[0] == "--window-title" && a[1] == "Chat – Pixel", "a phone app: tall screen, PC keyboard, device screen off");
     app.Shape = "tablet"; app.PcKeyboardOnly = false; app.ScreenOff = false; app.OnTop = true;
@@ -471,8 +471,8 @@ if (args.Contains("--remote-apps"))
     Check(a.Contains("--new-display=1920x1200") && !a.Contains("--display-ime-policy=hide") && !a.Contains("--turn-screen-off") && a.Contains("--always-on-top"), "a tablet app: wide screen, options off");
     app.Window = new WindowPlace { X = -8, Y = 40, W = 500, H = 1000 };
     a = app.ScrcpyArgs("t", quality);
-    Check(a.Contains("--new-display=1200x2400") && a.Contains("--window-x=0") && a.Contains("--window-y=40") && a.Contains("--window-width=500") && a.Contains("--window-height=1000"),
-          "a remembered window: same place and shape");
+    Check(a.Contains("--new-display=500x1000") && a.Contains("--render-fit=letterbox") && a.Contains("--window-x=0") && a.Contains("--window-y=40") && a.Contains("--window-width=500") && a.Contains("--window-height=1000"),
+          "a remembered window: same place and exact display size");
     app.Window = null; app.Shape = "custom"; app.CustomWidth = 99999; app.CustomHeight = 801;
     Check(app.ScrcpyArgs("t", quality).Contains("--new-display=3840x800"), "a custom size is kept within limits and even");
     Check(RemoteApp.ShortcutFileName("Chat: \"work\" / home?") == "Chat   work    home.lnk" && RemoteApp.ShortcutFileName("...") == "App.lnk"

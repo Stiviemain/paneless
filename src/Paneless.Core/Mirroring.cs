@@ -88,7 +88,7 @@ public sealed partial class MirrorManager(ToolPaths tools)
     public MirrorSession StartApp(string serial, string name, string package, MirrorOptions o)
     {
         var title = $"{name} – {package}";
-        var args = new List<string> { "--window-title", title, "--new-display=1080x1920", "--flex-display", "--start-app=" + package, "--no-audio" };
+        var args = new List<string> { "--window-title", title, "--new-display=1080x1920", "--flex-display", "--render-fit=letterbox", "--start-app=" + package, "--no-audio" };
         args.AddRange(Quality(o with { MaxSize = null }));
         if (o.KeepScreensOn) args.Add("--keep-active");
         if (o.ScreenOff) args.Add("--turn-screen-off");
@@ -108,14 +108,14 @@ public sealed partial class MirrorManager(ToolPaths tools)
     /// <summary>The running window of a remote app, if it's open.</summary>
     public MirrorSession? RemoteAppSession(string id)
     {
-        lock (_lock) return _sessions.FirstOrDefault(s => s.IsRunning && s.RemoteAppId == id);
+        lock (_lock) return _sessions.FirstOrDefault(s => s.IsRunning && !s.StoppedByUs && s.RemoteAppId == id);
     }
 
     /// <summary>A second, resizable screen of the device (with its launcher), next to its own screen.</summary>
     public MirrorSession StartScreen(string serial, string name, MirrorOptions o)
     {
         var title = $"{name} – second screen";
-        var args = new List<string> { "--window-title", title, "--new-display=1600x1000", "--flex-display", "--no-audio" };
+        var args = new List<string> { "--window-title", title, "--new-display=1600x1000", "--flex-display", "--render-fit=letterbox", "--no-audio" };
         args.AddRange(Quality(o with { MaxSize = null }));
         if (o.KeepScreensOn) args.Add("--keep-active");
         if (o.ScreenOff) args.Add("--turn-screen-off");

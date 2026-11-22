@@ -945,6 +945,7 @@
   "{0} app": "{0} app",
   "{0} apps": "{0} apps",
   "{0} apps including system apps. Double-click to open one.": "{0} apps, apps système comprises. Double-cliquez pour en ouvrir une.",
+  "{0} apps on {1} (loading icons…). Pick one and click Add.": "{0} apps sur {1} (chargement des icônes…). Choisissez-en une et cliquez sur Ajouter.",
   "{0} apps on {1} (names and icons couldn't be read). Pick one and click Add.": "{0} apps sur {1} (noms et icônes illisibles). Choisissez-en une et cliquez sur Ajouter.",
   "{0} apps on {1}. Pick one and click Add.": "{0} apps sur {1}. Choisissez-en une et cliquez sur Ajouter.",
   "{0} apps you installed. Double-click to open one.": "{0} apps que vous avez installées. Double-cliquez pour en ouvrir une.",

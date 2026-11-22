@@ -814,21 +814,28 @@ public sealed partial class MainViewModel : ObservableObject
 
     public string DeviceNameFor(RemoteApp app) => RowFor(app)?.Name ?? _s.KnownFor(app.DeviceId)?.Name ?? app.DeviceId;
 
+    readonly HashSet<string> _openingRemoteApps = new();
+
     /// <summary>Opens a remote app in its own window, or brings it to the front if it's open. Null if it opened, else why not.</summary>
     public async Task<string?> OpenRemoteAppAsync(RemoteApp app)
     {
         if (_s.Mirrors?.RemoteAppSession(app.Id) is { } open) { BringToFront?.Invoke(open); return null; }
-        var r = RowFor(app);
-        string? why = r == null ? Loc.F("{0} isn't on the network.", DeviceNameFor(app))
-            : !r.CanMirror ? Loc.F("{0} can't be reached right now ({1}).", r.Name, Theme.Look(r.State).Text) : null;
-        if (why != null) { SetStatus(Loc.F("Can't open {0}: {1}", app.Name, why), StatusKind.Warn); return why; }
-        if (_s.Demo) { SetStatus(Loc.F("Demo mode: would open {0} of {1}.", app.Name, r!.Name), StatusKind.Ok); return null; }
-        var title = $"{app.Name} – {r!.Name}";
-        var session = await StartWindowAsync(r, app.Name, serial => _s.Mirrors!.StartRemoteApp(serial, app, title, Options(r)),
-            unlock: true, toolbar: app.ShowToolbar, screenOff: app.ScreenOff);
-        if (session == null) return StatusText;
-        RemoteAppStarted?.Invoke(session, app);
-        return null;
+        if (!_openingRemoteApps.Add(app.Id)) return null;
+        try
+        {
+            var r = RowFor(app);
+            string? why = r == null ? Loc.F("{0} isn't on the network.", DeviceNameFor(app))
+                : !r.CanMirror ? Loc.F("{0} can't be reached right now ({1}).", r.Name, Theme.Look(r.State).Text) : null;
+            if (why != null) { SetStatus(Loc.F("Can't open {0}: {1}", app.Name, why), StatusKind.Warn); return why; }
+            if (_s.Demo) { SetStatus(Loc.F("Demo mode: would open {0} of {1}.", app.Name, r!.Name), StatusKind.Ok); return null; }
+            var title = $"{app.Name} – {r!.Name}";
+            var session = await StartWindowAsync(r, app.Name, serial => _s.Mirrors!.StartRemoteApp(serial, app, title, Options(r)),
+                unlock: true, toolbar: app.ShowToolbar, screenOff: app.ScreenOff);
+            if (session == null) return StatusText;
+            RemoteAppStarted?.Invoke(session, app);
+            return null;
+        }
+        finally { _openingRemoteApps.Remove(app.Id); }
     }
 
     /// <summary>A shortcut asked for a remote app (Paneless may have just started): waits up to 20 s for its device to

@@ -38,15 +38,14 @@ public sealed class RemoteApp
     /// <summary>The scrcpy options for this app's window (after "-s serial").</summary>
     public List<string> ScrcpyArgs(string title, MirrorOptions quality)
     {
-        var (w, h) = DisplaySize();
-        if (Window is { W: > 100, H: > 100 } place)
-        {
-            // Same shape as the remembered window, so the app doesn't start letterboxed.
-            var shorter = Math.Min(w, h);
-            (w, h) = place.W <= place.H ? (shorter, (int)Math.Round(shorter * (double)place.H / place.W)) : ((int)Math.Round(shorter * (double)place.W / place.H), shorter);
-        }
-        var args = new List<string> { "--window-title", title, $"--new-display={w & ~1}x{h & ~1}", "--flex-display", "--start-app=" + Package, "--no-audio",
-            "--no-vd-system-decorations" };
+        var (w, h) = Window is { W: > 100, H: > 100 } place
+            ? (Math.Clamp(place.W, 320, 3840), Math.Clamp(place.H, 320, 3840))
+            : DisplaySize();
+        // --flex-display defaults scrcpy's render-fit to "unscaled" (cropping whenever the window is smaller than the
+        // virtual display, e.g. clamped to the monitor or scaled on HiDPI). "letterbox" keeps the whole app visible
+        // immediately, while --flex-display still adapts the display to match the window on resize.
+        var args = new List<string> { "--window-title", title, $"--new-display={w & ~1}x{h & ~1}", "--flex-display", "--render-fit=letterbox",
+            "--start-app=" + Package, "--no-audio", "--no-vd-system-decorations" };
         if (PcKeyboardOnly) args.Add("--display-ime-policy=hide");
         args.Add("--video-codec=" + quality.VideoCodec);
         args.Add($"--video-bit-rate={Math.Clamp(quality.BitrateMbps, 1, 200)}M");
@@ -113,22 +112,29 @@ public sealed partial class AdbClient
     const string HelperRemote = "/data/local/tmp/paneless-helper.jar";
     const string HelperRun = "CLASSPATH=" + HelperRemote + " app_process / app.paneless.helper.Main";
     readonly HashSet<string> _helperPushed = new();
+    readonly SemaphoreSlim _helperLock = new(1, 1);
 
     async Task<bool> PushHelperAsync(string serial)
     {
         lock (_helperPushed) if (_helperPushed.Contains(serial)) return true;
-        var local = Path.Combine(Path.GetTempPath(), "paneless", "paneless-helper.jar");
-        Directory.CreateDirectory(Path.GetDirectoryName(local)!);
-        using (var res = Assembly.GetExecutingAssembly().GetManifestResourceStream("Paneless.Core.paneless-helper.jar"))
+        await _helperLock.WaitAsync();
+        try
         {
-            if (res == null) return false;
-            using var f = File.Create(local);
-            await res.CopyToAsync(f);
+            lock (_helperPushed) if (_helperPushed.Contains(serial)) return true;
+            var local = Path.Combine(Path.GetTempPath(), "paneless", "paneless-helper.jar");
+            Directory.CreateDirectory(Path.GetDirectoryName(local)!);
+            using (var res = Assembly.GetExecutingAssembly().GetManifestResourceStream("Paneless.Core.paneless-helper.jar"))
+            {
+                if (res == null) return false;
+                using var f = File.Create(local);
+                await res.CopyToAsync(f);
+            }
+            var r = await RunAsync(TimeSpan.FromSeconds(20), "-s", serial, "push", local, HelperRemote);
+            if (!r.Ok) return false;
+            lock (_helperPushed) _helperPushed.Add(serial);
+            return true;
         }
-        var r = await RunAsync(TimeSpan.FromSeconds(20), "-s", serial, "push", local, HelperRemote);
-        if (!r.Ok) return false;
-        lock (_helperPushed) _helperPushed.Add(serial);
-        return true;
+        finally { _helperLock.Release(); }
     }
 
     /// <summary>Every app with a launcher icon, with its name; null if the helper couldn't run.</summary>
@@ -146,7 +152,7 @@ public sealed partial class AdbClient
     {
         var result = new Dictionary<string, (string, byte[])>();
         if (!await PushHelperAsync(serial)) return result;
-        foreach (var chunk in packages.Where(IsPackageName).Distinct().Chunk(25))
+        foreach (var chunk in packages.Where(IsPackageName).Distinct().Chunk(60))
         {
             var r = await ShellAsync(serial, $"{HelperRun} icons {size} {string.Join(' ', chunk)}", TimeSpan.FromSeconds(60));
             foreach (var (pkg, name, png) in ParseIcons(r.Output)) result[pkg] = (name, png);

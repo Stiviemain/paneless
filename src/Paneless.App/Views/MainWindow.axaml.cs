@@ -263,6 +263,11 @@ public partial class MainWindow : Window
     {
         var open = new Dictionary<MirrorSession, (RemoteApp App, int Dressed)>();
         vm.RemoteAppStarted = (session, app) => { open[session] = (app, 0); RemoteApps?.UpdateStates(); };
+        if (_services?.Mirrors != null)
+            _services.Mirrors.Failed += (session, why) => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                if (session.RemoteAppId != null && !IsVisible) Toast.Show(session.Name, why);
+            });
         var timer = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         timer.Tick += (_, _) =>
         {

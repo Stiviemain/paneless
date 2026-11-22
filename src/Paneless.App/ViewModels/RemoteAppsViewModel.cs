@@ -104,6 +104,7 @@ public sealed partial class AddableApp(string package, string name, bool added) 
     public string Name { get; } = name;
     public bool Added { get; } = added;
     public string Note => Added ? Loc.T("added") : Package;
+    internal bool HasRealIcon { get; set; }
     [ObservableProperty] public partial Bitmap? Icon { get; set; }
 }
 
@@ -112,8 +113,10 @@ public sealed partial class RemoteAppsViewModel : ObservableObject
 {
     readonly AppServices _s;
     readonly MainViewModel _main;
+    readonly Dictionary<(string DeviceId, string Package), Bitmap> _iconCache = new();
     List<AddableApp> _addAll = [];
     int _loadGeneration;
+    bool _opening;
 
     public static readonly IReadOnlyList<ShapeChoice> Shapes =
     [
@@ -131,6 +134,13 @@ public sealed partial class RemoteAppsViewModel : ObservableObject
         Selected = Items.FirstOrDefault();
         UpdateStates();
         _main.DevicesChanged += UpdateStates;
+        if (_s.Mirrors != null)
+            _s.Mirrors.Failed += (session, why) => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                if (session.RemoteAppId == null) return;
+                Say(Loc.F("Can't open {0}: {1}", session.Name, why), StatusKind.Error);
+                UpdateStates();
+            });
     }
 
     /// <summary>Set by the window.</summary>
@@ -169,17 +179,27 @@ public sealed partial class RemoteAppsViewModel : ObservableObject
         }
     }
 
-    bool CanAct() => Selected != null;
+    bool CanAct() => Selected != null && !_opening;
 
     [RelayCommand(CanExecute = nameof(CanAct))]
     async Task Open()
     {
-        var item = Selected!;
-        Say(Loc.F("Opening {0}…", item.App.Name));
-        var why = await _main.OpenRemoteAppAsync(item.App);
-        if (why != null) Say(Loc.F("Can't open {0}: {1}", item.App.Name, why), StatusKind.Warn);
-        else Say(_s.Demo ? Loc.F("Demo mode: would open {0}.", item.App.Name) : Loc.F("{0} is open in its own window.", item.App.Name), StatusKind.Ok);
-        UpdateStates();
+        if (_opening || Selected is not { } item) return;
+        _opening = true;
+        OpenCommand.NotifyCanExecuteChanged();
+        try
+        {
+            Say(Loc.F("Opening {0}…", item.App.Name));
+            var why = await _main.OpenRemoteAppAsync(item.App);
+            if (why != null) Say(Loc.F("Can't open {0}: {1}", item.App.Name, why), StatusKind.Warn);
+            else Say(_s.Demo ? Loc.F("Demo mode: would open {0}.", item.App.Name) : Loc.F("{0} is open in its own window.", item.App.Name), StatusKind.Ok);
+            UpdateStates();
+        }
+        finally
+        {
+            _opening = false;
+            OpenCommand.NotifyCanExecuteChanged();
+        }
     }
 
     /// <summary>Opens a remote app from the list by double-click.</summary>
@@ -339,20 +359,57 @@ public sealed partial class RemoteAppsViewModel : ObservableObject
             // The helper couldn't run: fall back to the package names of the apps you installed.
             apps ??= (await _s.Adb.GetPackagesAsync(serial, false)).Select(p => new LauncherApp(p.Name, p.Name)).ToList();
             if (generation != _loadGeneration) return;
-            _addAll = apps.Select(a => new AddableApp(a.Package, a.Name, Added(a.Package)) { Icon = RemoteAppIcons.LetterTile(a.Name, 64) }).ToList();
-            ShowAddApps();
-            AddMessage = namesKnown ? Loc.F("{0} apps on {1}. Pick one and click Add.", _addAll.Count, row.Name)
-                : Loc.F("{0} apps on {1} (names and icons couldn't be read). Pick one and click Add.", _addAll.Count, row.Name);
-            IsLoadingApps = false;
-            if (!namesKnown) return;
-            // Icons arrive in batches, so the list is usable right away.
-            foreach (var chunk in _addAll.Chunk(25))
+            _addAll = apps.Select(a =>
             {
-                var icons = await _s.Adb.GetAppIconsAsync(serial, 64, chunk.Select(a => a.Package));
-                if (generation != _loadGeneration) return;
-                foreach (var a in chunk)
-                    if (icons.TryGetValue(a.Package, out var i) && RemoteAppIcons.FromPng(i.Png) is { } bmp) a.Icon = bmp;
+                var cached = _iconCache.GetValueOrDefault((row.GroupId, a.Package));
+                return new AddableApp(a.Package, a.Name, Added(a.Package))
+                {
+                    Icon = cached ?? RemoteAppIcons.LetterTile(a.Name, 64),
+                    HasRealIcon = cached != null,
+                };
+            }).ToList();
+            ShowAddApps();
+            if (!namesKnown)
+            {
+                AddMessage = Loc.F("{0} apps on {1} (names and icons couldn't be read). Pick one and click Add.", _addAll.Count, row.Name);
+                IsLoadingApps = false;
+                return;
             }
+            var pending = _addAll.Where(a => !a.HasRealIcon).ToList();
+            if (pending.Count == 0)
+            {
+                AddMessage = Loc.F("{0} apps on {1}. Pick one and click Add.", _addAll.Count, row.Name);
+                IsLoadingApps = false;
+                return;
+            }
+            AddMessage = Loc.F("{0} apps on {1} (loading icons…). Pick one and click Add.", _addAll.Count, row.Name);
+            IsLoadingApps = false;
+
+            // Load visible/searched apps first (fast ~1.5 s batch of 20), then the rest in larger batches of 60 so
+            // typing in Search gets real icons almost immediately instead of waiting for A..Z.
+            var first = true;
+            var attempted = new HashSet<string>();
+            while (generation == _loadGeneration)
+            {
+                var visible = AddApps.Where(a => !a.HasRealIcon && !attempted.Contains(a.Package)).Take(first ? 20 : 60).ToList();
+                var batch = visible.Count > 0 ? visible : _addAll.Where(a => !a.HasRealIcon && !attempted.Contains(a.Package)).Take(60).ToList();
+                if (batch.Count == 0) break;
+                first = false;
+                foreach (var a in batch) attempted.Add(a.Package);
+                var icons = await _s.Adb.GetAppIconsAsync(serial, 64, batch.Select(a => a.Package));
+                if (generation != _loadGeneration) return;
+                foreach (var a in batch)
+                {
+                    if (icons.TryGetValue(a.Package, out var i) && RemoteAppIcons.FromPng(i.Png) is { } bmp)
+                    {
+                        a.Icon = bmp;
+                        a.HasRealIcon = true;
+                        _iconCache[(row.GroupId, a.Package)] = bmp;
+                    }
+                }
+            }
+            if (generation == _loadGeneration)
+                AddMessage = Loc.F("{0} apps on {1}. Pick one and click Add.", _addAll.Count, row.Name);
         }
         catch (Exception ex) { if (generation == _loadGeneration) AddMessage = Loc.T("Couldn't read the app list: ") + ex.Message; }
         finally { if (generation == _loadGeneration) IsLoadingApps = false; }
