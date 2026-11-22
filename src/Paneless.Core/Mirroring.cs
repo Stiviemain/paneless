@@ -79,6 +79,7 @@ public sealed partial class MirrorManager(ToolPaths tools)
         if (o.ScreenOff) args.Add("--turn-screen-off");
         if (!o.Audio) args.Add("--no-audio");
         if (o.OnTop) args.Add("--always-on-top");
+        if (o.KeepAwake || o.ScreenOff) args.Add("--keep-active");
         if ((o.KeepAwake || o.ScreenOff) && !HasDisplaySession(serial)) args.Add("--screen-off-timeout=3600");
         return StartCore(serial, name, SessionKind.Mirror, args, lockOnClose: o.LockOnClose);
     }

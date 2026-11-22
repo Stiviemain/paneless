@@ -344,8 +344,8 @@ public partial class MainWindow : Window
     [System.Runtime.Versioning.SupportedOSPlatform("windows")]
     void TrackRemoteApps(MainViewModel vm)
     {
-        var open = new Dictionary<MirrorSession, (RemoteApp App, int Dressed)>();
-        vm.RemoteAppStarted = (session, app) => { open[session] = (app, 0); RemoteApps?.UpdateStates(); };
+        var open = new Dictionary<MirrorSession, (RemoteApp App, int Dressed, int LastW, int LastH)>();
+        vm.RemoteAppStarted = (session, app) => { open[session] = (app, 0, 0, 0); RemoteApps?.UpdateStates(); };
         if (_services?.Mirrors != null)
             _services.Mirrors.Failed += (session, why) => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
@@ -355,7 +355,7 @@ public partial class MainWindow : Window
         timer.Tick += (_, _) =>
         {
             if (open.Count == 0) return;
-            foreach (var (session, (app, dressed)) in open.ToList())
+            foreach (var (session, (app, dressed, lastW, lastH)) in open.ToList())
             {
                 if (!session.IsRunning)
                 {
@@ -380,9 +380,29 @@ public partial class MainWindow : Window
                     }
                     catch { /* cosmetic: the app works without it */ }
                 }
-                open[session] = (app, Math.Min(dressed + 1, 5));
+                int curW = lastW, curH = lastH;
                 if (!Platform.Win32.IsIconic(h) && Platform.Win32.ClientBounds(h) is { } c && c.Right - c.Left > 100 && c.Bottom - c.Top > 100)
-                    app.Window = new WindowPlace { X = c.Left, Y = c.Top, W = c.Right - c.Left, H = c.Bottom - c.Top };
+                {
+                    curW = c.Right - c.Left;
+                    curH = c.Bottom - c.Top;
+                    app.Window = new WindowPlace { X = c.Left, Y = c.Top, W = curW, H = curH };
+                }
+                // On tablets with Desktop/Freeform mode (e.g. Xiaomi HyperOS), force the virtual display & task
+                // to fill the entire window once the display appears and whenever the window is resized.
+                var resized = lastW > 0 && (Math.Abs(curW - lastW) > 12 || Math.Abs(curH - lastH) > 12);
+                if (session.DisplayId is { } did && did > 0 && (dressed is 0 or 2 || resized) && _services?.Helpers != null)
+                {
+                    var serial = session.Serial;
+                    var pkg = app.Package;
+                    var w = curW; var ht = curH;
+                    _ = Task.Run(async () =>
+                    {
+                        var helper = await _services.Helpers.GetOrStartAsync(serial);
+                        if (helper != null && helper.Supports("display_fullscreen"))
+                            try { await helper.EnsureDisplayFullscreenAsync(did, pkg, w, ht); } catch { }
+                    });
+                }
+                open[session] = (app, Math.Min(dressed + 1, 5), curW, curH);
             }
         };
         timer.Start();

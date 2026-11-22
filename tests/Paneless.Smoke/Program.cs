@@ -121,6 +121,19 @@ if (args.Contains("--groups"))
     var wallBack = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(wallJson)!.Wall;
     Check(wallBack.Width == 260 && wallBack.Order.SequenceEqual(["x"]) && wallBack.IsHidden("y"), "wall: layout is saved with the settings");
 
+    // 10. UnlockService.ParseLockInfo: virtual displays listed before Display 0 must not shadow Display 0's lock screen focus.
+    var multiDisplayLock = """
+        User "User" (id=0) (current): deviceLocked=1
+          Display: mDisplayId=243 (organized)
+          mCurrentFocus=null
+          Display: mDisplayId=244 (organized)
+          mCurrentFocus=Window{7c140ca u0 com.android.settings/com.android.settings.Settings}
+          Display: mDisplayId=0 (organized)
+          mCurrentFocus=Window{e3b79ba u0 NotificationShade}
+        """;
+    var parsedLock = UnlockService.ParseLockInfo(multiDisplayLock);
+    Check(parsedLock.Locked == true && parsedLock.OnLockScreen, "UnlockService reads Display 0 focus even when virtual displays appear first");
+
     return okAll ? 0 : 1;
 }
 
@@ -464,20 +477,20 @@ if (args.Contains("--remote-apps"))
     var quality = new MirrorOptions(false, true, false, true, null, "h265", 300, 60);
     var app = new RemoteApp { Package = "com.example.chat", Name = "Chat" };
     var a = app.ScrcpyArgs("Chat – Pixel", quality);
-    Check(a.Contains("--new-display=1080x1920") && a.Contains("--start-app=com.example.chat") && a.Contains("--flex-display") && a.Contains("--render-fit=letterbox") && a.Contains("--no-vd-system-decorations")
+    Check(a.Contains("--new-display=1080x1920/400") && a.Contains("--start-app=com.example.chat") && a.Contains("--flex-display") && a.Contains("--render-fit=letterbox") && a.Contains("--no-vd-system-decorations")
           && a.Contains("--display-ime-policy=hide") && a.Contains("--turn-screen-off") && a.Contains("--video-bit-rate=200M") && a.Contains("--max-fps=60") && a.Contains("--keep-active")
-          && !a.Any(x => x.StartsWith("--window-x")) && a[0] == "--window-title" && a[1] == "Chat – Pixel", "a phone app: tall screen, PC keyboard, device screen off");
+          && !a.Any(x => x.StartsWith("--window-x")) && a[0] == "--window-title" && a[1] == "Chat – Pixel", "a phone app: tall screen with phone DPI, PC keyboard, device screen off");
     app.Shape = "tablet"; app.PcKeyboardOnly = false; app.ScreenOff = false; app.OnTop = true;
     a = app.ScrcpyArgs("t", quality);
     Check(!app.ScrcpyArgs("t", quality with { KeepScreensOn = false }).Contains("--keep-active"), "a remote app keeps its screen on while the device is locked, unless switched off");
-    Check(a.Contains("--new-display=1920x1200") && !a.Contains("--display-ime-policy=hide") && !a.Contains("--turn-screen-off") && a.Contains("--always-on-top"), "a tablet app: wide screen, options off");
+    Check(a.Contains("--new-display=1920x1200/240") && !a.Contains("--display-ime-policy=hide") && !a.Contains("--turn-screen-off") && a.Contains("--always-on-top"), "a tablet app: wide screen with tablet DPI, options off");
     app.Window = new WindowPlace { X = -8, Y = 40, W = 500, H = 1000 };
     a = app.ScrcpyArgs("t", quality);
-    Check(a.Contains("--new-display=500x1000") && a.Contains("--render-fit=letterbox") && a.Contains("--window-x=0") && a.Contains("--window-y=40")
+    Check(a.Any(x => x.StartsWith("--new-display=500x1000/")) && a.Contains("--render-fit=letterbox") && a.Contains("--window-x=0") && a.Contains("--window-y=40")
           && !a.Any(x => x.StartsWith("--window-width") || x.StartsWith("--window-height")),
-          "a remembered window: same place and exact display size (no --window-width/height with --flex-display)");
+          "a remembered window: same place and exact display size with natural DPI (no --window-width/height with --flex-display)");
     app.Window = null; app.Shape = "custom"; app.CustomWidth = 99999; app.CustomHeight = 801;
-    Check(app.ScrcpyArgs("t", quality).Contains("--new-display=3840x800"), "a custom size is kept within limits and even");
+    Check(app.ScrcpyArgs("t", quality).Any(x => x.StartsWith("--new-display=3840x800/")), "a custom size is kept within limits and even");
     Check(RemoteApp.ShortcutFileName("Chat: \"work\" / home?") == "Chat   work    home.lnk" && RemoteApp.ShortcutFileName("...") == "App.lnk"
           && RemoteApp.ShortcutFileName(new string('x', 200)).Length == 84, "shortcut file names are safe for Windows");
 

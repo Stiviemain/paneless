@@ -35,16 +35,30 @@ public sealed class RemoteApp
         _ => (1080, 1920),
     };
 
+    /// <summary>Natural display density (DPI) for a virtual screen of <paramref name="w"/>×<paramref name="h"/> pixels:
+    /// scrcpy defaults virtual displays to 160 dpi, which makes 1080×1920 look like a giant 1080dp desktop monitor
+    /// (tiny UI, and triggers FREEFORM floating windows on tablets). Scaling to ~412 dp for phone shape and ~800 dp
+    /// for tablet shape keeps app text and layouts crisp and full-size.</summary>
+    public int DisplayDpi(int w, int h)
+    {
+        var shortSide = Math.Min(w, h);
+        var isTablet = Shape == "tablet" || (Shape == "custom" && w >= h);
+        var targetDp = isTablet ? 800.0 : 412.0;
+        var raw = (int)Math.Round(shortSide * 160.0 / targetDp);
+        return Math.Clamp((raw / 20) * 20, 160, isTablet ? 320 : 440);
+    }
+
     /// <summary>The scrcpy options for this app's window (after "-s serial").</summary>
     public List<string> ScrcpyArgs(string title, MirrorOptions quality)
     {
         var (w, h) = Window is { W: > 100, H: > 100 } place
             ? (Math.Clamp(place.W, 320, 3840), Math.Clamp(place.H, 320, 3840))
             : DisplaySize();
+        var dpi = DisplayDpi(w, h);
         // --flex-display defaults scrcpy's render-fit to "unscaled" (cropping whenever the window is smaller than the
         // virtual display, e.g. clamped to the monitor or scaled on HiDPI). "letterbox" keeps the whole app visible
         // immediately, while --flex-display still adapts the display to match the window on resize.
-        var args = new List<string> { "--window-title", title, $"--new-display={w & ~1}x{h & ~1}", "--flex-display", "--render-fit=letterbox",
+        var args = new List<string> { "--window-title", title, $"--new-display={w & ~1}x{h & ~1}/{dpi}", "--flex-display", "--render-fit=letterbox",
             "--start-app=" + Package, "--no-audio", "--no-vd-system-decorations" };
         if (PcKeyboardOnly) args.Add("--display-ime-policy=hide");
         args.Add("--video-codec=" + quality.VideoCodec);

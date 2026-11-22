@@ -601,8 +601,14 @@ public sealed partial class MainViewModel : ObservableObject
         if (_s.Unlock!.IsReady(r.Sn))
         {
             SetStatus(Loc.F("Unlocking {0}…", r.Name));
-            var res = await _s.Unlock.UnlockAsync(serial, r.Sn!, r.Name, wakeIfUnlocked: !opts.ScreenOff);
+            var res = await _s.Unlock.UnlockAsync(serial, r.Sn!, r.Name, wakeIfUnlocked: true);
             if (!res.Ok) note = res.Message;
+        }
+        else if (await _s.Adb!.IsScreenOnAsync(serial) == false)
+        {
+            // Android 17 Pixels in DOZE/OFF state send black frames to Display 0 until explicitly woken.
+            await _s.Adb.ShellAsync(serial, "input keyevent KEYCODE_WAKEUP", TimeSpan.FromSeconds(5));
+            await Task.Delay(350);
         }
         var session = _s.Mirrors!.Start(serial, r.Name, opts);
         MirrorStarted?.Invoke(session, r);

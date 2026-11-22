@@ -546,6 +546,14 @@ public sealed class DeviceHelperClient : IAsyncDisposable
         return CallAsync("launch_intent", args, timeout: TimeSpan.FromSeconds(10), ct: ct);
     }
 
+    public async Task<bool> EnsureDisplayFullscreenAsync(int displayId, string? package = null, int width = 0, int height = 0, CancellationToken ct = default)
+    {
+        var args = new JsonObject { ["displayId"] = displayId };
+        if (!string.IsNullOrEmpty(package)) args["package"] = package;
+        if (width > 0 && height > 0) { args["width"] = width; args["height"] = height; }
+        return (await CallAsync("display_fullscreen", args, timeout: TimeSpan.FromSeconds(8), ct: ct)).Ok;
+    }
+
     // ---------------------------------------------------------------- typed helpers (Step 5: Screen & Wall capture)
 
     public async Task<CaptureResult?> CaptureJpegAsync(int maxWidth = 480, int displayId = 0, int quality = 78, CancellationToken ct = default)

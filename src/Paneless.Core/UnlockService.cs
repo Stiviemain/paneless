@@ -36,13 +36,41 @@ public sealed partial class UnlockService(AdbClient adb, DataStore data, ISecret
 
     public async Task<LockInfo> GetLockInfoAsync(string serial)
     {
-        var r = await adb.ShellAsync(serial, "dumpsys trust | grep deviceLocked; dumpsys window | grep -E 'mCurrentFocus|isKeyguardShowing'");
-        var lines = r.Output.Split('\n');
+        // Use "dumpsys window displays" so we read mCurrentFocus specifically from Display 0;
+        // Android 16/17 devices with virtual displays list those displays before Display 0.
+        var r = await adb.ShellAsync(serial, "dumpsys trust | grep deviceLocked; dumpsys window displays | grep -E 'Display: mDisplayId=|mCurrentFocus=|isKeyguardShowing'");
+        return ParseLockInfo(r.Output);
+    }
+
+    public static LockInfo ParseLockInfo(string output)
+    {
+        var lines = output.Split('\n');
         var trust = lines.Where(l => l.Contains("deviceLocked=")).ToList();
         var line = trust.FirstOrDefault(l => l.Contains("(current)")) ?? trust.FirstOrDefault();
         bool? locked = line != null && LockedRx().Match(line) is { Success: true } m ? m.Groups[1].Value == "1" : null;
-        var focus = lines.FirstOrDefault(l => l.Contains("mCurrentFocus=")) ?? "";
-        return new LockInfo(locked, LockScreenRx().IsMatch(focus));
+
+        int? currentDisplay = null;
+        string? display0Focus = null;
+        string? fallbackFocus = null;
+        var keyguardShowing = false;
+
+        foreach (var raw in lines)
+        {
+            if (DisplayIdRx().Match(raw) is { Success: true } dm && int.TryParse(dm.Groups[1].Value, out var did))
+            {
+                currentDisplay = did;
+                continue;
+            }
+            if (raw.Contains("isKeyguardShowing=true", StringComparison.Ordinal)) keyguardShowing = true;
+            if (raw.Contains("mCurrentFocus=", StringComparison.Ordinal))
+            {
+                if (currentDisplay == 0) display0Focus = raw;
+                else if (currentDisplay == null && fallbackFocus == null) fallbackFocus = raw;
+            }
+        }
+
+        var focus = display0Focus ?? fallbackFocus ?? "";
+        return new LockInfo(locked, LockScreenRx().IsMatch(focus) || (keyguardShowing && focus.Contains("mCurrentFocus=null", StringComparison.Ordinal)));
     }
 
     public async Task<UnlockResult> UnlockAsync(string serial, string sn, string name, bool wakeIfUnlocked = true)
@@ -92,6 +120,8 @@ public sealed partial class UnlockService(AdbClient adb, DataStore data, ISecret
         return new(true, Text.F("{0} unlocked.", name));
     }
 
+    [GeneratedRegex(@"Display:\s*mDisplayId=(\d+)")]
+    private static partial Regex DisplayIdRx();
     [GeneratedRegex(@"deviceLocked=(\d)")]
     private static partial Regex LockedRx();
     [GeneratedRegex("NotificationShade|Keyguard|Bouncer|StatusBar")]
