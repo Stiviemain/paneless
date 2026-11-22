@@ -5,7 +5,7 @@
         x:Class="Paneless.App.Views.DeviceSettingsWindow"
         x:DataType="vm:ProfileEditorViewModel"
         Title="{Binding Title}" Icon="/Assets/Paneless.ico"
-        Width="880" Height="680" MinWidth="760" MinHeight="480"
+        Width="880" Height="740" MinWidth="760" MinHeight="480"
         WindowStartupLocation="CenterOwner">
 
   <Window.Styles>

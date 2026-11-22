@@ -20,6 +20,7 @@
 
 <p align="center">
   <a href="https://github.com/Stiviemain/paneless/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/Stiviemain/paneless?include_prereleases&label=release"></a>
+  <a href="https://github.com/Stiviemain/paneless/actions/workflows/build.yml"><img alt="Build" src="https://github.com/Stiviemain/paneless/actions/workflows/build.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
   <img alt="Windows 10/11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4">
   <img alt="Android USB and Wi-Fi" src="https://img.shields.io/badge/Android-USB%20%7C%20Wi--Fi-3ddc84">
@@ -78,7 +79,7 @@ The interface is built with [Avalonia](https://avaloniaui.net/), a cross-platfor
 
 **Mirroring**
 - One click (or double-click, or Enter) to mirror one or many devices.
-- Keep the device's own screen off while mirroring, keep it awake, play its audio on the PC, keep the window on top.
+- Keep the device's own screen off while mirroring, keep it awake, optionally lock it when the last mirror closes, play its audio on the PC, keep the window on top.
 - **Settings per device or per group:** max size, video codec (H.264, H.265, AV1), bit rate and frame-rate limit.
 - **Auto-unlock:** a saved PIN or password is entered when you mirror a locked device. Swipe patterns aren't supported.
 - **Second screen:** a separate, resizable screen of the device next to its own.
@@ -119,6 +120,7 @@ The interface is built with [Avalonia](https://avaloniaui.net/), a cross-platfor
 - **Logs:** the live log (logcat) of a device, filtered by importance, text or app, with crashes in red. Save it to a file.
 - **Inventory:** model, Android version, security patch, battery, storage, RAM, address and uptime of every device. Export it as CSV for Excel or as an HTML report.
 
+<p align="center"><img src="docs/images/wall.png" width="760" alt="Live Wall overview"></p>
 <p align="center"><img src="docs/images/automation.png" width="760" alt="Automation page with a provisioning recipe"></p>
 <p align="center"><img src="docs/images/inventory.png" width="760" alt="Inventory page"></p>
 
@@ -143,7 +145,7 @@ The interface is built with [Avalonia](https://avaloniaui.net/), a cross-platfor
 
 There's also a portable zip if you don't want to install it.
 
-> **Windows SmartScreen** may warn about an unknown publisher, because the installer isn't code-signed yet. Click *More info › Run anyway*, or check the SHA-256 checksum published with the release first.
+> **Windows SmartScreen** may warn about an unknown publisher, because the installer isn't code-signed yet. Click *More info › Run anyway*. All release binaries are built publicly by [GitHub Actions](https://github.com/Stiviemain/paneless/actions/workflows/release.yml) with SHA-256 checksums and [build provenance attestations](https://github.com/Stiviemain/paneless/attestations) attached—or you can [build from source](#building-from-source) in two commands.
 
 macOS and Linux builds are planned: the code is already cross-platform thanks to Avalonia, but those builds aren't packaged or tested yet.
 

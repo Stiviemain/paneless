@@ -9,6 +9,8 @@ on:
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 jobs:
   release:
@@ -37,15 +39,32 @@ jobs:
           Copy-Item releases/releases.win.json dist/
           Copy-Item "releases/PanelessApp-$version-full.nupkg" dist/
           if (Test-Path releases/RELEASES) { Copy-Item releases/RELEASES dist/ }
-          Get-ChildItem dist | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name } |
-            Set-Content dist/SHA256SUMS.txt -Encoding ascii
+          $hashes = @{}
+          Get-ChildItem dist | ForEach-Object {
+            $h = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            $hashes[$_.Name] = $h
+            "{0}  {1}" -f $h, $_.Name
+          } | Set-Content dist/SHA256SUMS.txt -Encoding ascii
+          $setupName = "Paneless-$version-Setup.exe"
+          $portName  = "Paneless-$version-Portable.zip"
+          $runUrl = "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           # Release notes: this version's section of CHANGELOG.md
           $log = Get-Content -Raw CHANGELOG.md
           $m = [regex]::Match($log, "(?ms)^## $([regex]::Escape($version)) .*?\r?\n(.*?)(?=^## |\z)")
           $notes = if ($m.Success) { $m.Groups[1].Value.Trim() } else { "See CHANGELOG.md." }
-          $notes += "`n`n**Install:** download ``Paneless-$version-Setup.exe`` and run it (Windows 10/11, no admin rights). Checksums are in ``SHA256SUMS.txt``."
+          $notes += "`n`n**Install:** download ``$setupName`` and run it (Windows 10/11, no admin rights). There is also a portable zip (``$portName``)."
+          $notes += "`n`n**Verification:** Built publicly from this commit by [GitHub Actions]($runUrl) with GitHub build provenance attestations (``gh attestation verify``)."
+          $notes += "`n- ``$setupName``: SHA-256 ``$($hashes[$setupName])`` · [VirusTotal](https://www.virustotal.com/gui/file/$($hashes[$setupName]))"
+          $notes += "`n- ``$portName``: SHA-256 ``$($hashes[$portName])`` · [VirusTotal](https://www.virustotal.com/gui/file/$($hashes[$portName]))"
           Set-Content notes.md $notes -Encoding utf8
           "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            dist/Paneless-*-Setup.exe
+            dist/Paneless-*-Portable.zip
 
       - name: Draft release
         shell: pwsh
