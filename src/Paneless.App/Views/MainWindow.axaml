@@ -119,6 +119,13 @@
               <TextBlock Classes="navlabel" Text="{l:T 'Devices'}" />
             </StackPanel>
           </Button>
+          <Button Classes="nav" Classes.on="{Binding IsRemoteAppsPage}" Command="{Binding GoCommand}" CommandParameter="RemoteApps"
+                  ToolTip.Tip="{l:T 'Android apps in windows of their own, with shortcuts'}">
+            <StackPanel Spacing="3">
+              <Path Classes="navicon" Data="M3.5 5 H20.5 V19 H3.5 Z M3.5 8.5 H20.5 M9 11.5 H15 V16.5 H9 Z" />
+              <TextBlock Classes="navlabel" Text="{l:T 'Remote apps'}" TextWrapping="Wrap" TextAlignment="Center" />
+            </StackPanel>
+          </Button>
           <Button Classes="nav" Classes.on="{Binding IsWallPage}" Command="{Binding GoCommand}" CommandParameter="Wall">
             <StackPanel Spacing="3">
               <Path Classes="navicon" Data="M3.5 4.5 H10.5 V11 H3.5 Z M13.5 4.5 H20.5 V11 H13.5 Z M3.5 13 H10.5 V19.5 H3.5 Z M13.5 13 H20.5 V19.5 H13.5 Z" />
@@ -415,6 +422,7 @@
     <Panel IsVisible="{Binding IsAutomationPage}"><views:AutomationPage x:Name="AutomationPage" /></Panel>
     <Panel IsVisible="{Binding IsInventoryPage}"><views:InventoryPage x:Name="InventoryPage" /></Panel>
     <Panel IsVisible="{Binding IsAssistantsPage}"><views:AssistantsPage x:Name="AssistantsPage" /></Panel>
+    <Panel IsVisible="{Binding IsRemoteAppsPage}"><views:RemoteAppsPage x:Name="RemoteAppsPage" /></Panel>
     </Panel>
   </DockPanel>
   </Grid>

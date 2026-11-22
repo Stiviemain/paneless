@@ -39,6 +39,7 @@
 - [Install](#install)
 - [First use](#first-use)
 - [Using Paneless](#using-paneless)
+- [Remote apps](#remote-apps)
 - [AI assistants](#ai-assistants)
 - [Privacy and security](#privacy-and-security)
 - [Troubleshooting](#troubleshooting)
@@ -82,6 +83,7 @@ The interface is built with [Avalonia](https://avaloniaui.net/), a cross-platfor
 - **Auto-unlock:** a saved PIN or password is entered when you mirror a locked device. Swipe patterns aren't supported.
 - **Second screen:** a separate, resizable screen of the device next to its own.
 - **Apps in their own window,** on a virtual display, so the device's screen is left alone.
+- **Remote apps:** keep the Android apps you use most on the *Remote apps* page and open them like Windows programs, each in its own window with the app's own icon and taskbar button. A shortcut on the desktop or in the Start menu opens one straight from Windows. See [Remote apps](#remote-apps).
 - **Camera:** the back or front camera in a window. The picture follows how the phone is held.
 - **Arrange windows:** tile all mirrors, or one group's, across the screen.
 
@@ -174,6 +176,7 @@ From then on, plugged-in USB devices appear immediately, and paired Wi-Fi device
 | Set up new devices the same way | **Automation › Recipes**, then **Run recipe** |
 | Restart devices every night | **Automation › Scheduled tasks › + New** |
 | Get told about low batteries or crashes | **Automation › Alerts** |
+| Use an Android app like a PC program | **Remote apps › Add an app…**, then **Open** or **Create shortcut** |
 | See every screen at once | **Wall** |
 | Find out why an app crashes | **Logs**, then **Crashes only** |
 | Get a list of all devices for Excel | **Inventory › Read devices › Export** |
@@ -186,9 +189,31 @@ From then on, plugged-in USB devices appear immediately, and paired Wi-Fi device
 **Where your data is** (Windows): `%LOCALAPPDATA%\Paneless`.
 - `known-devices.json`, `settings.json`, `groups.json`, `profiles.json`, `scripts.json`, `keymaps.json`
 - `recipes.json`, `schedules.json`, `alerts.json`
+- `remote-apps.json`, and the apps' icons in `remote-apps\`
 - `unlock-codes.json`, encrypted (see below)
 
 Screenshots and recordings go to `Documents\Paneless`. Logs, including what AI assistants did, are in `%TEMP%\paneless`.
+
+## Remote apps
+
+Use Android apps like programs on your PC, the way Windows' RemoteApp works over Remote Desktop: each app opens in a window of its own, without the rest of the phone around it.
+
+<p align="center"><img src="docs/images/remote-apps.png" width="760" alt="Remote apps page"></p>
+
+1. Open the **Remote apps** page and click **Add an app…** (or, in a device's app manager, **Add to Remote apps**).
+2. Pick the device and the app. Paneless reads the app's name and its real icon from the device.
+3. Click **Open**, or double-click it. Click **Create shortcut** for one on the desktop and in the Start menu.
+
+- **One window per app.** It runs on a separate virtual screen of the device, so the device's own screen is left alone (and can stay off). Right-click in the window goes back.
+- **Looks like the app:** the window and its taskbar button have the app's name and icon. Pin it to the taskbar like any program.
+- **Shortcuts** use the app's icon with a small Paneless logo in the corner, so you can tell where they come from. They start Paneless by itself (in the notification area) if it isn't running, and keep working when the device's IP address changes or Paneless updates.
+- **Remembers its window:** size and place, per app. Choose a phone or tablet shape, or your own size.
+- **PC keyboard only:** Android's on-screen keyboard stays out of the window (can be switched off per app).
+- The device is unlocked first if you saved its PIN.
+
+What Android doesn't allow: apps that block screen capture (banking, some video apps) show a black window, an app can only be open in one place at a time (opening it on the PC takes it off the phone's screen), and there's no sound per app. A few apps don't like a second screen and jump back to the phone.
+
+The app names and icons come from a small helper that Paneless copies to the device (like scrcpy's own server) and runs for a moment. It only reads, installs nothing and keeps nothing running.
 
 ## AI assistants
 

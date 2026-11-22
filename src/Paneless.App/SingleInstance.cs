@@ -23,8 +23,9 @@ public static class SingleInstance
         }
     }
 
-    /// <summary>Takes the lock. False if another Paneless already has it (it's then asked to show its window).</summary>
-    public static bool TryClaim()
+    /// <summary>Takes the lock. False if another Paneless already has it: it's then sent <paramref name="message"/>
+    /// ("show" to show its window, or "open-app &lt;id&gt;" from a remote app's shortcut).</summary>
+    public static bool TryClaim(string message = "show")
     {
         _mutex = new Mutex(true, "Local\\" + Name, out var created);
         if (created) return true;
@@ -33,14 +34,14 @@ public static class SingleInstance
             using var pipe = new NamedPipeClientStream(".", Name, PipeDirection.Out, PipeOptions.CurrentUserOnly);
             pipe.Connect(1500);
             using var w = new StreamWriter(pipe);
-            w.WriteLine("show");
+            w.WriteLine(message);
         }
         catch { }
         return false;
     }
 
-    /// <summary>Listens for "show" from a second start.</summary>
-    public static void Listen(Action show)
+    /// <summary>Listens for messages from a second start.</summary>
+    public static void Listen(Action<string> received)
     {
         _ = Task.Run(async () =>
         {
@@ -51,7 +52,7 @@ public static class SingleInstance
                     using var pipe = new NamedPipeServerStream(Name, PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
                     await pipe.WaitForConnectionAsync();
                     using var r = new StreamReader(pipe);
-                    if (await r.ReadLineAsync() == "show") show();
+                    if (await r.ReadLineAsync() is { Length: > 0 } message) received(message);
                 }
                 catch { await Task.Delay(1000); }
             }

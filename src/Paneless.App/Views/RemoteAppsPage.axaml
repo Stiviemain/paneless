@@ -1,0 +1,155 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Paneless.App.ViewModels"
+             xmlns:l="using:Paneless.App.Localization"
+             xmlns:core="using:Paneless.Core"
+             x:Class="Paneless.App.Views.RemoteAppsPage"
+             x:DataType="vm:RemoteAppsViewModel">
+  <DockPanel>
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+      <StackPanel Spacing="3">
+        <TextBlock Classes="pagetitle" Text="{l:T 'Remote apps'}" />
+        <TextBlock Classes="pagehint" TextWrapping="Wrap"
+                   Text="{l:T 'Android apps in windows of their own, like programs on your PC. Each one runs on a separate screen of the device, so the device’s own screen is left alone.'}" />
+      </StackPanel>
+      <Button Grid.Column="1" Classes="accent" VerticalAlignment="Bottom" Margin="12,0,0,0" Content="{l:T 'Add an app…'}" Command="{Binding StartAddCommand}" />
+    </Grid>
+
+    <TextBlock DockPanel.Dock="Bottom" Classes="small" Margin="0,8,0,0" Text="{Binding Message}" Foreground="{Binding MessageBrush}"
+               TextWrapping="Wrap" IsVisible="{Binding Message, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+    <Grid ColumnDefinitions="320,16,*">
+      <!-- your remote apps -->
+      <Border Classes="card" ClipToBounds="True">
+        <Panel>
+          <ListBox x:Name="AppList" ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" Background="Transparent" Classes="plain">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:RemoteAppItem">
+                <Grid ColumnDefinitions="Auto,*" Margin="2,4">
+                  <Image Width="40" Height="40" Source="{Binding Icon}" RenderOptions.BitmapInterpolationMode="HighQuality" />
+                  <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Spacing="1">
+                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Classes="small" Text="{Binding DeviceText}" Foreground="{Binding DeviceBrush}" TextTrimming="CharacterEllipsis" />
+                  </StackPanel>
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <StackPanel IsVisible="{Binding IsEmpty}" VerticalAlignment="Center" Margin="24" Spacing="8">
+            <TextBlock HorizontalAlignment="Center" FontWeight="SemiBold" Text="{l:T 'No remote apps yet'}" />
+            <TextBlock Classes="dim" TextAlignment="Center" TextWrapping="Wrap"
+                       Text="{l:T 'Click “Add an app…” and pick an app of a connected device. You can also add one from a device’s app manager.'}" />
+          </StackPanel>
+        </Panel>
+      </Border>
+
+      <!-- the selected app: open, shortcut, settings -->
+      <ScrollViewer Grid.Column="2" IsVisible="{Binding !IsAdding}">
+        <StackPanel Spacing="14" Margin="0,0,16,0" IsVisible="{Binding $parent[UserControl].((vm:RemoteAppsViewModel)DataContext).HasSelected}"
+                    DataContext="{Binding Selected}" x:DataType="vm:RemoteAppItem">
+          <Grid ColumnDefinitions="Auto,*">
+            <Image Width="72" Height="72" Source="{Binding Icon}" RenderOptions.BitmapInterpolationMode="HighQuality" VerticalAlignment="Top" />
+            <StackPanel Grid.Column="1" Margin="16,0,0,0" Spacing="4" VerticalAlignment="Center">
+              <TextBlock Text="{Binding Name}" FontSize="20" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+              <TextBlock Classes="small" Text="{Binding DeviceText}" Foreground="{Binding DeviceBrush}" />
+              <TextBlock Classes="small" Text="{Binding App.Package}" />
+            </StackPanel>
+          </Grid>
+
+          <WrapPanel ItemSpacing="8" LineSpacing="8">
+            <Button Classes="accent" Content="{l:T 'Open'}" Command="{Binding $parent[UserControl].((vm:RemoteAppsViewModel)DataContext).OpenCommand}" />
+            <Button Content="{l:T 'Remove…'}" Command="{Binding $parent[UserControl].((vm:RemoteAppsViewModel)DataContext).RemoveCommand}" />
+          </WrapPanel>
+
+          <Border Classes="card" Padding="14">
+            <StackPanel Spacing="10">
+              <TextBlock Classes="heading" Text="{l:T 'Shortcut'}" />
+              <TextBlock Classes="dim" TextWrapping="Wrap"
+                         Text="{l:T 'Opens this app straight from Windows, with its own icon (a small Paneless logo in the corner shows where it comes from). Paneless starts by itself in the notification area if it isn’t running.'}" />
+              <StackPanel Orientation="Horizontal" Spacing="18">
+                <CheckBox Content="{l:T 'On the desktop'}" IsChecked="{Binding $parent[UserControl].((vm:RemoteAppsViewModel)DataContext).OnDesktop}" />
+                <CheckBox Content="{l:T 'In the Start menu'}" IsChecked="{Binding $parent[UserControl].((vm:RemoteAppsViewModel)DataContext).InStartMenu}" />
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="12">
+                <Button Content="{Binding ShortcutButton}" Command="{Binding $parent[UserControl].((vm:RemoteAppsViewModel)DataContext).ShortcutCommand}"
+                        IsEnabled="{Binding $parent[UserControl].((vm:RemoteAppsViewModel)DataContext).CanCreateShortcuts}" />
+                <TextBlock Classes="small" VerticalAlignment="Center" IsVisible="{Binding HasShortcut}"
+                           Text="{l:T 'Change the name or icon? Click Update shortcuts afterwards.'}" TextWrapping="Wrap" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <Border Classes="card" Padding="14">
+            <StackPanel Spacing="10">
+              <TextBlock Classes="heading" Text="{l:T 'Customize'}" />
+              <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
+                <TextBlock Classes="label" VerticalAlignment="Center" Text="{l:T 'Name'}" />
+                <TextBox Grid.Column="1" MaxWidth="320" HorizontalAlignment="Left" MinWidth="220" Text="{Binding Name}" />
+                <TextBlock Grid.Row="1" Classes="label" VerticalAlignment="Center" Text="{l:T 'Window shape'}" />
+                <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                  <ComboBox MinWidth="160" ItemsSource="{Binding $parent[UserControl].((vm:RemoteAppsViewModel)DataContext).ShapeChoices}" SelectedItem="{Binding Shape}" />
+                  <NumericUpDown Width="120" Minimum="320" Maximum="3840" Increment="10" FormatString="0" Value="{Binding CustomWidth}" IsVisible="{Binding IsCustom}" />
+                  <TextBlock VerticalAlignment="Center" Text="×" IsVisible="{Binding IsCustom}" />
+                  <NumericUpDown Width="120" Minimum="320" Maximum="3840" Increment="10" FormatString="0" Value="{Binding CustomHeight}" IsVisible="{Binding IsCustom}" />
+                </StackPanel>
+                <TextBlock Grid.Row="2" Grid.Column="1" Classes="small" TextWrapping="Wrap"
+                           Text="{l:T 'The window remembers where you put it and how big you made it.'}" />
+              </Grid>
+              <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasPlace}">
+                <Button Classes="flat" Content="{l:T 'Forget the window’s place'}" Command="{Binding $parent[UserControl].((vm:RemoteAppsViewModel)DataContext).ForgetPlaceCommand}" />
+              </StackPanel>
+              <CheckBox Content="{l:T 'Type with the PC keyboard only (no Android keyboard in the window)'}" IsChecked="{Binding PcKeyboardOnly}" />
+              <CheckBox Content="{l:T 'Keep the device’s own screen off while it’s open'}" IsChecked="{Binding ScreenOff}" />
+              <CheckBox Content="{l:T 'Always on top'}" IsChecked="{Binding OnTop}" />
+              <CheckBox Content="{l:T 'Show the mirror toolbar next to the window'}" IsChecked="{Binding ShowToolbar}" />
+              <TextBlock Classes="small" TextWrapping="Wrap"
+                         Text="{l:T 'Changes apply the next time the app opens. Right-click in the window goes back.'}" />
+              <Button Classes="flat" HorizontalAlignment="Left" Content="{l:T 'Read the icon again'}" Command="{Binding $parent[UserControl].((vm:RemoteAppsViewModel)DataContext).ReloadIconCommand}" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </ScrollViewer>
+
+      <!-- adding an app -->
+      <Border Grid.Column="2" Classes="card" Padding="14" IsVisible="{Binding IsAdding}">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Top" Spacing="10" Margin="0,0,0,10">
+            <TextBlock Classes="heading" Text="{l:T 'Add an app'}" />
+            <Grid ColumnDefinitions="Auto,200,16,*">
+              <TextBlock Classes="label" VerticalAlignment="Center" Margin="0,0,8,0" Text="{l:T 'Device'}" />
+              <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding AddDevices}" SelectedItem="{Binding AddDevice}">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="core:DeviceRow">
+                    <TextBlock Text="{Binding Name}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+              <TextBox Grid.Column="3" PlaceholderText="{l:T 'Search apps'}" Text="{Binding AddFilter}" />
+            </Grid>
+            <TextBlock Classes="small" Text="{Binding AddMessage}" TextWrapping="Wrap" />
+          </StackPanel>
+          <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button Content="{l:T 'Cancel'}" Command="{Binding CancelAddCommand}" />
+            <Button Classes="accent" Content="{l:T 'Add'}" Command="{Binding ConfirmAddCommand}" />
+          </StackPanel>
+          <Panel>
+            <ListBox x:Name="AddList" ItemsSource="{Binding AddApps}" SelectedItem="{Binding AddSelected}" Background="Transparent" Classes="plain">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:AddableApp">
+                  <Grid ColumnDefinitions="Auto,*" Margin="2,2">
+                    <Image Width="32" Height="32" Source="{Binding Icon}" RenderOptions.BitmapInterpolationMode="HighQuality" />
+                    <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                      <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Classes="small" Text="{Binding Note}" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+            <ProgressBar IsIndeterminate="True" VerticalAlignment="Top" IsVisible="{Binding IsLoadingApps}" />
+          </Panel>
+        </DockPanel>
+      </Border>
+    </Grid>
+  </DockPanel>
+</UserControl>

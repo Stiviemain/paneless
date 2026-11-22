@@ -206,6 +206,7 @@ public partial class MainWindow : Window
     public InventoryViewModel? Inventory { get; private set; }
     public AutomationViewModel? Automation { get; private set; }
     public AssistantsViewModel? Assistants { get; private set; }
+    public RemoteAppsViewModel? RemoteApps { get; private set; }
     McpServer? _mcp;
 
     void SetUpPages(MainViewModel vm)
@@ -231,6 +232,12 @@ public partial class MainWindow : Window
             CopyAsync = async text => { if (Clipboard is { } cb) await Avalonia.Input.Platform.ClipboardExtensions.SetTextAsync(cb, text); },
             ConfirmAsync = (t, m) => ConfirmWindow.AskAsync(this, t, m, null, Localization.Loc.T("Add")),
         };
+        RemoteAppsPage.DataContext = RemoteApps = new RemoteAppsViewModel(s, vm)
+        {
+            ConfirmAsync = (t, m) => ConfirmWindow.AskAsync(this, t, m, null, Localization.Loc.T("Remove")),
+        };
+        vm.AddRemoteApp = RemoteApps.AddAsync;
+        if (OperatingSystem.IsWindows()) TrackRemoteApps(vm);
         automation.Start();
 
         // The wall takes pictures only while it's on screen; the inventory shows what it knows when opened.
@@ -247,6 +254,60 @@ public partial class MainWindow : Window
         };
         PropertyChanged += (_, e) => { if (e.Property == IsVisibleProperty || e.Property == WindowStateProperty) UpdateActive(); };
         Closed += (_, _) => { Wall?.SetActive(false); Logs?.Dispose(); _mcp?.Stop(); };
+    }
+
+    /// <summary>Remote app windows: give each its own icon and taskbar button once it shows, remember where it is, and
+    /// save that when it closes.</summary>
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    void TrackRemoteApps(MainViewModel vm)
+    {
+        var open = new Dictionary<MirrorSession, (RemoteApp App, int Dressed)>();
+        vm.RemoteAppStarted = (session, app) => { open[session] = (app, 0); RemoteApps?.UpdateStates(); };
+        var timer = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        timer.Tick += (_, _) =>
+        {
+            if (open.Count == 0) return;
+            foreach (var (session, (app, dressed)) in open.ToList())
+            {
+                if (!session.IsRunning)
+                {
+                    open.Remove(session);
+                    _services!.RemoteApps.Save();   // keeps the window's last place
+                    RemoteApps?.UpdateStates();
+                    continue;
+                }
+                try { session.Process.Refresh(); } catch { continue; }
+                var h = session.Process.MainWindowHandle;
+                if (h == 0) continue;
+                // Dressed twice (when it shows, and a few seconds later) in case the window sets its own icon late.
+                if (dressed == 0 || dressed == 4)
+                {
+                    try
+                    {
+                        if (!File.Exists(RemoteAppStore.IconIco(app.Id))) RemoteAppIcons.WriteIco(app);
+                        var ico = RemoteAppStore.IconIco(app.Id);
+                        ShellLinks.SetWindowIcon(h, ico);
+                        var exe = Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "Paneless.exe");
+                        ShellLinks.SetWindowIdentity(h, RemoteAppsViewModel.AppUserModelId(app), $"\"{exe}\" --open-app {app.Id}", app.Name, ico);
+                    }
+                    catch { /* cosmetic: the app works without it */ }
+                }
+                open[session] = (app, Math.Min(dressed + 1, 5));
+                if (!Platform.Win32.IsIconic(h) && Platform.Win32.ClientBounds(h) is { } c && c.Right - c.Left > 100 && c.Bottom - c.Top > 100)
+                    app.Window = new WindowPlace { X = c.Left, Y = c.Top, W = c.Right - c.Left, H = c.Bottom - c.Top };
+            }
+        };
+        timer.Start();
+    }
+
+    /// <summary>A shortcut asked for a remote app (Paneless may have just started hidden).</summary>
+    public async Task OpenRemoteAppFromShortcutAsync(string id)
+    {
+        if (Vm == null) return;
+        var why = await Vm.OpenRemoteAppByIdAsync(id);
+        if (why == null) return;
+        if (IsVisible) { Vm.Page = "RemoteApps"; return; }
+        if (OperatingSystem.IsWindows()) Toast.Show("Paneless", why);
     }
 
     /// <summary>Testing aid (demo mode): starts the AI server even though demo mode normally keeps it off.</summary>

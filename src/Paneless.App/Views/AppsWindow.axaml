@@ -53,6 +53,8 @@
       <StackPanel Grid.Column="2" Spacing="8">
         <TextBlock Text="{l:T 'Selected app'}" Classes="dim" FontSize="12" />
         <Button Classes="accent" HorizontalAlignment="Stretch" Content="{l:T 'Open'}" Command="{Binding OpenCommand}" ToolTip.Tip="{l:T 'Opens it on the device'}" />
+        <Button HorizontalAlignment="Stretch" Content="{l:T 'Add to Remote apps'}" Command="{Binding AddToRemoteAppsCommand}"
+                ToolTip.Tip="{l:T 'Keep this app on the Remote apps page: one click opens it in its own window, and it can have a shortcut.'}" />
         <Button HorizontalAlignment="Stretch" Content="{l:T 'Open in its own window'}" Command="{Binding OpenInWindowCommand}"
                 ToolTip.Tip="{l:T 'Runs the app on a separate, resizable screen of the device and shows it in a window here. The device’s own screen stays as it is.'}" />
         <Button HorizontalAlignment="Stretch" Content="{l:T 'Force stop'}" Command="{Binding ForceStopCommand}" />

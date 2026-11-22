@@ -50,7 +50,7 @@ public sealed partial class AppsViewModel : ObservableObject
     [ObservableProperty] public partial IBrush MessageBrush { get; set; } = Theme.Dim;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(OpenCommand), nameof(OpenInWindowCommand), nameof(ForceStopCommand), nameof(ClearDataCommand),
+    [NotifyCanExecuteChangedFor(nameof(OpenCommand), nameof(OpenInWindowCommand), nameof(AddToRemoteAppsCommand), nameof(ForceStopCommand), nameof(ClearDataCommand),
                                 nameof(ToggleEnabledCommand), nameof(UninstallCommand))]
     public partial AppItem? Selected { get; set; }
 
@@ -124,6 +124,14 @@ public sealed partial class AppsViewModel : ObservableObject
     {
         await _main.OpenAppWindowAsync(_row, Selected!.Package);
         Say(Loc.F("Opening {0} in a window of its own (a separate screen of the device, so its own screen stays as it is).", Selected!.Package), StatusKind.Ok);
+    }
+
+    [RelayCommand(CanExecute = nameof(HasSelected))]
+    async Task AddToRemoteApps()
+    {
+        if (_main.AddRemoteApp == null) return;
+        Say(Loc.F("Adding {0} to Remote apps…", Selected!.Package));
+        Say(await _main.AddRemoteApp(_row, Selected!.Package, null), StatusKind.Ok);
     }
 
     [RelayCommand(CanExecute = nameof(HasSelected))]

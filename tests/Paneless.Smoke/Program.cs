@@ -3,7 +3,7 @@
 using Paneless.Core;
 
 // --groups and --scripts-parse need no device and no scrcpy (they also run in CI).
-var offline = args.Contains("--groups") || args.Contains("--scripts-parse") || args.Contains("--automation") || args.Contains("--translations") || args.Contains("--assistants");
+var offline = args.Contains("--groups") || args.Contains("--scripts-parse") || args.Contains("--automation") || args.Contains("--translations") || args.Contains("--assistants") || args.Contains("--remote-apps");
 var tools = ToolLocator.Find() ?? (offline ? new ToolPaths("adb", "scrcpy") : null);
 if (tools == null) { Console.WriteLine("scrcpy/adb not found"); return 1; }
 Console.WriteLine($"adb:    {tools.Adb}\nscrcpy: {tools.Scrcpy}\ndata:   {AppPaths.DataDir}");
@@ -447,6 +447,47 @@ if (args.Contains("--assistants"))
           && (string?)facts["uptime"] == "9 days, 7 hours" && (string?)facts["collected_at"] == "2026-11-22 09:27", "device facts are rounded and readable");
     Check(AssistantFacts.Inventory(new DeviceInventory("W", "S", "", "", "", 0, "", null, false, "", null, null, null, null, "", "", null, DateTime.Now))["model"] is null,
           "missing device facts are left empty, not \"\"");
+    return okAll ? 0 : 1;
+}
+
+if (args.Contains("--remote-apps"))
+{
+    // Remote apps: window options, shortcut names, the device helper's output, the shortcut icon file. No device needed.
+    var okAll = true;
+    void Check(bool ok, string what) { if (!ok) okAll = false; Console.WriteLine($"{(ok ? "ok  " : "FAIL")} {what}"); }
+    var quality = new MirrorOptions(false, true, false, true, null, "h265", 300, 60);
+    var app = new RemoteApp { Package = "com.example.chat", Name = "Chat" };
+    var a = app.ScrcpyArgs("Chat – Pixel", quality);
+    Check(a.Contains("--new-display=1080x1920") && a.Contains("--start-app=com.example.chat") && a.Contains("--flex-display") && a.Contains("--no-vd-system-decorations")
+          && a.Contains("--display-ime-policy=hide") && a.Contains("--turn-screen-off") && a.Contains("--video-bit-rate=200M") && a.Contains("--max-fps=60")
+          && !a.Any(x => x.StartsWith("--window-x")) && a[0] == "--window-title" && a[1] == "Chat – Pixel", "a phone app: tall screen, PC keyboard, device screen off");
+    app.Shape = "tablet"; app.PcKeyboardOnly = false; app.ScreenOff = false; app.OnTop = true;
+    a = app.ScrcpyArgs("t", quality);
+    Check(a.Contains("--new-display=1920x1200") && !a.Contains("--display-ime-policy=hide") && !a.Contains("--turn-screen-off") && a.Contains("--always-on-top"), "a tablet app: wide screen, options off");
+    app.Window = new WindowPlace { X = -8, Y = 40, W = 500, H = 1000 };
+    a = app.ScrcpyArgs("t", quality);
+    Check(a.Contains("--new-display=1200x2400") && a.Contains("--window-x=0") && a.Contains("--window-y=40") && a.Contains("--window-width=500") && a.Contains("--window-height=1000"),
+          "a remembered window: same place and shape");
+    app.Window = null; app.Shape = "custom"; app.CustomWidth = 99999; app.CustomHeight = 801;
+    Check(app.ScrcpyArgs("t", quality).Contains("--new-display=3840x800"), "a custom size is kept within limits and even");
+    Check(RemoteApp.ShortcutFileName("Chat: \"work\" / home?") == "Chat   work    home.lnk" && RemoteApp.ShortcutFileName("...") == "App.lnk"
+          && RemoteApp.ShortcutFileName(new string('x', 200)).Length == 84, "shortcut file names are safe for Windows");
+
+    var listed = AdbClient.ParseLauncherApps("com.b.music\tMusic\r\nno application stand-in: x\ncom.a.chat\tChat\nbad line\ncom.c.empty\t\n");
+    Check(listed.Count == 3 && listed[0].Name == "Chat" && listed.Any(x => x.Package == "com.c.empty" && x.Name == "com.c.empty"), "the helper's app list is read, other output ignored");
+    var png = new byte[] { 0x89, (byte)'P', (byte)'N', (byte)'G', 13, 10, 26, 10, 1, 2 };
+    var icons = AdbClient.ParseIcons($"com.a.chat\tChat\t{Convert.ToBase64String(png)}\ncom.missing\t\t\ncom.bad\tBad\t!!notbase64\ncom.text\tText\t{Convert.ToBase64String("hello"u8.ToArray())}\n").ToList();
+    Check(icons.Count == 1 && icons[0].Package == "com.a.chat" && icons[0].Png.SequenceEqual(png), "the helper's icons are read, broken ones skipped");
+
+    var ico = IcoFile.FromPngs([(16, png), (256, png)]);
+    Check(ico.Length == 6 + 32 + 2 * png.Length && BitConverter.ToUInt16(ico, 2) == 1 && BitConverter.ToUInt16(ico, 4) == 2 && ico[6] == 16 && ico[22] == 0
+          && BitConverter.ToInt32(ico, 6 + 12) == 38 && BitConverter.ToInt32(ico, 22 + 12) == 38 + png.Length, "the shortcut icon file is laid out right");
+
+    var store = new RemoteAppStore([new RemoteApp { Id = "x", DeviceId = "SN1", Package = "p" }], persist: false);
+    var changed = 0; store.Changed += () => changed++; store.Save();
+    Check(store.Get("x") != null && store.Find("SN1", "p") != null && store.Find("SN2", "p") == null && changed == 1, "remote apps are found by device and package");
+    using (var helper = typeof(AdbClient).Assembly.GetManifestResourceStream("Paneless.Core.paneless-helper.jar"))
+        Check(helper is { Length: > 1000 }, "the device helper is built into Paneless");
     return okAll ? 0 : 1;
 }
 

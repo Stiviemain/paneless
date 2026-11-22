@@ -53,8 +53,10 @@ public partial class App : Application
             Paneless.Core.Text.Translate = Localization.Loc.T;
             Theme.Apply(ArgAfter(args, "--theme") ?? services.Data.Settings.Theme);
 
-            // One Paneless per user: a second start brings the first one forward.
-            if (snapshot == null && !demo && !SingleInstance.TryClaim())
+            // A remote app's shortcut: "Paneless.exe --open-app <id>".
+            var openApp = ArgAfter(args, "--open-app");
+            // One Paneless per user: a second start brings the first one forward (or has it open the remote app).
+            if (snapshot == null && !demo && !SingleInstance.TryClaim(openApp != null ? "open-app " + openApp : "show"))
             {
                 desktop.Shutdown();
                 base.OnFrameworkInitializationCompleted();
@@ -71,11 +73,17 @@ public partial class App : Application
             else
             {
                 SetUpTray(desktop, window, vm, services);
-                // Started with Windows: stay in the notification area (once, so clicking the tray icon can show it later).
-                if (args.Contains("--tray"))
+                // Started with Windows, or by a remote app's shortcut: stay in the notification area (once, so clicking the
+                // tray icon can show it later).
+                if (args.Contains("--tray") || openApp != null)
                 {
                     EventHandler? hideOnce = null;
-                    hideOnce = (_, _) => { window.Opened -= hideOnce; window.Hide(); };
+                    hideOnce = (_, _) =>
+                    {
+                        window.Opened -= hideOnce;
+                        window.Hide();
+                        if (openApp != null) _ = window.OpenRemoteAppFromShortcutAsync(openApp);
+                    };
                     window.Opened += hideOnce;
                 }
                 window.Closing += (_, e) =>
@@ -86,8 +94,9 @@ public partial class App : Application
                 };
                 if (!demo)
                 {
-                    SingleInstance.Listen(() => Dispatcher.UIThread.Post(() =>
+                    SingleInstance.Listen(message => Dispatcher.UIThread.Post(() =>
                     {
+                        if (message.StartsWith("open-app ")) { _ = window.OpenRemoteAppFromShortcutAsync(message[9..].Trim()); return; }
                         window.Show();
                         if (window.WindowState == WindowState.Minimized) window.WindowState = WindowState.Normal;
                         window.Activate();
@@ -367,6 +376,57 @@ public partial class App : Application
             wall.LargerCommand.Execute(first); wall.SameSizeCommand.Execute(first); wall.SortByNameCommand.Execute(null);
             log.AppendLine("larger, then same size as the others, sorted by name: " + Order());
             await File.WriteAllTextAsync(path + ".wall.txt", log.ToString());
+            await Task.Delay(500);
+        }
+        else if (view == "remote-add" && main.DataContext is MainViewModel rvm)
+        {
+            // The Remote apps page while adding an app (demo apps with letter tiles).
+            main.Height = 780; main.Width = 1240;
+            rvm.Page = "RemoteApps";
+            await Task.Delay(400);
+            main.RemoteApps?.StartAddCommand.Execute(null);
+            await Task.Delay(800);
+            if (main.RemoteApps is { } ra) ra.AddSelected = ra.AddApps.Skip(3).FirstOrDefault();
+            await Task.Delay(400);
+        }
+        else if (view == "remote-shortcut" && OperatingSystem.IsWindows())
+        {
+            // Writes a demo shortcut (with its badged icon) next to the PNG and gives the main window a taskbar identity;
+            // touches nothing else. The log says what worked.
+            var log = new System.Text.StringBuilder();
+            var app = new RemoteApp { Id = "test", Name = "Chat", Package = "com.example.chat" };
+            var ico = path + ".ico";
+            try
+            {
+                using var tile = RemoteAppIcons.LetterTile(app.Name, 256);
+                var frames = new[] { 16, 32, 48, 256 }.Select(px =>
+                {
+                    using var b = RemoteAppIcons.BadgedPreview(app.Name, px);
+                    using var ms = new MemoryStream();
+#pragma warning disable CS0618
+                    b.Save(ms);
+#pragma warning restore CS0618
+                    return (px, ms.ToArray());
+                }).ToList();
+                File.WriteAllBytes(ico, IcoFile.FromPngs(frames));
+                Platform.ShellLinks.CreateShortcut(path + ".lnk", Environment.ProcessPath!, "--open-app test", ico, "Chat on Pixel 11 Pro, opened with Paneless", "Paneless.RemoteApp.test");
+                log.AppendLine("shortcut: written");
+            }
+            catch (Exception ex) { log.AppendLine("shortcut: FAILED " + ex.Message); }
+            var hwnd = main.TryGetPlatformHandle()?.Handle ?? 0;
+            log.AppendLine("window identity: " + Platform.ShellLinks.SetWindowIdentity(hwnd, "Paneless.RemoteApp.test", $"\"{Environment.ProcessPath}\" --open-app test", "Chat", ico));
+            try { Platform.ShellLinks.SetWindowIcon(hwnd, ico); log.AppendLine("window icon: set"); } catch (Exception ex) { log.AppendLine("window icon: FAILED " + ex.Message); }
+            await File.WriteAllTextAsync(path + ".shortcut.txt", log.ToString());
+        }
+        else if (view == "remote-icon")
+        {
+            // The shortcut icon of a demo app (letter tile + Paneless badge), drawn at the sizes the .ico gets.
+            var host = new Window { Width = 520, Height = 300, Background = Avalonia.Media.Brushes.White };
+            var row = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 16, Margin = new Thickness(16) };
+            foreach (var px in new[] { 256, 48, 32, 16 })
+                row.Children.Add(new Image { Width = px, Height = px, Source = RemoteAppIcons.BadgedPreview("Chat", px), VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top });
+            host.Content = row;
+            host.Show(main); target = host;
             await Task.Delay(500);
         }
         else if (view == "mcp-selftest" && main.DataContext is MainViewModel)

@@ -68,10 +68,11 @@ public sealed partial class MainViewModel : ObservableObject
     public bool IsAutomationPage => Page == "Automation";
     public bool IsInventoryPage => Page == "Inventory";
     public bool IsAssistantsPage => Page == "Assistants";
+    public bool IsRemoteAppsPage => Page == "RemoteApps";
 
     partial void OnPageChanged(string value)
     {
-        foreach (var p in new[] { nameof(IsDevicesPage), nameof(IsWallPage), nameof(IsLogsPage), nameof(IsAutomationPage), nameof(IsInventoryPage), nameof(IsAssistantsPage) })
+        foreach (var p in new[] { nameof(IsDevicesPage), nameof(IsWallPage), nameof(IsLogsPage), nameof(IsAutomationPage), nameof(IsInventoryPage), nameof(IsAssistantsPage), nameof(IsRemoteAppsPage) })
             OnPropertyChanged(p);
     }
 
@@ -741,34 +742,37 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     /// <summary>Starts a scrcpy window of another kind (app, second screen, camera) for one device.</summary>
-    async Task StartWindowAsync(DeviceRow? r, string what, Func<string, MirrorSession> start, Func<string, Task>? prepare = null, bool unlock = false)
+    async Task<MirrorSession?> StartWindowAsync(DeviceRow? r, string what, Func<string, MirrorSession> start, Func<string, Task>? prepare = null,
+        bool unlock = false, bool toolbar = true, bool? screenOff = null)
     {
-        if (r is not { CanMirror: true }) { SetStatus(Loc.T("Select one available device first."), StatusKind.Warn); return; }
-        if (_s.Demo) { SetStatus(Loc.F("Demo mode: would open {0} of {1}.", what, r.Name), StatusKind.Ok); return; }
+        if (r is not { CanMirror: true }) { SetStatus(Loc.T("Select one available device first."), StatusKind.Warn); return null; }
+        if (_s.Demo) { SetStatus(Loc.F("Demo mode: would open {0} of {1}.", what, r.Name), StatusKind.Ok); return null; }
+        MirrorSession? session = null;
         IsBusy = true;
         var connected = false;
         try
         {
             if (r.State == DeviceState.Available) SetStatus(Loc.F("Connecting to {0}…", r.Name));
             var serial = await _s.Directory!.ConnectAsync(r);
-            if (serial == null) { SetStatus(Loc.F("Couldn't connect to {0}.", r.Name), StatusKind.Error); return; }
+            if (serial == null) { SetStatus(Loc.F("Couldn't connect to {0}.", r.Name), StatusKind.Error); return null; }
             connected = r.State == DeviceState.Available;
             string? note = null;
             if (unlock && _s.Unlock!.IsReady(r.Sn))
             {
                 SetStatus(Loc.F("Unlocking {0}…", r.Name));
-                var res = await _s.Unlock.UnlockAsync(serial, r.Sn!, r.Name, wakeIfUnlocked: !Options(r).ScreenOff);
+                var res = await _s.Unlock.UnlockAsync(serial, r.Sn!, r.Name, wakeIfUnlocked: !(screenOff ?? Options(r).ScreenOff));
                 if (!res.Ok) note = res.Message;
             }
             if (prepare != null) await prepare(serial);
-            var session = start(serial);
-            // Second screens and app windows get a toolbar of their own.
-            if (session.Kind is SessionKind.Screen or SessionKind.App) MirrorStarted?.Invoke(session, r);
+            session = start(serial);
+            // Second screens and app windows get a toolbar of their own (remote apps only if they want one).
+            if (toolbar && session.Kind is SessionKind.Screen or SessionKind.App) MirrorStarted?.Invoke(session, r);
             if (note != null) SetStatus(Loc.F("Opening {0} of {1}, but: {2}", what, r.Name, note), StatusKind.Warn);
             else SetStatus(Loc.F("Opening {0} of {1}…", what, r.Name), StatusKind.Ok);
         }
         finally { IsBusy = false; }
         if (connected) await RefreshListAsync();
+        return session;
     }
 
     [RelayCommand]
@@ -796,6 +800,46 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Opens one app of a device in a window of its own (from the app manager).</summary>
     public Task OpenAppWindowAsync(DeviceRow r, string package) =>
         StartWindowAsync(r, package, serial => _s.Mirrors!.StartApp(serial, r.Name, package, Options(r)), unlock: true);
+
+    // ---------------------------------------------------------------- remote apps
+
+    /// <summary>Set by the main window: a remote app's window started (give it its icon and taskbar button, remember its place).</summary>
+    public Action<MirrorSession, RemoteApp>? RemoteAppStarted { get; set; }
+
+    /// <summary>Set by the main window: adds an app of a device to Remote apps (from the app manager); returns what happened.</summary>
+    public Func<DeviceRow, string, string?, Task<string>>? AddRemoteApp { get; set; }
+
+    /// <summary>The device a remote app is on, if it's around (by its serial number, so IP changes don't matter).</summary>
+    public DeviceRow? RowFor(RemoteApp app) => _rows.FirstOrDefault(x => x.GroupId == app.DeviceId);
+
+    public string DeviceNameFor(RemoteApp app) => RowFor(app)?.Name ?? _s.KnownFor(app.DeviceId)?.Name ?? app.DeviceId;
+
+    /// <summary>Opens a remote app in its own window, or brings it to the front if it's open. Null if it opened, else why not.</summary>
+    public async Task<string?> OpenRemoteAppAsync(RemoteApp app)
+    {
+        if (_s.Mirrors?.RemoteAppSession(app.Id) is { } open) { BringToFront?.Invoke(open); return null; }
+        var r = RowFor(app);
+        string? why = r == null ? Loc.F("{0} isn't on the network.", DeviceNameFor(app))
+            : !r.CanMirror ? Loc.F("{0} can't be reached right now ({1}).", r.Name, Theme.Look(r.State).Text) : null;
+        if (why != null) { SetStatus(Loc.F("Can't open {0}: {1}", app.Name, why), StatusKind.Warn); return why; }
+        if (_s.Demo) { SetStatus(Loc.F("Demo mode: would open {0} of {1}.", app.Name, r!.Name), StatusKind.Ok); return null; }
+        var title = $"{app.Name} – {r!.Name}";
+        var session = await StartWindowAsync(r, app.Name, serial => _s.Mirrors!.StartRemoteApp(serial, app, title, Options(r)),
+            unlock: true, toolbar: app.ShowToolbar, screenOff: app.ScreenOff);
+        if (session == null) return StatusText;
+        RemoteAppStarted?.Invoke(session, app);
+        return null;
+    }
+
+    /// <summary>A shortcut asked for a remote app (Paneless may have just started): waits up to 20 s for its device to
+    /// show up, then opens it. Null if it opened, else why not.</summary>
+    public async Task<string?> OpenRemoteAppByIdAsync(string id)
+    {
+        var app = _s.RemoteApps.Get(id);
+        if (app == null) return Loc.T("This shortcut's app isn't in Paneless any more. Add it again on the Remote apps page.");
+        for (var i = 0; i < 20 && RowFor(app) is not { CanMirror: true }; i++) await Task.Delay(1000);
+        return await OpenRemoteAppAsync(app);
+    }
 
     [RelayCommand]
     async Task SendFiles()

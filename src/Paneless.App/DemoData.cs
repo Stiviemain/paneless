@@ -52,6 +52,16 @@ public static class DemoData
     };
 
     /// <summary>Made-up inventory for demo rows.</summary>
+    /// <summary>Example remote apps (letter tiles, no real logos).</summary>
+    public static List<RemoteApp> RemoteApps() =>
+    [
+        new() { Id = "demo-chat", DeviceId = "A", Package = "com.example.chat", Name = "Chat", ShowToolbar = false,
+                Shortcuts = [@"C:\Users\you\Desktop\Chat.lnk"] },
+        new() { Id = "demo-music", DeviceId = "B", Package = "com.example.music", Name = "Music", Shape = "tablet" },
+        new() { Id = "demo-notes", DeviceId = "A", Package = "com.example.notes", Name = "Notes", OnTop = true },
+        new() { Id = "demo-kiosk", DeviceId = "K01", Package = "com.example.kiosk", Name = "Lobby kiosk", Shape = "tablet", ScreenOff = false },
+    ];
+
     public static DeviceInventory Inventory(DeviceRow r)
     {
         var h = Math.Abs(r.Key.GetHashCode());

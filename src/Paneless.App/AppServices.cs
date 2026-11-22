@@ -49,6 +49,10 @@ public sealed class AppServices
     public AlertStore Alerts => _alerts ??= Demo ? new AlertStore(DemoData.Alerts(), false) : new AlertStore();
     AlertStore? _alerts;
 
+    /// <summary>Remote apps: Android apps in windows of their own. In demo mode examples in memory only.</summary>
+    public RemoteAppStore RemoteApps => _remoteApps ??= Demo ? new RemoteAppStore(DemoData.RemoteApps(), false) : new RemoteAppStore();
+    RemoteAppStore? _remoteApps;
+
     /// <summary>The latest inventory read-out per device id (serial number), shared by Inventory, Alerts and Claude.</summary>
     public System.Collections.Concurrent.ConcurrentDictionary<string, DeviceInventory> Inventory { get; } = new();
 

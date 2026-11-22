@@ -8,6 +8,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- The on-device helper for app names and icons; built from tools/android-helper (see its build.ps1). -->
+    <EmbeddedResource Include="Assets/paneless-helper.jar" LogicalName="Paneless.Core.paneless-helper.jar" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="11.0.0" />
   </ItemGroup>
 

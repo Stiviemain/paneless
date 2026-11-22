@@ -19,6 +19,8 @@ public sealed class MirrorSession
     public bool StoppedByUs { get; set; }
     /// <summary>Put the device to sleep when this session closes and no other display window remains open for it.</summary>
     public bool LockOnClose { get; init; }
+    /// <summary>Remote app windows: which remote app this is (<see cref="RemoteApp.Id"/>).</summary>
+    public string? RemoteAppId { get; init; }
     /// <summary>App and second-screen windows: the number of the virtual display scrcpy created (from its log).</summary>
     public int? DisplayId { get; set; }
     /// <summary>Camera windows: how often it was reopened after the device cut the camera off.</summary>
@@ -92,6 +94,20 @@ public sealed partial class MirrorManager(ToolPaths tools)
         if (o.OnTop) args.Add("--always-on-top");
         if ((o.KeepAwake || o.ScreenOff) && !HasDisplaySession(serial)) args.Add("--screen-off-timeout=3600");
         return StartCore(serial, title, SessionKind.App, args, lockOnClose: o.LockOnClose);
+    }
+
+    /// <summary>A remote app: like <see cref="StartApp"/>, with the app's own name, window shape and remembered place.</summary>
+    public MirrorSession StartRemoteApp(string serial, RemoteApp app, string title, MirrorOptions o)
+    {
+        var args = app.ScrcpyArgs(title, o);
+        if ((o.KeepAwake || app.ScreenOff) && !HasDisplaySession(serial)) args.Add("--screen-off-timeout=3600");
+        return StartCore(serial, title, SessionKind.App, args, lockOnClose: o.LockOnClose, remoteAppId: app.Id);
+    }
+
+    /// <summary>The running window of a remote app, if it's open.</summary>
+    public MirrorSession? RemoteAppSession(string id)
+    {
+        lock (_lock) return _sessions.FirstOrDefault(s => s.IsRunning && s.RemoteAppId == id);
     }
 
     /// <summary>A second, resizable screen of the device (with its launcher), next to its own screen.</summary>
@@ -205,7 +221,8 @@ public sealed partial class MirrorManager(ToolPaths tools)
         return StartCore(s.Serial, s.Name, SessionKind.Camera, args, restarts: restarts);
     }
 
-    MirrorSession StartCore(string serial, string name, SessionKind kind, IEnumerable<string> args, string? outputFile = null, int restarts = 0, bool lockOnClose = false)
+    MirrorSession StartCore(string serial, string name, SessionKind kind, IEnumerable<string> args, string? outputFile = null, int restarts = 0, bool lockOnClose = false,
+        string? remoteAppId = null)
     {
         var psi = new ProcessStartInfo(tools.Scrcpy)
         {
@@ -236,7 +253,8 @@ public sealed partial class MirrorManager(ToolPaths tools)
         p.OutputDataReceived += Append;
         p.ErrorDataReceived += Append;
 
-        session = new MirrorSession { Serial = serial, Name = name, Process = p, LogPath = log, Kind = kind, OutputFile = outputFile, Args = args.ToList(), Restarts = restarts, LockOnClose = lockOnClose };
+        session = new MirrorSession { Serial = serial, Name = name, Process = p, LogPath = log, Kind = kind, OutputFile = outputFile, Args = args.ToList(), Restarts = restarts, LockOnClose = lockOnClose,
+            RemoteAppId = remoteAppId };
         p.Exited += (_, _) =>
         {
             p.WaitForExit(3000);   // flush the output handlers (bounded: a leftover child could hold the pipe)
