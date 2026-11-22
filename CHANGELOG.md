@@ -2,6 +2,30 @@
 
 All notable changes to Paneless. Versions follow [Semantic Versioning](https://semver.org).
 
+## 1.0.0-beta.3 (2026-11-22)
+
+Remote apps, a much more capable Wall, better USB support and a few fixes.
+
+**Remote apps** (new page)
+- Use Android apps like programs on your PC: each one opens in a window of its own, on a separate screen of the device, so the device's own screen is left alone (and can stay off).
+- The window has the app's name and icon and its own taskbar button, and remembers its size and place. Phone or tablet shape, or your own size; type with the PC keyboard only.
+- **Shortcuts** on the desktop and in the Start menu, with the app's icon and a small Paneless logo in the corner. They start Paneless by itself if it isn't running.
+- Add apps on the Remote apps page or from a device's app manager. Paneless reads the apps' names and real icons from the device.
+
+**Wall**
+- Screens that are off show "Screen off" and a Wake button instead of a black picture.
+- Drag pictures into your own order, drag a picture's corner to resize it, or make them all one size.
+- Right-click a picture: mirror, wake, unlock, turn the screen off, save a screenshot, second screen, apps, device settings, size, move, hide.
+
+**Devices and mirroring**
+- **USB:** devices on a cable are shown reliably next to Wi-Fi ones, and right-click › **Switch to Wi-Fi** lets you unplug and keep going.
+- Second screens and app windows unlock the device first and respect "Turn device screen off".
+- **Lock device when mirror closes**, globally, per group or per device.
+
+**AI assistants**
+- Device facts read better (battery health in words, uptime in days and hours, storage in GB), and devices that still need pairing say so.
+- Fixed: AI apps that send a byte-order mark (e.g. from Windows PowerShell) couldn't connect.
+
 ## 1.0.0-beta.2 (2026-11-21)
 
 A new layout with a navigation bar on the left, automation, overview pages, AI assistants, automatic updates and two more languages.
