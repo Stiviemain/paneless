@@ -50,30 +50,34 @@ public final class Main {
             System.out.flush();
             System.exit(0);
         } else if ("daemon".equals(args[0]) && args.length >= 2) {
-            DaemonServer server = new DaemonServer(ctx);
-            apps.register(server);
-            UiModule ui = new UiModule(server);
-            ui.register(server);
-            ClipboardModule clipboard = new ClipboardModule(server);
-            clipboard.register(server);
-            FilesModule files = new FilesModule(server);
-            files.register(server);
-            TasksModule tasks = new TasksModule(server);
-            tasks.register(server);
-            ScreenModule screen = new ScreenModule(server);
-            screen.register(server);
-            TelemetryModule telemetry = new TelemetryModule(server);
-            telemetry.register(server);
-            DeviceUtilsModule utils = new DeviceUtilsModule(server);
-            utils.register(server);
-            ControlsModule controls = new ControlsModule(server, ui);
-            controls.register(server);
-            server.run(args[1]);
-            System.exit(0);
+            try {
+                DaemonServer server = new DaemonServer(ctx);
+                registerSafe("apps", () -> apps.register(server));
+                UiModule[] uiHolder = new UiModule[1];
+                registerSafe("ui", () -> { uiHolder[0] = new UiModule(server); uiHolder[0].register(server); });
+                registerSafe("clipboard", () -> new ClipboardModule(server).register(server));
+                registerSafe("files", () -> new FilesModule(server).register(server));
+                registerSafe("tasks", () -> new TasksModule(server).register(server));
+                registerSafe("screen", () -> new ScreenModule(server).register(server));
+                registerSafe("telemetry", () -> new TelemetryModule(server).register(server));
+                registerSafe("utils", () -> new DeviceUtilsModule(server).register(server));
+                registerSafe("controls", () -> new ControlsModule(server, uiHolder[0]).register(server));
+                server.run(args[1]);
+                System.exit(0);
+            } catch (Throwable t) {
+                t.printStackTrace(System.err);
+                System.err.flush();
+                System.exit(1);
+            }
         } else {
             System.err.println("unknown command: " + args[0]);
             System.exit(2);
         }
+    }
+
+    private static void registerSafe(String name, Runnable init) {
+        try { init.run(); }
+        catch (Throwable t) { System.err.println("module " + name + " disabled: " + t); }
     }
 
     /** Exempts this shell app_process from Android 9+ non-SDK hidden API restrictions where permitted. */

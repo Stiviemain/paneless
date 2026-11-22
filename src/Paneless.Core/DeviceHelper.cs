@@ -809,8 +809,15 @@ public sealed class DeviceHelperManager(AdbClient adb) : IAsyncDisposable
             Connected?.Invoke(serial);
             return client;
         }
-        catch
+        catch (Exception ex)
         {
+            try
+            {
+                Directory.CreateDirectory(AppPaths.LogDir);
+                File.AppendAllText(Path.Combine(AppPaths.LogDir, "errors.log"),
+                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Helper start failed ({serial}): {ex.Message}{Environment.NewLine}");
+            }
+            catch { }
             return null;
         }
         finally { gate.Release(); }

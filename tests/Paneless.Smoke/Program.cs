@@ -518,6 +518,40 @@ if (args.Contains("--translations"))
     return 0;
 }
 
+if (args.Contains("--helper-live"))
+{
+    // Read-only live verification of the persistent helper daemon against a real device (counts/status only; zero private data).
+    var prefix = args[Array.IndexOf(args, "--helper-live") + 1];
+    var ac = new AdbClient(tools.Adb);
+    var dev = (await ac.GetDevicesAsync()).First(d => d.Serial.StartsWith(prefix) && d.State == "device");
+    await using var h = await DeviceHelperClient.StartAsync(ac, dev.Serial);
+    Console.WriteLine($"connected: v{h.ProtocolVersion} sdk={h.DeviceSdk} commands={h.Commands.Count}");
+    var apps = await h.GetLauncherAppsAsync();
+    Console.WriteLine($"apps: {apps?.Count ?? -1}");
+    var files = await h.ListFilesAsync("/sdcard");
+    Console.WriteLine($"files(/sdcard): {files?.Count ?? -1}");
+    var tasks = await h.ListTasksAsync();
+    Console.WriteLine($"tasks: {tasks?.Count ?? -1}");
+    var scrOn = await h.IsScreenOnAsync();
+    Console.WriteLine($"screen_state: on={scrOn}");
+    var inv = await h.GetInventoryAsync("smoke");
+    Console.WriteLine($"inventory: {(inv == null ? "FAIL" : $"{inv.Manufacturer} {inv.Model} Android {inv.AndroidVersion} bat={inv.BatteryLevel}% ram={inv.RamTotalMb}MB")}");
+    var det = await h.GetDetailedAppsAsync(false);
+    Console.WriteLine($"apps_detail: {det?.Count ?? -1}");
+    var cam = await h.GetCameraOrientationsAsync();
+    Console.WriteLine($"camera_info: back={cam?.Back} front={cam?.Front}");
+    var sys = await h.GetSystemStateAsync();
+    Console.WriteLine($"sys_get: {(sys == null ? "FAIL" : $"dark={sys.DarkMode} bright={sys.Brightness} dnd={sys.Dnd} music={sys.MusicVolume}/{sys.MusicMax}")}");
+    var media = await h.GetMediaStateAsync();
+    Console.WriteLine($"media_state: {(media == null ? "FAIL" : $"playing={media.Playing}")}");
+    var clipOk = (await h.CallAsync("clipboard_get")).Ok;
+    Console.WriteLine($"clipboard_get: ok={clipOk}");
+    var uiRes = await h.GetUiTreeAsync(maxNodes: 20);
+    Console.WriteLine($"ui_tree: ok={uiRes.Ok} count={uiRes.Data["count"]} err={uiRes.Error}");
+    await h.CallAsync("ui_detach");
+    return 0;
+}
+
 if (args.Contains("--helper"))
 {
     var okAll = true;

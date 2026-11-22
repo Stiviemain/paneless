@@ -221,6 +221,7 @@ public final class ControlsModule {
     }
 
     private DaemonServer.Result handleNotificationsWatch(JSONObject req) throws Exception {
+        if (uiModule == null) return DaemonServer.Result.fail("UiAutomation module unavailable.");
         boolean enabled = req.optBoolean("enabled", false);
         watchingNotifications = enabled;
         if (enabled) {

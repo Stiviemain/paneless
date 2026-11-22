@@ -1,6 +1,5 @@
 package app.paneless.helper;
 
-import android.app.KeyguardManager;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -19,23 +18,36 @@ import java.nio.ByteOrder;
 /**
  * Fast, lightweight screen capture (on-device downscaled JPEG) and event-driven display/screen-state
  * reporting for Paneless' Wall and screen checks. Cuts Wall Wi-Fi payload by ~100x vs full-res PNG.
+ * All system services are fetched lazily and defensively (KeyguardManager is avoided because on
+ * Android 17 it triggers WindowManagerGlobal -> ApplicationSharedMemory which isn't initialized in app_process).
  */
 public final class ScreenModule {
     private final DaemonServer server;
-    private final PowerManager power;
-    private final KeyguardManager keyguard;
-    private final DisplayManager displayManager;
+    private final Context context;
+    private PowerManager power;
+    private DisplayManager displayManager;
     private final Object watchLock = new Object();
     private DisplayManager.DisplayListener displayListener;
     private Boolean lastDisplayOn;
 
     public ScreenModule(DaemonServer server) {
         this.server = server;
-        Context ctx = server.context();
-        this.power = (PowerManager) ctx.getSystemService(Context.POWER_SERVICE);
-        this.keyguard = (KeyguardManager) ctx.getSystemService(Context.KEYGUARD_SERVICE);
-        this.displayManager = (DisplayManager) ctx.getSystemService(Context.DISPLAY_SERVICE);
+        this.context = server.context();
         server.addCloseHook(this::stopDisplayWatch);
+    }
+
+    private PowerManager power() {
+        if (power == null) {
+            try { power = (PowerManager) context.getSystemService(Context.POWER_SERVICE); } catch (Throwable ignored) { }
+        }
+        return power;
+    }
+
+    private DisplayManager displayManager() {
+        if (displayManager == null) {
+            try { displayManager = (DisplayManager) context.getSystemService(Context.DISPLAY_SERVICE); } catch (Throwable ignored) { }
+        }
+        return displayManager;
     }
 
     public void register(DaemonServer server) {
@@ -52,34 +64,41 @@ public final class ScreenModule {
     }
 
     public boolean isDisplayOn(int displayId) {
-        if (displayId == 0 && power != null && !power.isInteractive()) return false;
-        if (displayManager != null) {
-            Display d = displayManager.getDisplay(displayId);
-            if (d != null) return d.getState() == Display.STATE_ON;
+        PowerManager pm = power();
+        if (displayId == 0 && pm != null && !pm.isInteractive()) return false;
+        DisplayManager dm = displayManager();
+        if (dm != null) {
+            try {
+                Display d = dm.getDisplay(displayId);
+                if (d != null) return d.getState() == Display.STATE_ON;
+            } catch (Throwable ignored) { }
         }
-        return power == null || power.isInteractive();
+        return pm == null || pm.isInteractive();
     }
 
     private DaemonServer.Result handleState() throws Exception {
+        PowerManager pm = power();
+        DisplayManager dm = displayManager();
         JSONObject res = new JSONObject();
         res.put("on", isDisplayOn(0));
-        res.put("interactive", power != null && power.isInteractive());
-        res.put("locked", keyguard != null && keyguard.isDeviceLocked());
+        res.put("interactive", pm != null && pm.isInteractive());
         JSONArray displays = new JSONArray();
-        if (displayManager != null) {
-            for (Display d : displayManager.getDisplays()) {
-                if (d == null) continue;
-                JSONObject o = new JSONObject();
-                o.put("id", d.getDisplayId());
-                o.put("state", stateName(d.getState()));
-                o.put("on", d.getState() == Display.STATE_ON);
-                o.put("rotation", d.getRotation());
-                android.graphics.Point sz = new android.graphics.Point();
-                d.getRealSize(sz);
-                o.put("width", sz.x);
-                o.put("height", sz.y);
-                displays.put(o);
-            }
+        if (dm != null) {
+            try {
+                for (Display d : dm.getDisplays()) {
+                    if (d == null) continue;
+                    JSONObject o = new JSONObject();
+                    o.put("id", d.getDisplayId());
+                    o.put("state", stateName(d.getState()));
+                    o.put("on", d.getState() == Display.STATE_ON);
+                    o.put("rotation", d.getRotation());
+                    android.graphics.Point sz = new android.graphics.Point();
+                    d.getRealSize(sz);
+                    o.put("width", sz.x);
+                    o.put("height", sz.y);
+                    displays.put(o);
+                }
+            } catch (Throwable ignored) { }
         }
         res.put("displays", displays);
         return DaemonServer.Result.ok(res);
@@ -194,7 +213,8 @@ public final class ScreenModule {
 
     private void startDisplayWatch() {
         synchronized (watchLock) {
-            if (displayListener != null || displayManager == null) return;
+            DisplayManager dm = displayManager();
+            if (displayListener != null || dm == null) return;
             lastDisplayOn = isDisplayOn(0);
             displayListener = new DisplayManager.DisplayListener() {
                 @Override public void onDisplayAdded(int displayId) { }
@@ -213,14 +233,16 @@ public final class ScreenModule {
                     }
                 }
             };
-            displayManager.registerDisplayListener(displayListener, server.handler());
+            try { dm.registerDisplayListener(displayListener, server.handler()); }
+            catch (Throwable ignored) { displayListener = null; }
         }
     }
 
     private void stopDisplayWatch() {
         synchronized (watchLock) {
-            if (displayListener != null && displayManager != null) {
-                try { displayManager.unregisterDisplayListener(displayListener); } catch (Throwable ignored) { }
+            DisplayManager dm = displayManager();
+            if (displayListener != null && dm != null) {
+                try { dm.unregisterDisplayListener(displayListener); } catch (Throwable ignored) { }
             }
             displayListener = null;
             lastDisplayOn = null;
