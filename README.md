@@ -244,7 +244,7 @@ ChatGPT and Gemini in a web browser can't reach programs on your PC, so they can
 | Nothing | not see the device at all |
 | Read | see status, battery, apps and the log |
 | See | also take screenshots |
-| Control | also tap, swipe, type and open apps |
+| Control | also tap, swipe, type, open apps, and unlock/lock using your saved code (never revealed to the assistant) |
 | Manage | also install and remove apps, copy files, run scripts, recipes and commands, restart |
 
 By default assistants may only **read**, and Paneless asks you before one changes anything, naming the app that asks (*Allow once*, *Allow for 15 minutes* or *Don't allow*). **Pause** refuses everything until you resume, and the page lists what each assistant did. Paneless never gives an assistant your unlock codes.

@@ -34,11 +34,12 @@ public sealed record AssistantActivity(DateTime Time, string Client, string Tool
 public sealed class AssistantTools
 {
     public const string Instructions =
-        "Paneless manages the user's Android devices (phones, tablets, watches) over Wi-Fi with adb and scrcpy. " +
+        "Paneless manages the user's Android devices (phones, tablets, watches) over Wi-Fi or USB with adb and scrcpy. " +
         "Start with list_devices. Devices are named by their name or id. Some actions need the user's approval in Paneless, " +
         "and each device has a permission level the user set (read, screen, control, manage): if a tool is refused, tell the user " +
-        "they can change it on the AI page in Paneless. To operate a screen: take a screenshot, then tap or swipe using the " +
-        "pixel coordinates of that screenshot. Never guess coordinates without a recent screenshot.";
+        "they can change it on the AI page in Paneless. If a device is locked or its screen is off, use unlock_device (uses the " +
+        "code saved in Paneless without revealing it) and lock_device when done. To operate a screen: take a screenshot, then tap " +
+        "or swipe using the pixel coordinates of that screenshot. Never guess coordinates without a recent screenshot.";
 
     sealed record Tool(string Name, string Description, AssistantAccess Level, JsonObject Schema, Func<JsonObject, Task<ToolResult>> Run, bool Changes = false);
 
@@ -386,6 +387,37 @@ public sealed class AssistantTools
                 await Allow(t, [r], Localization.Loc.T("open a mirror window"));
                 await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => _main.MirrorByIdAsync(r.GroupId));
                 return ToolResult.Text($"Mirroring {r.Name}.");
+            }, changes: true);
+
+        Add("unlock_device", "Unlocks a locked device (or wakes its screen if already unlocked) using the unlock code saved in Paneless. The code is never revealed to you.",
+            AssistantAccess.Control, Schema(DeviceArg), async (t, a) =>
+            {
+                var r = FindDevice(a);
+                await Allow(t, [r], Localization.Loc.T("unlock the device"));
+                if (_s.Demo) return ToolResult.Text($"Demo mode: would unlock {r.Name}.");
+                var serial = await SerialOf(r);
+                if (_s.Unlock == null || !_s.Unlock.HasCode(r.Sn))
+                {
+                    var st = _s.Unlock != null ? await _s.Unlock.GetLockInfoAsync(serial) : null;
+                    if (st?.Locked == false)
+                    {
+                        await _s.Adb!.ShellAsync(serial, "input keyevent KEYCODE_WAKEUP", TimeSpan.FromSeconds(5));
+                        return ToolResult.Text($"{r.Name} is already unlocked (screen woken).");
+                    }
+                    return ToolResult.Text($"No unlock code is saved for {r.Name} in Paneless. Ask the user to unlock it manually or set up auto-unlock in Paneless.", true);
+                }
+                var res = await _s.Unlock.UnlockAsync(serial, r.Sn!, r.Name);
+                return ToolResult.Text(res.Message, !res.Ok);
+            }, changes: true);
+
+        Add("lock_device", "Turns the device's screen off and puts it to sleep (locks it).",
+            AssistantAccess.Control, Schema(DeviceArg), async (t, a) =>
+            {
+                var r = FindDevice(a);
+                await Allow(t, [r], Localization.Loc.T("lock the device"));
+                if (_s.Demo) return ToolResult.Text($"Demo mode: would lock {r.Name}.");
+                var res = await _s.Adb!.ShellAsync(await SerialOf(r), "input keyevent KEYCODE_SLEEP", TimeSpan.FromSeconds(5));
+                return res.Ok ? ToolResult.Text($"Locked {r.Name}.") : ToolResult.Text($"Couldn't lock {r.Name}: {res.LastLine}", true);
             }, changes: true);
 
         Add("install_app", "Installs (or updates) an APK file from the user's PC on a device or a whole group.",
