@@ -12,9 +12,9 @@
 </p>
 
 <p align="center">
-  <b>Painless screen mirroring and device management for your Android devices.</b><br>
-  Connects phones, tablets and watches over Wi-Fi or USB, mirrors any of them to your PC with one click,<br>
-  and manages one device or a whole fleet at once: install apps, run scripts, change settings, control groups together.<br>
+  <b>Painless screen mirroring, Remote apps and device management for your Android devices.</b><br>
+  Connects phones, tablets and watches over Wi-Fi or USB, mirrors any screen with one click,<br>
+  runs Android apps like native Windows programs with their own icons and shortcuts, and manages one device or a whole fleet at once.<br>
   Built on <a href="https://github.com/Genymobile/scrcpy">scrcpy</a>, with an interface made with <a href="https://avaloniaui.net/">Avalonia</a>.
 </p>
 
@@ -52,7 +52,8 @@
 
 [scrcpy](https://github.com/Genymobile/scrcpy) is excellent, but it's a command-line tool: you have to find each device's address, pair it, connect it and remember the right options. Paneless does that for you, and goes beyond watching a screen:
 
-- **See:** a live list of every device on your network, with status and battery, and their screens on your PC with a toolbar on every mirror.
+- **See:** a live list of every device over Wi-Fi or USB, with status and battery, and their screens on your PC with a toolbar on every mirror.
+- **Run Android apps like PC programs (Remote apps):** open any app in its own resizable window with its real icon, taskbar button, and desktop/Start menu shortcuts—even while the phone stays locked and its screen stays off.
 - **Manage:** organise devices in groups, then act on one device or a whole group at once.
   - Install or remove apps.
   - Copy files.
