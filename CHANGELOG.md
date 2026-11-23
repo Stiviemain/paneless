@@ -2,6 +2,34 @@
 
 All notable changes to Paneless. Versions follow [Semantic Versioning](https://semver.org).
 
+## 1.0.0-beta.5 (2026-11-23)
+
+Zero-install Phone-to-PC continuity (Files & photos, live clipboard sync, Quick controls, app handoff, Locate device), smarter AI/MCP tools, a cleaner UI, major Android 17 & HyperOS fixes, and idle phone battery savings.
+
+**Phone-to-PC tools (zero Android app to install)**
+- **Files & photos browser:** browse folders on any device with EXIF-aware photo and video thumbnails, upload/download files, and optionally auto-download new photos and screenshots straight into `Documents\Paneless\Media\<Device>`.
+- **Always-on clipboard sync** (opt-in per device or group): instant two-way text clipboard sync between Windows and Android without needing a mirror window open.
+- **Quick controls & media:** toggle Dark mode, Do Not Disturb, Auto-rotate, Wi-Fi and Bluetooth, adjust brightness and volume sliders, and control Now Playing media from your PC.
+- **Locate device:** blink the rear flashlight, vibrate and chime a misplaced phone or tablet from the Devices or Wall menu.
+- **Opt-in 2FA / OTP auto-copy:** copy incoming one-time verification codes from Android notifications straight to your Windows clipboard (English, German and French).
+- **App handoff:** *Pop out current app* moves the app on your phone into its own PC window; *Send back to phone* returns a virtual-display app to the device screen.
+- **Faster Wall & thermal alerts:** on-device downscaled JPEG capture (~20 KB instead of ~3 MB PNG), event-driven screen-off detection, instant camera orientation while a camera window is open, and push overheat alerts.
+
+**AI assistants (MCP)**
+- **Semantic UI automation:** new `read_ui_tree` and `ui_action` tools let AI assistants inspect and tap elements by text or label without taking a screenshot on every step (password fields are automatically redacted).
+- **More device tools:** `unlock_device` and `lock_device` (using Paneless' locally stored DPAPI unlock code without ever revealing it to the AI, following the normal confirmation / 15-minute grant rule), `list_remote_apps`, `open_remote_app`, `get_clipboard` / `set_clipboard`, `list_files` / `pull_file`, `list_running_apps`, `move_app_to_display`, `open_url`, `get_device_controls` / `set_device_control`, `media_control`, and `locate_device`.
+- **Better MCP compliance & setup:** standard MCP 2025 tool annotations (`readOnlyHint` / `destructiveHint` / `idempotentHint` / `openWorldHint`), 1-click **Cursor** setup (`~/.cursor/mcp.json`), green `✓ Configured in …` status badge, VS Code guidance, and fast fail (~2.5 s instead of 25 s) when Paneless is already running with AI access off.
+
+**UI, apps & settings**
+- **Cleaner navigation & layout:** moved **Logs** down above **Settings** with subtle dividers, added a left active accent pill, cogwheel Settings icon, subtle live status dots on **AI** and **Logs**, `Ctrl+1`–`Ctrl+7` / `Ctrl+,` shortcuts, slimmer sub-page headers, context-aware search with inline clear button, centered button labels, monospace metric columns, and a refined AI JSON code box.
+- **Real app icons in the App manager:** friendly app names, lazy-loaded app icons, and version/APK size details.
+- **Settings backup & factory reset:** export and import settings (optionally including saved devices, groups, profiles and remote apps; unlock codes are never exported) and reset to defaults under **Settings**.
+
+**Battery savings & real-device fixes**
+- **Idle phone battery savings:** slowed/paused background battery polling when Paneless is minimized or in the tray, automatic idle helper shutdown after 2 min (60 s on watches) when no background sync watcher or live tool needs it, and **Settings › Connecting › Disconnect idle Wi-Fi devices while in the background** (on by default; disconnects idle Wi-Fi ADB connections after 5 min in the tray so phones stay in Deep Doze, and reconnects seamlessly on demand).
+- **Android 17 (Pixel) fixes:** fixed black mirror / failed auto-unlock when virtual displays existed (`dumpsys window` multi-display parsing, waking Display 0 from Doze, `--keep-active`), and fixed helper startup on Android 17 (`KeyguardManager` / `ApplicationSharedMemory`).
+- **Tablet Remote apps fix (HyperOS / desktop mode):** new virtual displays now use natural phone/tablet DPI and force `WINDOWING_MODE_FULLSCREEN`, so Remote apps fill the window edge-to-edge instead of opening as small centered floating windows.
+
 ## 1.0.0-beta.4 (2026-11-22)
 
 Remote apps, a much more capable Wall, better USB support and a few fixes.

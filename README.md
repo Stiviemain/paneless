@@ -12,9 +12,10 @@
 </p>
 
 <p align="center">
-  <b>Painless screen mirroring, Remote apps and device management for your Android devices.</b><br>
+  <b>Painless screen mirroring, Remote apps, Phone-to-PC sync and device management for Android.</b><br>
   Connects phones, tablets and watches over Wi-Fi or USB, mirrors any screen with one click,<br>
-  runs Android apps like native Windows programs with their own icons and shortcuts, and manages one device or a whole fleet at once.<br>
+  runs Android apps like native Windows programs with their own icons and shortcuts, syncs files, clipboard and quick controls,<br>
+  and manages one device or a whole fleet — with <b>no Android app to install</b>.<br>
   Built on <a href="https://github.com/Genymobile/scrcpy">scrcpy</a>, with an interface made with <a href="https://avaloniaui.net/">Avalonia</a>.
 </p>
 
@@ -54,14 +55,15 @@
 
 - **See:** a live list of every device over Wi-Fi or USB, with status and battery, and their screens on your PC with a toolbar on every mirror.
 - **Run Android apps like PC programs (Remote apps):** open any app in its own resizable window with its real icon, taskbar button, and desktop/Start menu shortcuts—even while the phone stays locked and its screen stays off.
+- **Stay in sync (no phone app required):** browse files and photos with thumbnails, auto-download new photos and screenshots, sync your text clipboard live, toggle quick settings & media, copy 2FA codes, or ring a misplaced phone.
 - **Manage:** organise devices in groups, then act on one device or a whole group at once.
-  - Install or remove apps.
+  - Install or remove apps (with real app icons).
   - Copy files.
   - Run adb scripts.
   - Apply settings.
-- **Control:** use your keyboard and mouse on a device, map keys for games, or do something once and have it happen on every device of a group.
-- **Automate:** set devices up with recipes, run tasks on a schedule, get alerts when a battery runs low or an app crashes, and run scripts every time a device connects (e.g. turn off Doze).
-- **Ask an AI assistant:** let Claude, Codex, Gemini CLI or another MCP app answer questions about your devices or work on them for you, within the limits you set per device.
+- **Control:** use your keyboard and mouse on a device, map keys for games, pop an open phone app straight into its own PC window, or do something once and have it happen on every device of a group.
+- **Automate:** set devices up with recipes, run tasks on a schedule, get alerts when a battery runs low, a device gets hot or an app crashes, and run scripts every time a device connects (e.g. turn off Doze).
+- **Ask an AI assistant:** let Claude, Codex, Gemini CLI, Cursor or another MCP app inspect screens (screenshots or semantic UI tree), answer questions, or work on your devices within the limits you set per device.
 
 That makes it handy at home with a phone and a tablet, and just as useful with a shelf of test devices, kiosk tablets or a family's phones.
 
@@ -93,10 +95,20 @@ The interface is built with [Avalonia](https://avaloniaui.net/), a cross-platfor
 - Rotate, back, home, recent apps, volume, power.
 - Screen off, notifications, quick settings.
 - Screenshot, record, camera, type the PC clipboard.
+- **App handoff:** *Pop out current app* moves the app on your phone into its own PC window; *Send back to phone* returns a virtual-display app to the device screen.
 - **Key mapping** for games: keys become taps and a WASD or arrow-key joystick.
 - **Group control:** what you do on one device happens on the whole group.
 
 <p align="center"><img src="docs/images/toolbar.png" height="420" alt="Mirror toolbar">&nbsp;&nbsp;<img src="docs/images/groups.png" width="560" alt="Group manager"></p>
+
+**Phone-to-PC tools (zero Android app installed)**
+- **Files & photos browser:** browse folders with EXIF-aware photo and video thumbnails, upload or download files, and optionally auto-download new photos and screenshots straight to `Documents\Paneless\Media\<Device>`.
+- **Always-on clipboard sync** *(opt-in per device or group)*: instant two-way text clipboard sync between Windows and Android without mirroring open.
+- **Quick controls & media:** toggle Dark mode, Do Not Disturb, Auto-rotate, Wi-Fi and Bluetooth, adjust brightness and volume sliders, and control Now Playing media.
+- **Locate device:** blink the flashlight, vibrate and chime a misplaced device from the Devices or Wall menu.
+- **Opt-in 2FA / OTP auto-copy:** copies incoming verification codes from Android notifications straight to your Windows clipboard (EN, DE, FR).
+
+<p align="center"><img src="docs/images/files.png" width="490" alt="Files and photos browser">&nbsp;&nbsp;<img src="docs/images/controls.png" width="260" alt="Quick controls and media"></p>
 
 **Managing devices, one or a whole fleet**
 - **Act on a group in one go:** drop an APK on a group heading to install it on every device in it; send files the same way; run a script on the whole group.
@@ -105,8 +117,8 @@ The interface is built with [Avalonia](https://avaloniaui.net/), a cross-platfor
   - Fields like `{package}` are asked for when a script runs.
   - Risky scripts ask first.
 - **Run scripts automatically** every time a device connects, e.g. *Turn off Doze*, so settings that reset on restart stay the way you want.
-- **App manager:** open, force-stop, disable, clear data, uninstall, install APKs (also on a whole group).
-- **Settings per device or group:** mirror quality, behaviour on connect, a folder for files.
+- **App manager:** friendly app names with real icons, version and APK size; open, force-stop, disable, clear data, uninstall, install APKs (also on a whole group), or add straight to Remote apps.
+- **Settings per device or group:** mirror quality, behaviour on connect, sync options, a folder for files.
 - **Group control:** do something on one device and it happens on every connected device of its group.
 
 <p align="center"><img src="docs/images/scripts.png" width="760" alt="Scripts window"></p>
@@ -129,8 +141,10 @@ The interface is built with [Avalonia](https://avaloniaui.net/), a cross-platfor
 - Paneless can be a tool for Claude, Codex, Gemini CLI and other AI apps that support [MCP](https://modelcontextprotocol.io). Ask about your devices, or let the assistant install apps, run scripts or operate a screen. See [AI assistants](#ai-assistants).
 
 **Around the app**
-- Notification-area icon, optional start with Windows.
+- Notification-area icon, optional start with Windows, and keyboard navigation (`Ctrl+1`–`Ctrl+7` for pages, `Ctrl+,` for Settings).
 - A global shortcut per device (e.g. Ctrl+Alt+P).
+- **Battery-friendly in the background:** slows and pauses battery polling when minimized, shuts down its idle device helper automatically, and disconnects idle Wi-Fi devices after 5 minutes in the tray so phones stay in Android Deep Doze (reconnecting automatically when you open Paneless or launch a shortcut).
+- **Settings backup & factory reset:** export and import your configuration (optionally including saved devices, groups, profiles and remote apps — unlock codes are never exported) or reset to defaults in **Settings**.
 - **Automatic updates** from GitHub Releases: downloaded in the background and installed when you close Paneless. Can be turned off.
 - **Share scripts:** export one or all of your scripts as a file or to the clipboard; import from a file, the clipboard or a link (e.g. a GitHub Gist). Imported scripts are shown before they're added and ask before running.
 - **Light and dark mode**, following the system theme by default and switching live in Settings.
@@ -180,10 +194,17 @@ From then on, plugged-in USB devices appear immediately, and paired Wi-Fi device
 | Restart devices every night | **Automation › Scheduled tasks › + New** |
 | Get told about low batteries or crashes | **Automation › Alerts** |
 | Use an Android app like a PC program | **Remote apps › Add an app…**, then **Open** or **Create shortcut** |
+| Browse files and photos on a device | Right-click › **Files and photos…** (or **More › Files and photos…**) |
+| Toggle Dark mode, DND, volume or media | Right-click › **Quick controls…** (or **More › Quick controls…**) |
+| Sync clipboard, photos or 2FA codes | **Device settings…** (or **Group settings…**), tick the sync options you want |
+| Pop the phone's current app into a PC window | Right-click › **Pop out current app** (or the mirror toolbar) |
+| Ring & flash a misplaced phone | Right-click › **Locate device** (also on the **Wall**) |
 | See every screen at once | **Wall** |
-| Find out why an app crashes | **Logs**, then **Crashes only** |
+| Find out why an app crashes | **Logs** (at the bottom of the left bar), then **Crashes only** |
 | Get a list of all devices for Excel | **Inventory › Read devices › Export** |
 | Share a script | **Scripts**, select it, **Share** (to add one: **Import**) |
+| Back up or reset Paneless settings | **Settings › Backup and reset** |
+| Switch pages with the keyboard | `Ctrl+1`–`Ctrl+7` for pages, `Ctrl+,` for **Settings** |
 | Switch light / dark mode | **Settings › Appearance** (follows the system theme by default) |
 | Change the language | **Settings › Language**, then restart Paneless |
 
@@ -217,7 +238,7 @@ Use Android apps like programs on your PC, the way Windows' RemoteApp works over
 
 What Android doesn't allow: apps that block screen capture (banking, some video apps) show a black window, an app can only be open in one place at a time (opening it on the PC takes it off the phone's screen), and there's no sound per app. A few apps don't like a second screen and jump back to the phone.
 
-The app names and icons come from a small helper that Paneless copies to the device (like scrcpy's own server) and runs for a moment. It only reads, installs nothing and keeps nothing running.
+App icons, Files & photos, Quick controls, clipboard sync, fast Wall captures and semantic UI trees are powered by a small helper (`paneless-helper`) that Paneless pushes to `/data/local/tmp` and runs over a local ADB socket (just like scrcpy's own server). It installs no Android app, holds no wakelocks, and shuts itself down automatically after 2 minutes idle (60 s on watches) whenever no background sync watcher or open tool window needs it.
 
 ## AI assistants
 
@@ -243,10 +264,10 @@ ChatGPT and Gemini in a web browser can't reach programs on your PC, so they can
 | Level | Assistants may… |
 |---|---|
 | Nothing | not see the device at all |
-| Read | see status, battery, apps, remote apps and the log |
-| See | also take screenshots |
-| Control | also tap, swipe, type, open apps / remote apps, and unlock/lock using your saved code (never revealed to the assistant) |
-| Manage | also install and remove apps, copy files, run scripts, recipes and commands, restart |
+| Read | see status, battery, apps, remote apps, running apps, files list, clipboard, controls/media state and the log |
+| See | also take screenshots and inspect the semantic UI tree (`read_ui_tree`, with password fields redacted) |
+| Control | also tap/swipe/type, act on UI elements by label (`ui_action`), open apps / remote apps / URLs, hand off apps between displays, set clipboard, toggle quick controls/media, locate device, and unlock/lock using your saved code (never revealed to the assistant) |
+| Manage | also install and remove apps, pull/copy files, run scripts, recipes and commands, restart |
 
 By default assistants may only **read**, and Paneless asks you before one changes anything, naming the app that asks (*Allow once*, *Allow for 15 minutes* or *Don't allow*). **Pause** refuses everything until you resume, and the page lists what each assistant did. Paneless never gives an assistant your unlock codes, and marks every tool with standard MCP `readOnlyHint` / `destructiveHint` annotations.
 
@@ -254,6 +275,7 @@ By default assistants may only **read**, and Paneless asks you before one change
 - *"Which of my devices have less than 20 % battery?"*
 - *"Unlock the Pixel, open Settings and turn on dark mode, then lock it again."*
 - *"Install `C:\Builds\app.apk` on the Test lab group."*
+- *"Ring my Pixel so I can find it, or pull the latest screenshot from `DCIM/Screenshots`."*
 - *"Why does my app crash on the tablet? Read its log."*
 
 <details>
@@ -279,12 +301,13 @@ Paneless has to be running (it starts in the notification area by itself when an
 
 ## Privacy and security
 
-- **Local only.** Paneless talks to your devices over your own network with adb and scrcpy. It sends nothing anywhere else, with two exceptions:
+- **Local only.** Paneless talks to your devices over your own network with adb, scrcpy and its local in-RAM helper (no APK installed, no wakelocks, auto-stops when idle). It sends nothing anywhere else, with two exceptions:
   - Update checks ask GitHub for the newest release (switch off in **Settings › Updates**).
-  - If you connect an AI assistant, what it reads through Paneless (device facts, logs, screenshots) becomes part of your conversation with that AI service. Only the devices and levels you allow are visible to it.
+  - If you connect an AI assistant, what it reads through Paneless (device facts, logs, screenshots, UI tree) becomes part of your conversation with that AI service. Only the devices and levels you allow are visible to it.
 - **Unlock codes** are encrypted with Windows DPAPI, the protection Credential Manager and browsers use. Only your Windows account on this PC can read them (on macOS the keychain, on Linux the Secret Service).
   - A code is typed only after Paneless confirms the device is locked and its lock screen is in front.
   - One failed try pauses auto-unlock for that device.
+  - Unlock codes are **never** included in Settings backups and never revealed to AI assistants.
 - **Wireless debugging** gives full control of a device to any computer you paired. Only pair computers you trust, and turn it off on networks you don't.
 - Found a vulnerability? Please see [SECURITY.md](SECURITY.md).
 
