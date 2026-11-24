@@ -82,6 +82,7 @@ public partial class MainWindow : Window
             Vm.ShowFiles = row => ShowFiles(row);
             Vm.ShowControls = row => ShowControls(row);
             Vm.PickFilesAsync = PickFilesAsync;
+            Vm.ExportDevicesAsync = ExportDevicesAsync;
             Vm.ArrangeWindows = sessions => { if (OperatingSystem.IsWindows()) WindowArranger.Arrange(sessions, TryGetPlatformHandle()?.Handle ?? 0); };
             // Remember where camera windows are, so one the device cuts off (e.g. when it rotates) reopens in place.
             if (OperatingSystem.IsWindows() && _services?.Mirrors is { } mm)
@@ -302,6 +303,7 @@ public partial class MainWindow : Window
         RemoteAppsPage.DataContext = RemoteApps = new RemoteAppsViewModel(s, vm)
         {
             ConfirmAsync = (t, m) => ConfirmWindow.AskAsync(this, t, m, null, Localization.Loc.T("Remove")),
+            ExportConnectionsAsync = ExportRemoteAppsAsync,
         };
         vm.AddRemoteApp = RemoteApps.AddAsync;
         if (OperatingSystem.IsWindows()) TrackRemoteApps(vm);
@@ -365,8 +367,30 @@ public partial class MainWindow : Window
     [System.Runtime.Versioning.SupportedOSPlatform("windows")]
     void TrackRemoteApps(MainViewModel vm)
     {
-        var open = new Dictionary<MirrorSession, (RemoteApp App, int Dressed, int LastW, int LastH)>();
-        vm.RemoteAppStarted = (session, app) => { open[session] = (app, 0, 0, 0); RemoteApps?.UpdateStates(); };
+        var open = new Dictionary<MirrorSession, (RemoteApp App, int Dressed, int LastW, int LastH, int LastDpi)>();
+        vm.RemoteAppStarted = (session, app) =>
+        {
+            var (iw, ih) = app.Window is { W: > 100, H: > 100 } p
+                ? (Math.Clamp(p.W, 320, 3840), Math.Clamp(p.H, 320, 3840))
+                : app.DisplaySize();
+            open[session] = (app, 0, 0, 0, app.DisplayDpi(iw, ih));
+            RemoteApps?.UpdateStates();
+        };
+        if (RemoteApps != null)
+            RemoteApps.ResizeLiveWindow = app =>
+            {
+                var entry = open.FirstOrDefault(kv => kv.Key.IsRunning && kv.Value.App.Id == app.Id);
+                if (entry.Key == null) return;
+                try { entry.Key.Process.Refresh(); } catch { return; }
+                var h = entry.Key.Process.MainWindowHandle;
+                if (h == 0) return;
+                var (tw, th) = app.DisplaySize();
+                if (Platform.Win32.ResizeClientOnScreen(h, tw, th) is not null && Platform.Win32.ClientBounds(h) is { } c)
+                {
+                    app.Window = new WindowPlace { X = c.Left, Y = c.Top, W = c.Right - c.Left, H = c.Bottom - c.Top };
+                    _services?.RemoteApps.Save();
+                }
+            };
         if (_services?.Mirrors != null)
             _services.Mirrors.Failed += (session, why) => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
@@ -376,7 +400,7 @@ public partial class MainWindow : Window
         timer.Tick += (_, _) =>
         {
             if (open.Count == 0) return;
-            foreach (var (session, (app, dressed, lastW, lastH)) in open.ToList())
+            foreach (var (session, (app, dressed, lastW, lastH, lastDpi)) in open.ToList())
             {
                 if (!session.IsRunning)
                 {
@@ -401,17 +425,31 @@ public partial class MainWindow : Window
                     }
                     catch { /* cosmetic: the app works without it */ }
                 }
-                int curW = lastW, curH = lastH;
+                int curW = lastW, curH = lastH, curDpi = lastDpi;
                 if (!Platform.Win32.IsIconic(h) && Platform.Win32.ClientBounds(h) is { } c && c.Right - c.Left > 100 && c.Bottom - c.Top > 100)
                 {
                     curW = c.Right - c.Left;
                     curH = c.Bottom - c.Top;
                     app.Window = new WindowPlace { X = c.Left, Y = c.Top, W = curW, H = curH };
                 }
+                // Keep DPI matched to the actual window size and the user's ScalePercent: scrcpy's --flex-display
+                // resizes pixels without updating density, which otherwise blows up UI when a window is shrunk.
+                var dpiChanged = false;
+                if (session.DisplayId is { } didDpi && didDpi > 0 && curW > 100 && curH > 100 && _services?.Adb is { } adb)
+                {
+                    var wantDpi = app.DisplayDpi(curW, curH);
+                    if (wantDpi != curDpi)
+                    {
+                        curDpi = wantDpi;
+                        dpiChanged = true;
+                        var serial = session.Serial;
+                        _ = Task.Run(async () => { try { await adb.SetDisplayDensityAsync(serial, didDpi, wantDpi); } catch { } });
+                    }
+                }
                 // On tablets with Desktop/Freeform mode (e.g. Xiaomi HyperOS), force the virtual display & task
                 // to fill the entire window once the display appears and whenever the window is resized.
                 var resized = lastW > 0 && (Math.Abs(curW - lastW) > 12 || Math.Abs(curH - lastH) > 12);
-                if (session.DisplayId is { } did && did > 0 && (dressed is 0 or 2 || resized) && _services?.Helpers != null)
+                if (session.DisplayId is { } did && did > 0 && (dressed is 0 or 2 || resized || dpiChanged) && _services?.Helpers != null)
                 {
                     var serial = session.Serial;
                     var pkg = app.Package;
@@ -423,7 +461,7 @@ public partial class MainWindow : Window
                             try { await helper.EnsureDisplayFullscreenAsync(did, pkg, w, ht); } catch { }
                     });
                 }
-                open[session] = (app, Math.Min(dressed + 1, 5), curW, curH);
+                open[session] = (app, Math.Min(dressed + 1, 5), curW, curH, curDpi);
             }
         };
         timer.Start();
@@ -439,6 +477,15 @@ public partial class MainWindow : Window
         if (OperatingSystem.IsWindows()) Toast.Show("Paneless", why);
     }
 
+    /// <summary>A shortcut asked to mirror a device (Paneless may have just started hidden).</summary>
+    public async Task OpenMirrorFromShortcutAsync(string deviceId)
+    {
+        if (Vm == null) return;
+        for (var i = 0; i < 20 && !Vm.NetworkRows.Any(r => (r.GroupId == deviceId || r.Serial == deviceId) && r.CanMirror); i++)
+            await Task.Delay(1000);
+        await Vm.MirrorByIdAsync(deviceId);
+    }
+
     /// <summary>Testing aid (demo mode): starts the AI server even though demo mode normally keeps it off.</summary>
     public void StartAssistantServerForTest() => _mcp?.Start();
 
@@ -451,6 +498,67 @@ public partial class MainWindow : Window
             FileTypeChoices = [new FilePickerFileType(ext.ToUpperInvariant()) { Patterns = ["*." + ext] }],
         });
         return file?.TryGetLocalPath();
+    }
+
+    async Task<string?> ExportDevicesAsync(IReadOnlyList<DeviceRow> rows, string? groupLabel)
+    {
+        if (_services == null || rows.Count == 0) return null;
+        var icon = RemoteAppIcons.PanelessPng(48);
+        var entries = rows.Select(r => new ExportEntry(
+            StableKey: "paneless:mirror:" + r.GroupId,
+            Name: r.Name,
+            Folder: _services.Groups.GroupOf(r.GroupId)?.Name,
+            Description: Loc.F("{0}, mirrored with Paneless", r.Name),
+            Kind: ExportEntryKind.Mirror,
+            TargetId: r.GroupId,
+            IconPng: icon)).ToList();
+        var summary = rows.Count == 1 ? rows[0].Name
+            : groupLabel != null ? Loc.F("{0} in {1}", Loc.Count(rows.Count, "{0} device", "{0} devices"), groupLabel)
+            : Loc.Count(rows.Count, "{0} device", "{0} devices");
+        return await ExportEntriesAsync(entries, summary, ConnectionExporters.SuggestedFileName(entries, groupLabel ?? "Paneless-devices"));
+    }
+
+    async Task<string?> ExportRemoteAppsAsync(IReadOnlyList<RemoteApp> apps)
+    {
+        if (_services == null || Vm == null || apps.Count == 0) return null;
+        var entries = apps.Select(app =>
+        {
+            var devName = Vm.DeviceNameFor(app);
+            return new ExportEntry(
+                StableKey: "paneless:remote-app:" + app.Id,
+                Name: app.Name,
+                Folder: "Remote apps",
+                Description: Loc.F("{0} on {1} ({2}), opened with Paneless", app.Name, devName, app.Package),
+                Kind: ExportEntryKind.RemoteApp,
+                TargetId: app.Id,
+                IconPng: RemoteAppIcons.BadgedPng(app, 48));
+        }).ToList();
+        var summary = apps.Count == 1 ? apps[0].Name : Loc.Count(apps.Count, "{0} remote app", "{0} remote apps");
+        return await ExportEntriesAsync(entries, summary, ConnectionExporters.SuggestedFileName(entries, "Paneless-remote-apps"));
+    }
+
+    async Task<string?> ExportEntriesAsync(IReadOnlyList<ExportEntry> entries, string summary, string suggestedName)
+    {
+        if (_services == null) return null;
+        var choice = await ConnectionExportWindow.AskAsync(this, summary);
+        if (choice == null) return null;
+        if (_services.Demo) return Loc.F("Demo mode: would export {0}.", summary);
+
+        var ext = choice.Exporter.FileExtension;
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            SuggestedFileName = suggestedName + "." + ext,
+            DefaultExtension = ext,
+            FileTypeChoices = [new FilePickerFileType(choice.Exporter.FileTypeName) { Patterns = ["*." + ext] }],
+        });
+        var path = file?.TryGetLocalPath();
+        if (string.IsNullOrEmpty(path)) return null;
+
+        var exe = Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "Paneless.exe");
+        if (OperatingSystem.IsWindows()) exe = Platform.Win32.GetShortPath(exe);
+        var content = choice.Exporter.Export(entries, exe, choice.DisplayMode, choice.RootFolder);
+        await File.WriteAllTextAsync(path, content, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        return Loc.F("Exported {0} to {1}.", summary, Path.GetFileName(path));
     }
 
     async Task<string?> PickOneFileAsync(string title, string[] patterns)

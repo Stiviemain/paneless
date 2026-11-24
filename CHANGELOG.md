@@ -2,6 +2,22 @@
 
 All notable changes to Paneless. Versions follow [Semantic Versioning](https://semver.org).
 
+## 1.0.0-beta.6 (2026-11-24)
+
+Embedded sessions for connection managers (Devolutions RDM), live UI scaling and live window-shape resizing for Remote apps, and a branded installer splash screen with WinGet automation.
+
+**Embedded sessions & Devolutions RDM export**
+- **Embedded session host (`--embed`):** open any device mirror, second screen, or Remote app inside a dedicated host window for external tab managers (Devolutions Remote Desktop Manager, etc.), with borderless embedded `scrcpy`, an inline right-edge mirror toolbar, and automatic child process cleanup when the tab closes.
+- **Export for remote tools (`.rdm`):** export devices, selections, whole groups, or Remote apps (**Export for remote tools…** / **Export all…**) with Paneless group folders, real badged app icons, preserved Remote app shapes, and deterministic IDs so re-imports update in place.
+
+**Remote apps live scaling & window shape**
+- **Per-app UI scale (`65 %`–`150 %`):** lower virtual display density down to `120 dpi` so dense phone and tablet apps fit comfortably on PC monitors without excessive scrolling.
+- **Automatic DPI sync & live shape resizing:** resizing a Remote app window automatically updates its virtual display DPI (`wm density`), and switching **Window shape** (`Phone`, `Tablet`, `Custom` W×H) or **UI scale** applies live without restarting the app.
+
+**Installer & distribution**
+- **Branded installer splash:** added a dark Paneless setup splash image with a `#4f8cff` progress bar (`tools/make-splash.ps1`, `Paneless-splash.png`) and explicit `win-x64` Velopack packaging.
+- **WinGet automation:** added `.github/workflows/winget.yml` to open package updates in `microsoft/winget-pkgs` automatically on future releases.
+
 ## 1.0.0-beta.5 (2026-11-23)
 
 Zero-install Phone-to-PC continuity (Files & photos, live clipboard sync, Quick controls, app handoff, Locate device), smarter AI/MCP tools, a cleaner UI, major Android 17 & HyperOS fixes, and idle phone battery savings.

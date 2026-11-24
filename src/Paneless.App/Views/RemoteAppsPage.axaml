@@ -12,7 +12,10 @@
         <TextBlock Classes="pagehint" TextWrapping="Wrap"
                    Text="{l:T 'Android apps in windows of their own, like programs on your PC. Each one runs on a separate screen of the device, so the device’s own screen is left alone.'}" />
       </StackPanel>
-      <Button Grid.Column="1" Classes="accent" VerticalAlignment="Bottom" Margin="12,0,0,0" Content="{l:T 'Add an app…'}" Command="{Binding StartAddCommand}" />
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom" Margin="12,0,0,0">
+        <Button Content="{l:T 'Export all…'}" Command="{Binding ExportAllCommand}" IsVisible="{Binding !IsEmpty}" />
+        <Button Classes="accent" Content="{l:T 'Add an app…'}" Command="{Binding StartAddCommand}" />
+      </StackPanel>
     </Grid>
 
     <TextBlock DockPanel.Dock="Bottom" Classes="small" Margin="0,8,0,0" Text="{Binding Message}" Foreground="{Binding MessageBrush}"
@@ -58,6 +61,7 @@
 
           <WrapPanel ItemSpacing="8" LineSpacing="8">
             <Button Classes="accent" Content="{l:T 'Open'}" Command="{Binding $parent[UserControl].((vm:RemoteAppsViewModel)DataContext).OpenCommand}" />
+            <Button Content="{l:T 'Export for remote tools…'}" Command="{Binding $parent[UserControl].((vm:RemoteAppsViewModel)DataContext).ExportSelectedCommand}" />
             <Button Content="{l:T 'Remove…'}" Command="{Binding $parent[UserControl].((vm:RemoteAppsViewModel)DataContext).RemoveCommand}" />
           </WrapPanel>
 
@@ -82,7 +86,7 @@
           <Border Classes="card" Padding="14">
             <StackPanel Spacing="10">
               <TextBlock Classes="heading" Text="{l:T 'Customize'}" />
-              <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
+              <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="10">
                 <TextBlock Classes="label" VerticalAlignment="Center" Text="{l:T 'Name'}" />
                 <TextBox Grid.Column="1" MaxWidth="320" HorizontalAlignment="Left" MinWidth="220" Text="{Binding Name}" />
                 <TextBlock Grid.Row="1" Classes="label" VerticalAlignment="Center" Text="{l:T 'Window shape'}" />
@@ -93,7 +97,12 @@
                   <NumericUpDown Width="120" Minimum="320" Maximum="3840" Increment="10" FormatString="0" Value="{Binding CustomHeight}" IsVisible="{Binding IsCustom}" />
                 </StackPanel>
                 <TextBlock Grid.Row="2" Grid.Column="1" Classes="small" TextWrapping="Wrap"
-                           Text="{l:T 'The window remembers where you put it and how big you made it.'}" />
+                           Text="{l:T 'The window remembers where you put it and how big you made it. Shape changes apply live while the app is open.'}" />
+                <TextBlock Grid.Row="3" Classes="label" VerticalAlignment="Center" Text="{l:T 'UI scale'}" />
+                <ComboBox Grid.Row="3" Grid.Column="1" MinWidth="180" HorizontalAlignment="Left"
+                          ItemsSource="{Binding $parent[UserControl].((vm:RemoteAppsViewModel)DataContext).ScaleChoices}" SelectedItem="{Binding Scale}" />
+                <TextBlock Grid.Row="4" Grid.Column="1" Classes="small" TextWrapping="Wrap"
+                           Text="{l:T 'Lower makes text and buttons smaller so more fits without scrolling. Applies live while the app is open.'}" />
               </Grid>
               <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasPlace}">
                 <Button Classes="flat" Content="{l:T 'Forget the window’s place'}" Command="{Binding $parent[UserControl].((vm:RemoteAppsViewModel)DataContext).ForgetPlaceCommand}" />

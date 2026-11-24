@@ -1034,6 +1034,28 @@ public sealed partial class MainViewModel : ObservableObject
         await SendFilesAsync(files, Members(h).Select(m => m.Row).ToList());
     }
 
+    /// <summary>Set by the window: exports one or more devices as connection entries for external remote tools.</summary>
+    public Func<IReadOnlyList<DeviceRow>, string?, Task<string?>>? ExportDevicesAsync { get; set; }
+
+    [RelayCommand]
+    async Task ExportConnections()
+    {
+        if (ExportDevicesAsync == null) return;
+        var picked = SelectedRows.Where(r => !r.NeedsPairing).ToList();
+        if (picked.Count == 0)
+            picked = Items.OfType<DeviceItemViewModel>().Select(d => d.Row).Where(r => !r.NeedsPairing).ToList();
+        if (picked.Count == 0) { SetStatus(Loc.T("No paired devices to export."), StatusKind.Warn); return; }
+        if (await ExportDevicesAsync(picked, null) is { Length: > 0 } msg) SetStatus(msg, StatusKind.Ok);
+    }
+
+    public async Task ExportGroupConnectionsAsync(GroupHeaderViewModel h)
+    {
+        if (ExportDevicesAsync == null) return;
+        var rows = Members(h).Select(m => m.Row).Where(r => !r.NeedsPairing).ToList();
+        if (rows.Count == 0) { SetStatus(Loc.T("No paired devices in this group to export."), StatusKind.Warn); return; }
+        if (await ExportDevicesAsync(rows, h.Name) is { Length: > 0 } msg) SetStatus(msg, StatusKind.Ok);
+    }
+
     [RelayCommand]
     void ArrangeAll() => Arrange(null);
 

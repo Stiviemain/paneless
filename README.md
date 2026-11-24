@@ -42,6 +42,7 @@
 - [First use](#first-use)
 - [Using Paneless](#using-paneless)
 - [Remote apps](#remote-apps)
+- [Remote tools (RDM)](#remote-tools-rdm)
 - [AI assistants](#ai-assistants)
 - [Privacy and security](#privacy-and-security)
 - [Troubleshooting](#troubleshooting)
@@ -194,6 +195,7 @@ From then on, plugged-in USB devices appear immediately, and paired Wi-Fi device
 | Restart devices every night | **Automation › Scheduled tasks › + New** |
 | Get told about low batteries or crashes | **Automation › Alerts** |
 | Use an Android app like a PC program | **Remote apps › Add an app…**, then **Open** or **Create shortcut** |
+| Open devices or Remote apps as tabs in RDM | Right-click a device / group (or on **Remote apps**) › **Export for remote tools…** |
 | Browse files and photos on a device | Right-click › **Files and photos…** (or **More › Files and photos…**) |
 | Toggle Dark mode, DND, volume or media | Right-click › **Quick controls…** (or **More › Quick controls…**) |
 | Sync clipboard, photos or 2FA codes | **Device settings…** (or **Group settings…**), tick the sync options you want |
@@ -231,7 +233,7 @@ Use Android apps like programs on your PC, the way Windows' RemoteApp works over
 - **One window per app.** It runs on a separate virtual screen of the device, so the device's own screen is left alone (and can stay off). Right-click in the window goes back.
 - **Looks like the app:** the window and its taskbar button have the app's name and icon. Pin it to the taskbar like any program.
 - **Shortcuts** use the app's icon with a small Paneless logo in the corner, so you can tell where they come from. They start Paneless by itself (in the notification area) if it isn't running, and keep working when the device's IP address changes or Paneless updates.
-- **Remembers its window:** size and place, per app. Choose a phone or tablet shape, or your own size.
+- **Remembers its window:** size and place, per app. Choose a phone or tablet shape, or your own size — **Window shape** and **UI scale** (`65 %`–`150 %`) apply live while the app is open.
 - **PC keyboard only:** Android's on-screen keyboard stays out of the window (can be switched off per app).
 - The device is unlocked first if you saved its PIN.
 - **Keeps showing when you lock the device:** the app window stays live while the device is locked and its own screen is off (*Settings › Keep app windows on when locked*, on by default). Without it, some devices (e.g. Pixels with Android 17) turn the window black a few seconds after their screen goes off.
@@ -239,6 +241,25 @@ Use Android apps like programs on your PC, the way Windows' RemoteApp works over
 What Android doesn't allow: apps that block screen capture (banking, some video apps) show a black window, an app can only be open in one place at a time (opening it on the PC takes it off the phone's screen), and there's no sound per app. A few apps don't like a second screen and jump back to the phone.
 
 App icons, Files & photos, Quick controls, clipboard sync, fast Wall captures and semantic UI trees are powered by a small helper (`paneless-helper`) that Paneless pushes to `/data/local/tmp` and runs over a local ADB socket (just like scrcpy's own server). It installs no Android app, holds no wakelocks, and shuts itself down automatically after 2 minutes idle (60 s on watches) whenever no background sync watcher or open tool window needs it.
+
+## Remote tools (RDM)
+
+Open your Android mirrors and Remote apps right alongside your RDP, SSH and VPN sessions inside connection managers like [Devolutions Remote Desktop Manager](https://devolutions.net/remote-desktop-manager/) (RDM)—no plugin or add-on required.
+
+<p align="center"><img src="docs/images/rdm-integration.png" width="760" alt="Paneless device mirror and Remote app embedded as tabs in Devolutions Remote Desktop Manager"></p>
+
+1. In Paneless, pick what you want to export:
+   - **A device or selection:** right-click › **Export for remote tools…** (or **More › Export for remote tools…**).
+   - **A whole group:** group menu (`⋯` or right-click) › **Export for remote tools…** (includes offline group members too).
+   - **Remote apps:** **Export for remote tools…** on one app, or **Export all…** in the page header.
+2. Choose the target tool (**Remote Desktop Manager**), whether sessions open as an **Embedded tab** or an **External window**, and the vault folder (default `Paneless`), then save the `.rdm` file.
+3. In RDM, import it via **File › Import › Import (.rdm)**.
+
+- **True embedded tabs (Windows):** devices and Remote apps dock directly inside RDM tabs with no extra terminal window, and closing the tab closes the session cleanly.
+- **Inline mirror toolbar:** embedded device mirrors include a compact right-hand toolbar inside the tab (Rotate, Back, Home, Recents, Volume, Power, Screen off, Notifications, Quick settings, Screenshot, Record, Type clipboard).
+- **Real icons & folder structure:** Remote apps keep their real Android icon with the Paneless corner badge, mirrors get the Paneless icon, and your Paneless groups become vault folders.
+- **Preserves your configured shape:** embedded Remote apps keep their phone, tablet or custom shape centered inside the tab instead of stretching across wide monitors.
+- **Re-import friendly:** every entry gets a stable ID, so exporting again later updates existing entries in place instead of creating duplicates.
 
 ## AI assistants
 
@@ -382,4 +403,4 @@ Paneless is [MIT licensed](LICENSE). It stands on the shoulders of:
 
 Their licenses are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
-Paneless isn't affiliated with Google, Genymobile, AvaloniaUI or any device maker. Android is a trademark of Google LLC.
+Paneless isn't affiliated with Google, Genymobile, AvaloniaUI, Devolutions or any device maker. Android is a trademark of Google LLC.

@@ -34,4 +34,5 @@ public sealed partial class GroupHeaderViewModel(MainViewModel main, DeviceGroup
     [RelayCommand] void Settings() => main.GroupSettings(this);
     [RelayCommand] void Arrange() => main.ArrangeGroup(this);
     [RelayCommand] Task SendFiles() => main.SendFilesToGroupAsync(this);
+    [RelayCommand] Task ExportConnections() => main.ExportGroupConnectionsAsync(this);
 }

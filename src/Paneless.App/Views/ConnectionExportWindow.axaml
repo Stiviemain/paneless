@@ -1,0 +1,43 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="using:Paneless.App.Localization"
+        xmlns:core="using:Paneless.Core"
+        x:Class="Paneless.App.Views.ConnectionExportWindow"
+        Title="{l:T 'Export for remote tools'}" Icon="/Assets/Paneless.ico"
+        Width="460" SizeToContent="Height" CanResize="False"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+  <StackPanel Margin="24,20" Spacing="14">
+    <StackPanel Spacing="4">
+      <TextBlock FontSize="18" FontWeight="SemiBold" Text="{l:T 'Export for remote tools'}" />
+      <TextBlock x:Name="SummaryText" Classes="dim" TextWrapping="Wrap" />
+    </StackPanel>
+
+    <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="12" ColumnSpacing="12">
+      <TextBlock Classes="label" VerticalAlignment="Center" Text="{l:T 'Remote tool'}" />
+      <ComboBox x:Name="FormatBox" Grid.Column="1" HorizontalAlignment="Stretch" SelectionChanged="OnFormatChanged">
+        <ComboBox.ItemTemplate>
+          <DataTemplate x:DataType="core:IConnectionExporter">
+            <TextBlock Text="{Binding Name}" />
+          </DataTemplate>
+        </ComboBox.ItemTemplate>
+      </ComboBox>
+
+      <TextBlock Grid.Row="1" Classes="label" VerticalAlignment="Center" Text="{l:T 'Open in'}" />
+      <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+        <RadioButton x:Name="EmbeddedRadio" GroupName="ExportMode" Content="{l:T 'Embedded tab'}" IsChecked="True" />
+        <RadioButton x:Name="ExternalRadio" GroupName="ExportMode" Content="{l:T 'External window'}" />
+      </StackPanel>
+
+      <TextBlock Grid.Row="2" Classes="label" VerticalAlignment="Center" Text="{l:T 'Folder in vault'}" />
+      <TextBox x:Name="FolderBox" Grid.Row="2" Grid.Column="1" MaxLength="120" PlaceholderText="Paneless" />
+    </Grid>
+
+    <TextBlock Classes="small" TextWrapping="Wrap"
+               Text="{l:T 'Imports into your remote tool’s vault with icons and folder structure. Re-importing later updates existing entries instead of duplicating them.'}" />
+
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,4,0,0">
+      <Button Content="{l:T 'Cancel'}" IsCancel="True" Click="OnCancel" />
+      <Button Classes="accent" Content="{l:T 'Export…'}" MinWidth="104" IsDefault="True" FontWeight="SemiBold" Click="OnExport" />
+    </StackPanel>
+  </StackPanel>
+</Window>

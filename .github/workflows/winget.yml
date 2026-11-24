@@ -1,0 +1,42 @@
+name: WinGet
+
+# Opens a pull request in microsoft/winget-pkgs when a release is published
+# (once the initial Stiviemain.Paneless PR is merged and secrets.WINGET_TOKEN is set).
+on:
+  release:
+    types: [released]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish (e.g. v1.0.0-beta.5)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check WINGET_TOKEN
+        id: check
+        shell: bash
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          if [ -n "$WINGET_TOKEN" ]; then
+            echo "has_token=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_token=false" >> "$GITHUB_OUTPUT"
+            echo "WINGET_TOKEN secret is not configured; skipping WinGet PR creation."
+          fi
+
+      - name: Submit to WinGet
+        if: steps.check.outputs.has_token == 'true'
+        uses: vedantmgoyal9/winget-releaser@v2
+        with:
+          identifier: Stiviemain.Paneless
+          installers-regex: 'Setup\.exe$'
+          release-tag: ${{ inputs.tag || github.event.release.tag_name || github.ref_name }}
+          token: ${{ secrets.WINGET_TOKEN }}

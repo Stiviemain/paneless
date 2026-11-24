@@ -14,6 +14,12 @@ public sealed record ShapeChoice(string Value, string Label)
     public override string ToString() => Label;
 }
 
+/// <summary>A UI scale choice for a remote app's virtual display; Value is percent (e.g. 75, 100, 125).</summary>
+public sealed record ScaleChoice(int Value, string Label)
+{
+    public override string ToString() => Label;
+}
+
 /// <summary>One remote app in the list; its settings are edited here and saved right away.</summary>
 public sealed partial class RemoteAppItem : ObservableObject
 {
@@ -27,6 +33,8 @@ public sealed partial class RemoteAppItem : ObservableObject
         _loading = true;   // filling in the values isn't a change (it would forget the window's place)
         Name = app.Name;
         Shape = RemoteAppsViewModel.Shapes.FirstOrDefault(s => s.Value == app.Shape) ?? RemoteAppsViewModel.Shapes[0];
+        Scale = RemoteAppsViewModel.Scales.FirstOrDefault(s => s.Value == app.ScalePercent)
+                ?? RemoteAppsViewModel.Scales.First(s => s.Value == 100);
         CustomWidth = app.CustomWidth;
         CustomHeight = app.CustomHeight;
         ShowToolbar = app.ShowToolbar;
@@ -42,6 +50,7 @@ public sealed partial class RemoteAppItem : ObservableObject
     [ObservableProperty] public partial Bitmap? Icon { get; set; }
     [ObservableProperty] public partial string Name { get; set; }
     [ObservableProperty] public partial ShapeChoice Shape { get; set; }
+    [ObservableProperty] public partial ScaleChoice Scale { get; set; }
     [ObservableProperty] public partial decimal? CustomWidth { get; set; }
     [ObservableProperty] public partial decimal? CustomHeight { get; set; }
     [ObservableProperty] public partial bool ShowToolbar { get; set; }
@@ -70,10 +79,18 @@ public sealed partial class RemoteAppItem : ObservableObject
         if (_loading || App.Shape == value.Value) return;
         App.Shape = value.Value;
         ForgetPlace();
+        _page.NotifyShapeChanged(App, immediate: true);
     }
 
-    partial void OnCustomWidthChanged(decimal? value) { if (!_loading && value is { } v && (int)v != App.CustomWidth) { App.CustomWidth = (int)v; ForgetPlace(); } }
-    partial void OnCustomHeightChanged(decimal? value) { if (!_loading && value is { } v && (int)v != App.CustomHeight) { App.CustomHeight = (int)v; ForgetPlace(); } }
+    partial void OnScaleChanged(ScaleChoice value)
+    {
+        if (_loading || value == null || App.ScalePercent == value.Value) return;
+        App.ScalePercent = value.Value;
+        _page.Save();
+    }
+
+    partial void OnCustomWidthChanged(decimal? value) { if (!_loading && value is { } v && (int)v != App.CustomWidth) { App.CustomWidth = (int)v; ForgetPlace(); _page.NotifyShapeChanged(App, immediate: false); } }
+    partial void OnCustomHeightChanged(decimal? value) { if (!_loading && value is { } v && (int)v != App.CustomHeight) { App.CustomHeight = (int)v; ForgetPlace(); _page.NotifyShapeChanged(App, immediate: false); } }
     partial void OnShowToolbarChanged(bool value) { if (!_loading) { App.ShowToolbar = value; _page.Save(); } }
     partial void OnPcKeyboardOnlyChanged(bool value) { if (!_loading) { App.PcKeyboardOnly = value; _page.Save(); } }
     partial void OnOnTopChanged(bool value) { if (!_loading) { App.OnTop = value; _page.Save(); } }
@@ -126,6 +143,17 @@ public sealed partial class RemoteAppsViewModel : ObservableObject
     ];
     public IReadOnlyList<ShapeChoice> ShapeChoices => Shapes;
 
+    public static readonly IReadOnlyList<ScaleChoice> Scales =
+    [
+        new(65, Loc.T("65 % (most fits)")),
+        new(75, Loc.T("75 % (compact)")),
+        new(85, "85 %"),
+        new(100, Loc.T("100 % (default)")),
+        new(125, Loc.T("125 % (larger)")),
+        new(150, "150 %"),
+    ];
+    public IReadOnlyList<ScaleChoice> ScaleChoices => Scales;
+
     public RemoteAppsViewModel(AppServices services, MainViewModel main)
     {
         _s = services;
@@ -145,13 +173,33 @@ public sealed partial class RemoteAppsViewModel : ObservableObject
 
     /// <summary>Set by the window.</summary>
     public Func<string, string, Task<bool>>? ConfirmAsync { get; set; }
+    /// <summary>Set by the window: exports one or more remote apps for external connection managers.</summary>
+    public Func<IReadOnlyList<RemoteApp>, Task<string?>>? ExportConnectionsAsync { get; set; }
+    /// <summary>Set by the window: resizes an already-open remote app window to match its updated shape.</summary>
+    public Action<RemoteApp>? ResizeLiveWindow { get; set; }
+
+    CancellationTokenSource? _shapeDebounce;
+
+    internal void NotifyShapeChanged(RemoteApp app, bool immediate)
+    {
+        _shapeDebounce?.Cancel();
+        _shapeDebounce?.Dispose();
+        _shapeDebounce = null;
+        if (immediate) { ResizeLiveWindow?.Invoke(app); return; }
+        var cts = _shapeDebounce = new CancellationTokenSource();
+        _ = Task.Run(async () =>
+        {
+            try { await Task.Delay(350, cts.Token); } catch (OperationCanceledException) { return; }
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => { if (!cts.IsCancellationRequested) ResizeLiveWindow?.Invoke(app); });
+        });
+    }
 
     public ObservableCollection<RemoteAppItem> Items { get; } = new();
     public bool IsEmpty => Items.Count == 0;
     public bool CanCreateShortcuts => OperatingSystem.IsWindows();
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(OpenCommand), nameof(RemoveCommand), nameof(ShortcutCommand), nameof(ForgetPlaceCommand), nameof(ReloadIconCommand))]
+    [NotifyCanExecuteChangedFor(nameof(OpenCommand), nameof(RemoveCommand), nameof(ShortcutCommand), nameof(ForgetPlaceCommand), nameof(ReloadIconCommand), nameof(ExportSelectedCommand))]
     public partial RemoteAppItem? Selected { get; set; }
     public bool HasSelected => Selected != null;
     partial void OnSelectedChanged(RemoteAppItem? value) => OnPropertyChanged(nameof(HasSelected));
@@ -204,6 +252,20 @@ public sealed partial class RemoteAppsViewModel : ObservableObject
 
     /// <summary>Opens a remote app from the list by double-click.</summary>
     public Task OpenItemAsync(RemoteAppItem item) { Selected = item; return Open(); }
+
+    [RelayCommand(CanExecute = nameof(CanAct))]
+    async Task ExportSelected()
+    {
+        if (Selected is not { } item || ExportConnectionsAsync == null) return;
+        if (await ExportConnectionsAsync([item.App]) is { Length: > 0 } msg) Say(msg, StatusKind.Ok);
+    }
+
+    [RelayCommand]
+    async Task ExportAll()
+    {
+        if (Items.Count == 0 || ExportConnectionsAsync == null) return;
+        if (await ExportConnectionsAsync(Items.Select(i => i.App).ToList()) is { Length: > 0 } msg) Say(msg, StatusKind.Ok);
+    }
 
     [RelayCommand(CanExecute = nameof(CanAct))]
     void ForgetPlace()

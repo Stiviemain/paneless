@@ -76,8 +76,9 @@ if (Test-Path $feed) {
     }
 }
 dotnet tool restore | Out-Null
-dotnet vpk pack --packId PanelessApp --packVersion $version --packDir $publish --mainExe Paneless.exe `
-    --packTitle Paneless --packAuthors $authors --icon (Join-Path $root 'Paneless.ico') --outputDir $out
+dotnet vpk pack --packId PanelessApp --packVersion $version --runtime $Rid --packDir $publish --mainExe Paneless.exe `
+    --packTitle Paneless --packAuthors $authors --icon (Join-Path $root 'Paneless.ico') `
+    --splashImage (Join-Path $root 'Paneless-splash.png') --splashProgressColor '#4f8cff' --outputDir $out
 if ($LASTEXITCODE) { throw 'vpk pack failed' }
 Get-ChildItem $out | Where-Object { $_.Name -like "*$version*" -or $_.Name -like 'PanelessApp-*' -or $_.Name -like 'releases*' } |
     ForEach-Object { Write-Host ("  {0}  {1:N1} MB" -f $_.Name, ($_.Length / 1MB)) }

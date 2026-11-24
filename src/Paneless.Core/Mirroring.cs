@@ -72,13 +72,14 @@ public sealed partial class MirrorManager(ToolPaths tools)
     }
 
     /// <summary>Mirrors the device's screen.</summary>
-    public MirrorSession Start(string serial, string name, MirrorOptions o)
+    public MirrorSession Start(string serial, string name, MirrorOptions o, bool embedded = false)
     {
         var args = new List<string> { "--window-title", name };
+        if (embedded) args.Add("--window-borderless");
         args.AddRange(Quality(o));
         if (o.ScreenOff) args.Add("--turn-screen-off");
         if (!o.Audio) args.Add("--no-audio");
-        if (o.OnTop) args.Add("--always-on-top");
+        if (!embedded && o.OnTop) args.Add("--always-on-top");
         if (o.KeepAwake || o.ScreenOff) args.Add("--keep-active");
         if ((o.KeepAwake || o.ScreenOff) && !HasDisplaySession(serial)) args.Add("--screen-off-timeout=3600");
         return StartCore(serial, name, SessionKind.Mirror, args, lockOnClose: o.LockOnClose);
@@ -99,9 +100,9 @@ public sealed partial class MirrorManager(ToolPaths tools)
     }
 
     /// <summary>A remote app: like <see cref="StartApp"/>, with the app's own name, window shape and remembered place.</summary>
-    public MirrorSession StartRemoteApp(string serial, RemoteApp app, string title, MirrorOptions o)
+    public MirrorSession StartRemoteApp(string serial, RemoteApp app, string title, MirrorOptions o, bool embedded = false)
     {
-        var args = app.ScrcpyArgs(title, o);
+        var args = app.ScrcpyArgs(title, o, embedded);
         if ((o.KeepAwake || app.ScreenOff) && !HasDisplaySession(serial)) args.Add("--screen-off-timeout=3600");
         return StartCore(serial, title, SessionKind.App, args, lockOnClose: o.LockOnClose, remoteAppId: app.Id);
     }
@@ -113,14 +114,18 @@ public sealed partial class MirrorManager(ToolPaths tools)
     }
 
     /// <summary>A second, resizable screen of the device (with its launcher), next to its own screen.</summary>
-    public MirrorSession StartScreen(string serial, string name, MirrorOptions o)
+    public MirrorSession StartScreen(string serial, string name, MirrorOptions o, bool embedded = false, (int W, int H)? embeddedSize = null)
     {
         var title = $"{name} – second screen";
-        var args = new List<string> { "--window-title", title, "--new-display=1600x1000", "--flex-display", "--render-fit=letterbox", "--no-audio" };
+        var (w, h) = embedded && embeddedSize is { W: > 100, H: > 100 } es
+            ? (Math.Clamp(es.W, 320, 3840) & ~1, Math.Clamp(es.H, 320, 3840) & ~1)
+            : (1600, 1000);
+        var args = new List<string> { "--window-title", title, $"--new-display={w}x{h}", "--flex-display", "--render-fit=letterbox", "--no-audio" };
+        if (embedded) args.Add("--window-borderless");
         args.AddRange(Quality(o with { MaxSize = null }));
         if (o.KeepScreensOn) args.Add("--keep-active");
         if (o.ScreenOff) args.Add("--turn-screen-off");
-        if (o.OnTop) args.Add("--always-on-top");
+        if (!embedded && o.OnTop) args.Add("--always-on-top");
         if ((o.KeepAwake || o.ScreenOff) && !HasDisplaySession(serial)) args.Add("--screen-off-timeout=3600");
         return StartCore(serial, title, SessionKind.Screen, args, lockOnClose: o.LockOnClose);
     }

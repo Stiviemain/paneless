@@ -53,10 +53,31 @@ public partial class App : Application
             Paneless.Core.Text.Translate = Localization.Loc.T;
             Theme.Apply(ArgAfter(args, "--theme") ?? services.Data.Settings.Theme);
 
-            // A remote app's shortcut: "Paneless.exe --open-app <id>".
+            // Launch targets: "--open-app <id>", "--mirror <deviceId>", "--screen <deviceId>".
             var openApp = ArgAfter(args, "--open-app");
-            // One Paneless per user: a second start brings the first one forward (or has it open the remote app).
-            if (snapshot == null && !demo && !SingleInstance.TryClaim(openApp != null ? "open-app " + openApp : "show"))
+            var openMirror = ArgAfter(args, "--mirror");
+            var openScreen = ArgAfter(args, "--screen");
+
+            // Embedded host mode (for tab managers such as Remote Desktop Manager): bypass single-instance so the
+            // launched process stays alive and owns a dedicated top-level window hosting scrcpy.
+            if (args.Contains("--embed") && (openApp != null || openMirror != null || openScreen != null))
+            {
+                KeepRunningOnErrors(() => null);
+                var (kind, id) = openApp != null ? (EmbeddedTargetKind.RemoteApp, openApp)
+                               : openScreen != null ? (EmbeddedTargetKind.Screen, openScreen)
+                               : (EmbeddedTargetKind.Mirror, openMirror!);
+                var hostWindow = new EmbeddedSessionWindow(services, kind, id);
+                desktop.MainWindow = hostWindow;
+                desktop.ShutdownRequested += (_, _) => hostWindow.ShutdownSession();
+                base.OnFrameworkInitializationCompleted();
+                return;
+            }
+
+            var instanceMessage = openApp != null ? "open-app " + openApp
+                                : openMirror != null ? "mirror " + openMirror
+                                : "show";
+            // One Paneless per user: a second start brings the first one forward (or has it open the remote app/mirror).
+            if (snapshot == null && !demo && !SingleInstance.TryClaim(instanceMessage))
             {
                 desktop.Shutdown();
                 base.OnFrameworkInitializationCompleted();
@@ -73,9 +94,9 @@ public partial class App : Application
             else
             {
                 SetUpTray(desktop, window, vm, services);
-                // Started with Windows, or by a remote app's shortcut: stay in the notification area (once, so clicking the
+                // Started with Windows, or by a shortcut: stay in the notification area (once, so clicking the
                 // tray icon can show it later).
-                if (args.Contains("--tray") || openApp != null)
+                if (args.Contains("--tray") || openApp != null || openMirror != null)
                 {
                     EventHandler? hideOnce = null;
                     hideOnce = (_, _) =>
@@ -83,6 +104,7 @@ public partial class App : Application
                         window.Opened -= hideOnce;
                         window.Hide();
                         if (openApp != null) _ = window.OpenRemoteAppFromShortcutAsync(openApp);
+                        else if (openMirror != null) _ = window.OpenMirrorFromShortcutAsync(openMirror);
                     };
                     window.Opened += hideOnce;
                 }
@@ -102,6 +124,7 @@ public partial class App : Application
                     SingleInstance.Listen(message => Dispatcher.UIThread.Post(() =>
                     {
                         if (message.StartsWith("open-app ")) { _ = window.OpenRemoteAppFromShortcutAsync(message[9..].Trim()); return; }
+                        if (message.StartsWith("mirror ")) { _ = window.OpenMirrorFromShortcutAsync(message[7..].Trim()); return; }
                         window.Show();
                         if (window.WindowState == WindowState.Minimized) window.WindowState = WindowState.Normal;
                         window.Activate();

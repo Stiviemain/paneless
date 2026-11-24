@@ -573,6 +573,19 @@ if (args.Contains("--remote-apps"))
           "a remembered window: same place and exact display size with natural DPI (no --window-width/height with --flex-display)");
     app.Window = null; app.Shape = "custom"; app.CustomWidth = 99999; app.CustomHeight = 801;
     Check(app.ScrcpyArgs("t", quality).Any(x => x.StartsWith("--new-display=3840x800/")), "a custom size is kept within limits and even");
+    var scaled = new RemoteApp { Package = "com.example.demo", Shape = "tablet" };
+    Check(scaled.DisplayDpi(560, 1000) == 200
+          && (scaled.ScalePercent = 75) == 75 && scaled.DisplayDpi(560, 1000) == 160
+          && (scaled.ScalePercent = 65) == 65 && scaled.DisplayDpi(560, 1000) == 140
+          && (scaled.ScalePercent = 55) == 55 && scaled.DisplayDpi(560, 1000) == 120
+          && (scaled.ScalePercent = 150) == 150 && scaled.DisplayDpi(560, 1000) == 320
+          && (scaled.ScalePercent = 0) == 0 && scaled.DisplayDpi(560, 1000) == 200,
+          "remote app UI scale adjusts virtual display DPI cleanly (down to 120 dpi floor)");
+    var fitPhone = RemoteApp.FitToArea(1080, 1920, 1680, 915);
+    var fitCustom = RemoteApp.FitToArea(700, 800, 1680, 915);
+    Check(fitPhone.W <= 1680 && fitPhone.H <= 915 && fitPhone.W % 2 == 0 && fitPhone.H % 2 == 0 && Math.Abs((double)fitPhone.W / fitPhone.H - 1080.0 / 1920.0) < 0.01
+          && fitCustom == (700, 800),
+          "live shape resize fits display aspect ratio inside monitor work area");
     Check(RemoteApp.ShortcutFileName("Chat: \"work\" / home?") == "Chat   work    home.lnk" && RemoteApp.ShortcutFileName("...") == "App.lnk"
           && RemoteApp.ShortcutFileName(new string('x', 200)).Length == 84, "shortcut file names are safe for Windows");
 
@@ -591,6 +604,51 @@ if (args.Contains("--remote-apps"))
     Check(store.Get("x") != null && store.Find("SN1", "p") != null && store.Find("SN2", "p") == null && changed == 1, "remote apps are found by device and package");
     using (var helper = typeof(AdbClient).Assembly.GetManifestResourceStream("Paneless.Core.paneless-helper.jar"))
         Check(helper is { Length: > 1000 }, "the device helper is built into Paneless");
+
+    // Embedded RemoteApp args: keeps configured shape, drops --flex-display / --always-on-top / desktop coords, adds --window-borderless.
+    var embApp = new RemoteApp { Id = "app1", DeviceId = "SN1", Package = "com.example.book", Name = "Books", Shape = "phone", OnTop = true, Window = new WindowPlace { X = 100, Y = 50, W = 700, H = 1200 } };
+    var ea = embApp.ScrcpyArgs("Books", quality, embedded: true);
+    Check(ea.Contains("--new-display=1080x1920/400") && ea.Contains("--window-borderless") && ea.Contains("--render-fit=letterbox")
+          && !ea.Contains("--flex-display") && !ea.Contains("--always-on-top") && !ea.Any(x => x.StartsWith("--window-x")),
+          "embedded remote app keeps configured shape with letterbox and borderless window");
+
+    // Extensible connection exporter + Devolutions RDM XML output.
+    var rdm = ConnectionExporters.Find("rdm");
+    Check(rdm != null && ConnectionExporters.All.Count >= 1 && rdm.FileExtension == "rdm" && rdm.SupportsEmbedded && rdm.SupportsIcons,
+          "RDM exporter is registered in ConnectionExporters");
+    var g1 = ConnectionExporters.DeterministicGuid("paneless:remote-app:app1");
+    var g2 = ConnectionExporters.DeterministicGuid("paneless:remote-app:app1");
+    var g3 = ConnectionExporters.DeterministicGuid("paneless:mirror:SN1");
+    Check(g1 == g2 && g1 != g3 && g1.ToString()[14] == '5', "deterministic v5 GUIDs stay stable across re-exports");
+    var entries = new List<ExportEntry>
+    {
+        new("paneless:remote-app:app1", "Books & Notes", "Remote apps", "Books on Pixel", ExportEntryKind.RemoteApp, "app1", png),
+        new("paneless:mirror:SN1", "Pixel 11 Pro", "My devices", "Pixel mirrored", ExportEntryKind.Mirror, "SN1", null),
+    };
+    var xmlEmb = rdm!.Export(entries, @"C:\Users\Test\Paneless.exe", ExportDisplayMode.Embedded, "Paneless");
+    var docEmb = System.Xml.Linq.XDocument.Parse(xmlEmb);
+    var conns = docEmb.Root!.Element("Connections")!.Elements("Connection").ToList();
+    Check(docEmb.Root.Name == "RDMExport" && docEmb.Root.Element("Version")?.Value == "2" && conns.Count == 2
+          && conns[0].Element("ConnectionType")?.Value == "CommandLine"
+          && conns[0].Element("Name")?.Value == "Books & Notes"
+          && conns[0].Element("Group")?.Value == @"Paneless\Remote apps"
+          && conns[0].Element("OpenEmbedded")?.Value == "true"
+          && conns[0].Element("CommandLine")?.Value == @"C:\Users\Test\Paneless.exe --embed --open-app app1"
+          && conns[0].Element("Image")?.Value == Convert.ToBase64String(png)
+          && conns[0].Element("ImageMD5")?.Value?.Length == 32
+          && conns[0].Element("Cmd")?.Element("ProcessName")?.Value == "Paneless"
+          && conns[0].Element("Cmd")?.Element("EmbeddedWaitTime")?.Value == "3000"
+          && conns[1].Element("Group")?.Value == @"Paneless\My devices"
+          && conns[1].Element("CommandLine")?.Value == @"C:\Users\Test\Paneless.exe --embed --mirror SN1"
+          && conns[1].Element("Image") == null,
+          "RDM embedded export writes valid XML with folders, deterministic IDs, command lines and PNG icons");
+    var xmlExt = rdm.Export([entries[1]], @"C:\Program Files\Paneless\Paneless.exe", ExportDisplayMode.External, "");
+    var connExt = System.Xml.Linq.XDocument.Parse(xmlExt).Root!.Element("Connections")!.Element("Connection")!;
+    Check(connExt.Element("OpenEmbedded")?.Value == "false"
+          && connExt.Element("CommandLine")?.Value == "\"C:\\Program Files\\Paneless\\Paneless.exe\" --mirror SN1"
+          && connExt.Element("Group")?.Value == "My devices"
+          && connExt.Element("Cmd")?.Element("UseDefaultWorkingDirectory")?.Value == "true",
+          "RDM external export quotes paths with spaces and omits --embed");
     return okAll ? 0 : 1;
 }
 

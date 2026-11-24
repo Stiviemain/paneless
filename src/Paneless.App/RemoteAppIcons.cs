@@ -60,6 +60,23 @@ public static class RemoteAppIcons
         return Badged(tile, size);
     }
 
+    /// <summary>PNG bytes of a remote app's icon with the Paneless corner badge (e.g. for exported connection entries).</summary>
+    public static byte[] BadgedPng(RemoteApp app, int size = 48)
+    {
+        using var source = Load(app.Id, cached: false) ?? LetterTile(app.Name, 256);
+        using var badged = Badged(source, size);
+        return Encode(badged);
+    }
+
+    /// <summary>PNG bytes of the Paneless logo scaled to <paramref name="size"/> px (e.g. for exported mirror entries).</summary>
+    public static byte[] PanelessPng(int size = 48)
+    {
+        using var rtb = new RenderTargetBitmap(new PixelSize(size, size), new Vector(96, 96));
+        using (var ctx = rtb.CreateDrawingContext())
+            ctx.DrawImage(Logo, new Rect(0, 0, size, size));
+        return Encode(rtb);
+    }
+
     static RenderTargetBitmap Badged(Bitmap icon, int size)
     {
         var rtb = new RenderTargetBitmap(new PixelSize(size, size), new Vector(96, 96));

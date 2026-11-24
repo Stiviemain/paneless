@@ -16,6 +16,8 @@ public sealed class RemoteApp
     public string Shape { get; set; } = "phone";
     public int CustomWidth { get; set; } = 1080;
     public int CustomHeight { get; set; } = 1920;
+    /// <summary>UI scale in percent (e.g. 65, 75, 85, 100, 125, 150). Lower lowers DPI so more fits without scrolling.</summary>
+    public int ScalePercent { get; set; } = 100;
     public bool ShowToolbar { get; set; }
     /// <summary>Hide Android's on-screen keyboard in the window: type with the PC's keyboard.</summary>
     public bool PcKeyboardOnly { get; set; } = true;
@@ -35,43 +37,58 @@ public sealed class RemoteApp
         _ => (1080, 1920),
     };
 
+    /// <summary>Scales <paramref name="targetW"/>×<paramref name="targetH"/> down proportionally if needed so it fits
+    /// inside <paramref name="maxW"/>×<paramref name="maxH"/>, keeping both sides even and at least 320 px.</summary>
+    public static (int W, int H) FitToArea(int targetW, int targetH, int maxW, int maxH)
+    {
+        int limW = Math.Max(320, maxW), limH = Math.Max(320, maxH);
+        double fit = Math.Min(1.0, Math.Min((double)limW / targetW, (double)limH / targetH));
+        int w = Math.Max(320, ((int)Math.Round(targetW * fit)) & ~1);
+        int h = Math.Max(320, ((int)Math.Round(targetH * fit)) & ~1);
+        return (w, h);
+    }
+
     /// <summary>Natural display density (DPI) for a virtual screen of <paramref name="w"/>×<paramref name="h"/> pixels:
     /// scrcpy defaults virtual displays to 160 dpi, which makes 1080×1920 look like a giant 1080dp desktop monitor
-    /// (tiny UI, and triggers FREEFORM floating windows on tablets). Scaling to ~412 dp for phone shape and ~800 dp
-    /// for tablet shape keeps app text and layouts crisp and full-size.</summary>
+    /// (tiny UI, and triggers FREEFORM floating windows on tablets). Scaling around ~412 dp for portrait windows and
+    /// ~800 dp for landscape tablet windows, multiplied by <see cref="ScalePercent"/>, keeps layouts crisp and lets
+    /// users pack more content on desktop screens (down to Android's 120 dpi floor).</summary>
     public int DisplayDpi(int w, int h)
     {
         var shortSide = Math.Min(w, h);
-        var isTablet = Shape == "tablet" || (Shape == "custom" && w >= h);
+        var isTablet = w >= h && Shape != "phone";
         var targetDp = isTablet ? 800.0 : 412.0;
-        var raw = (int)Math.Round(shortSide * 160.0 / targetDp);
-        return Math.Clamp((raw / 20) * 20, 160, isTablet ? 320 : 440);
+        var scale = (ScalePercent is >= 50 and <= 200 ? ScalePercent : 100) / 100.0;
+        var raw = (int)Math.Round(shortSide * 160.0 / targetDp * scale);
+        return Math.Clamp((raw / 20) * 20, 120, isTablet ? 360 : 480);
     }
 
     /// <summary>The scrcpy options for this app's window (after "-s serial").</summary>
-    public List<string> ScrcpyArgs(string title, MirrorOptions quality)
+    public List<string> ScrcpyArgs(string title, MirrorOptions quality, bool embedded = false)
     {
-        var (w, h) = Window is { W: > 100, H: > 100 } place
+        var (w, h) = !embedded && Window is { W: > 100, H: > 100 } place
             ? (Math.Clamp(place.W, 320, 3840), Math.Clamp(place.H, 320, 3840))
             : DisplaySize();
         var dpi = DisplayDpi(w, h);
-        // --flex-display defaults scrcpy's render-fit to "unscaled" (cropping whenever the window is smaller than the
-        // virtual display, e.g. clamped to the monitor or scaled on HiDPI). "letterbox" keeps the whole app visible
-        // immediately, while --flex-display still adapts the display to match the window on resize.
-        var args = new List<string> { "--window-title", title, $"--new-display={w & ~1}x{h & ~1}/{dpi}", "--flex-display", "--render-fit=letterbox",
+        // Standalone windows use --flex-display so dragging the window border adapts the virtual display.
+        // Embedded tabs (e.g. RDM) are much wider than a phone, so omit --flex-display and let --render-fit=letterbox
+        // preserve the configured phone/tablet/custom shape crisply centered inside the tab.
+        var args = new List<string> { "--window-title", title, $"--new-display={w & ~1}x{h & ~1}/{dpi}", "--render-fit=letterbox",
             "--start-app=" + Package, "--no-audio", "--no-vd-system-decorations" };
+        if (embedded) args.Add("--window-borderless");
+        else args.Add("--flex-display");
         if (PcKeyboardOnly) args.Add("--display-ime-policy=hide");
         args.Add("--video-codec=" + quality.VideoCodec);
         args.Add($"--video-bit-rate={Math.Clamp(quality.BitrateMbps, 1, 200)}M");
         if (quality.MaxFps > 0) args.Add($"--max-fps={quality.MaxFps}");
         if (ScreenOff) args.Add("--turn-screen-off");
-        if (OnTop) args.Add("--always-on-top");
+        if (!embedded && OnTop) args.Add("--always-on-top");
         // Android (e.g. 17 on Pixels) turns a virtual screen off a few seconds after the device's own screen goes off;
         // simulated user activity keeps just this screen on (the device still locks and its own screen stays off).
         if (quality.KeepScreensOn) args.Add("--keep-active");
         // scrcpy 5.x rejects --window-width/--window-height when --flex-display is on;
         // --new-display=WxH above already restores the remembered size, so only pass position here.
-        if (Window is { W: > 100, H: > 100 } p)
+        if (!embedded && Window is { W: > 100, H: > 100 } p)
             args.AddRange([$"--window-x={Math.Max(0, p.X)}", $"--window-y={Math.Max(0, p.Y)}"]);
         return args;
     }
@@ -151,6 +168,13 @@ public sealed partial class AdbClient
             return true;
         }
         finally { _helperLock.Release(); }
+    }
+
+    /// <summary>Changes the density (DPI) of a virtual display (&gt; 0) live without restarting the app.</summary>
+    public async Task SetDisplayDensityAsync(string serial, int displayId, int dpi)
+    {
+        if (displayId <= 0) return;
+        await ShellAsync(serial, $"wm density {Math.Clamp(dpi, 120, 480)} -d {displayId}", TimeSpan.FromSeconds(5));
     }
 
     /// <summary>Every app with a launcher icon, with its name; null if the helper couldn't run.</summary>
