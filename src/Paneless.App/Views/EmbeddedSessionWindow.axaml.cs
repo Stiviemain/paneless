@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Paneless.App.Localization;
 using Paneless.App.Platform;
 using Paneless.App.ViewModels;
@@ -19,7 +20,6 @@ public partial class EmbeddedSessionWindow : Window
     readonly EmbeddedTargetKind _kind;
     readonly string _targetId = "";
     readonly DispatcherTimer _syncTimer = new() { Interval = TimeSpan.FromMilliseconds(200) };
-    readonly DispatcherTimer _hideHint = new() { Interval = TimeSpan.FromSeconds(5) };
 
     MirrorSession? _session;
     ToolbarViewModel? _toolbarVm;
@@ -30,6 +30,7 @@ public partial class EmbeddedSessionWindow : Window
     bool _starting;
     bool _closing;
     bool _firstStart = true;
+    bool _fullscreenEnsured;
     string? _remoteAppPackage;
 
     public EmbeddedSessionWindow() => InitializeComponent();   // for the XAML previewer
@@ -54,14 +55,18 @@ public partial class EmbeddedSessionWindow : Window
                     _lastFailure = why;
             });
 
-        _hideHint.Tick += (_, _) => { _hideHint.Stop(); HintPopup.IsOpen = false; };
         _syncTimer.Tick += (_, _) => SyncTick();
         Opened += (_, _) => _ = StartSessionAsync();
         Resized += (_, _) => SyncChildBounds();
         Activated += (_, _) => FocusEmbedded();
         GotFocus += (_, _) => FocusEmbedded();
         HostArea.PointerPressed += (_, _) => FocusEmbedded();
-        ToolbarPanel.AddHandler(Button.ClickEvent, (_, _) => Dispatcher.UIThread.Post(FocusEmbedded, DispatcherPriority.Background), RoutingStrategies.Bubble);
+        ToolbarPanel.AddHandler(Button.ClickEvent, (_, e) =>
+        {
+            if ((e.Source as Avalonia.Visual)?.FindAncestorOfType<Button>(includeSelf: true) is { Flyout: null })
+                Dispatcher.UIThread.Post(FocusEmbedded, DispatcherPriority.Background);
+        }, RoutingStrategies.Bubble);
+        ToolbarStrip.FlyoutClosed += () => Dispatcher.UIThread.Post(FocusEmbedded, DispatcherPriority.Background);
         Closing += (_, _) => ShutdownSession();
         Closed += (_, _) => ShutdownSession();
     }
@@ -106,16 +111,9 @@ public partial class EmbeddedSessionWindow : Window
         if (!show || _services == null) return;
         var vm = new ToolbarViewModel(_services, session, row)
         {
+            IsStandaloneEmbedded = true,
             MirrorWindow = () => _childHwnd,
             ReadClipboardAsync = async () => Clipboard is { } cb ? await Avalonia.Input.Platform.ClipboardExtensions.TryGetTextAsync(cb) : null,
-        };
-        vm.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName != nameof(ToolbarViewModel.Hint) || vm.Hint.Length == 0 || !ToolbarPanel.IsVisible) return;
-            HintText.Text = vm.Hint;
-            HintPopup.IsOpen = true;
-            _hideHint.Stop();
-            _hideHint.Start();
         };
         _toolbarVm = vm;
         ToolbarPanel.DataContext = vm;
@@ -124,8 +122,7 @@ public partial class EmbeddedSessionWindow : Window
 
     void DetachToolbar()
     {
-        _hideHint.Stop();
-        HintPopup.IsOpen = false;
+        ToolbarStrip.HideToast();
         ToolbarPanel.IsVisible = false;
         ToolbarPanel.DataContext = null;
         if (_toolbarVm is { } vm)
@@ -142,6 +139,7 @@ public partial class EmbeddedSessionWindow : Window
         _lastFailure = null;
         _childHwnd = 0;
         _lastW = _lastH = 0;
+        _fullscreenEnsured = false;
         _syncTimer.Stop();
         DetachToolbar();
 
@@ -312,13 +310,13 @@ public partial class EmbeddedSessionWindow : Window
         if (w <= 20 || h <= 20) return;
         if (w == _lastW && h == _lastH) return;
 
-        var bigChange = _lastW > 0 && (Math.Abs(w - _lastW) > 12 || Math.Abs(h - _lastH) > 12);
         _lastW = w;
         _lastH = h;
         Win32.ResizeChild(_childHwnd, 0, 0, _lastW, _lastH);
 
-        if (bigChange && _session is { DisplayId: { } did and > 0 } s && _remoteAppPackage is { Length: > 0 } pkg && _services?.Helpers != null)
+        if (!_fullscreenEnsured && _session is { DisplayId: { } did and > 0 } s && _remoteAppPackage is { Length: > 0 } pkg && _services?.Helpers != null)
         {
+            _fullscreenEnsured = true;
             var serial = s.Serial;
             var cw = _lastW; var ch = _lastH;
             _ = Task.Run(async () =>

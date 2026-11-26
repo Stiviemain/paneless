@@ -40,6 +40,8 @@
         <TextBlock Classes="pagehint" Text="{l:T 'A live picture of every connected device. Click one to mirror it, drag it to move it, drag its corner to resize it, right-click for more. Pictures are only taken while this page is open.'}" />
       </StackPanel>
       <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom" Margin="12,0,0,0">
+        <Button Content="{l:T 'Wake all'}" Command="{Binding WakeAllCommand}" IsVisible="{Binding HasSleepingTiles}"
+                ToolTip.Tip="{l:T 'Wakes every sleeping device on the Wall (and unlocks devices with a saved code).'}" />
         <Button Content="{Binding ShowHiddenText}" Command="{Binding ShowHiddenCommand}" IsVisible="{Binding !!HiddenCount}" />
         <ComboBox Width="160" ItemsSource="{Binding GroupChoices}" SelectedItem="{Binding GroupFilter}" />
         <ComboBox Width="90" ItemsSource="{Binding SecondChoices}" SelectedItem="{Binding Seconds}" ToolTip.Tip="{l:T 'Seconds between pictures'}">
@@ -66,18 +68,30 @@
                   <ContextMenu>
                     <MenuItem Header="{l:T 'Mirror'}" Command="{Binding Wall.MirrorCommand}" CommandParameter="{Binding}" FontWeight="SemiBold" IsVisible="{Binding !IsMirroring}" />
                     <MenuItem Header="{l:T 'Show the mirror window'}" Command="{Binding Wall.MirrorCommand}" CommandParameter="{Binding}" FontWeight="SemiBold" IsVisible="{Binding IsMirroring}" />
-                    <MenuItem Header="{l:T 'Wake the screen'}" Command="{Binding Wall.WakeCommand}" CommandParameter="{Binding}" />
-                    <MenuItem Header="{l:T 'Unlock now'}" Command="{Binding Wall.UnlockCommand}" CommandParameter="{Binding}" IsVisible="{Binding CanUnlock}" />
-                    <MenuItem Header="{l:T 'Turn the screen off'}" Command="{Binding Wall.TurnScreenOffCommand}" CommandParameter="{Binding}" />
+                    <MenuItem Header="{l:T 'Displays &amp; camera'}">
+                      <MenuItem Header="{l:T 'Open a second screen'}" Command="{Binding Wall.SecondScreenCommand}" CommandParameter="{Binding}" />
+                      <MenuItem Header="{l:T 'Pop out current app'}" Command="{Binding Wall.PopOutCurrentAppCommand}" CommandParameter="{Binding}" />
+                      <Separator />
+                      <MenuItem Header="{l:T 'Back camera'}" Command="{Binding Wall.CameraBackCommand}" CommandParameter="{Binding}" />
+                      <MenuItem Header="{l:T 'Front camera'}" Command="{Binding Wall.CameraFrontCommand}" CommandParameter="{Binding}" />
+                    </MenuItem>
                     <Separator />
-                    <MenuItem Header="{l:T 'Refresh the picture'}" Command="{Binding Wall.RefreshPictureCommand}" CommandParameter="{Binding}" />
-                    <MenuItem Header="{l:T 'Save a screenshot'}" Command="{Binding Wall.SaveScreenshotCommand}" CommandParameter="{Binding}" />
-                    <Separator />
-                    <MenuItem Header="{l:T 'Open a second screen'}" Command="{Binding Wall.SecondScreenCommand}" CommandParameter="{Binding}" />
-                    <MenuItem Header="{l:T 'Apps…'}" Command="{Binding Wall.AppsCommand}" CommandParameter="{Binding}" />
-                    <MenuItem Header="{l:T 'Files &amp; photos…'}" Command="{Binding Wall.FilesCommand}" CommandParameter="{Binding}" />
-                    <MenuItem Header="{l:T 'Locate device'}" Command="{Binding Wall.LocateCommand}" CommandParameter="{Binding}" />
-                    <MenuItem Header="{l:T 'Device settings…'}" Command="{Binding Wall.DeviceSettingsCommand}" CommandParameter="{Binding}" />
+                    <MenuItem Header="{l:T 'Power &amp; screen'}">
+                      <MenuItem Header="{l:T 'Wake the screen'}" Command="{Binding Wall.WakeCommand}" CommandParameter="{Binding}" IsEnabled="{Binding CanClickWake}" />
+                      <MenuItem Header="{l:T 'Unlock now'}" Command="{Binding Wall.UnlockCommand}" CommandParameter="{Binding}" IsVisible="{Binding CanUnlock}" IsEnabled="{Binding CanClickWake}" />
+                      <MenuItem Header="{l:T 'Turn the screen off'}" Command="{Binding Wall.TurnScreenOffCommand}" CommandParameter="{Binding}" />
+                      <Separator />
+                      <MenuItem Header="{l:T 'Refresh the picture'}" Command="{Binding Wall.RefreshPictureCommand}" CommandParameter="{Binding}" />
+                      <MenuItem Header="{l:T 'Save a screenshot'}" Command="{Binding Wall.SaveScreenshotCommand}" CommandParameter="{Binding}" />
+                    </MenuItem>
+                    <MenuItem Header="{l:T 'Device tools'}">
+                      <MenuItem Header="{l:T 'Apps…'}" Command="{Binding Wall.AppsCommand}" CommandParameter="{Binding}" />
+                      <MenuItem Header="{l:T 'Files &amp; photos…'}" Command="{Binding Wall.FilesCommand}" CommandParameter="{Binding}" />
+                      <MenuItem Header="{l:T 'Quick controls &amp; media…'}" Command="{Binding Wall.QuickControlsCommand}" CommandParameter="{Binding}" />
+                      <Separator />
+                      <MenuItem Header="{l:T 'Run a script…'}" Command="{Binding Wall.RunScriptCommand}" CommandParameter="{Binding}" />
+                      <MenuItem Header="{l:T 'Locate device'}" Command="{Binding Wall.LocateCommand}" CommandParameter="{Binding}" />
+                    </MenuItem>
                     <Separator />
                     <MenuItem Header="{l:T 'Size'}">
                       <MenuItem Header="{l:T 'Larger'}" Command="{Binding Wall.LargerCommand}" CommandParameter="{Binding}" />
@@ -94,6 +108,8 @@
                       <MenuItem Header="{l:T 'Sort all by name'}" Command="{Binding Wall.SortByNameCommand}" />
                     </MenuItem>
                     <MenuItem Header="{l:T 'Hide from the Wall'}" Command="{Binding Wall.HideCommand}" CommandParameter="{Binding}" />
+                    <Separator />
+                    <MenuItem Header="{l:T 'Device settings…'}" Command="{Binding Wall.DeviceSettingsCommand}" CommandParameter="{Binding}" />
                   </ContextMenu>
                 </Button.ContextMenu>
                 <Panel>
@@ -106,10 +122,17 @@
                       <Image Source="{Binding Image}" Classes.off="{Binding ScreenOff}" Stretch="Uniform" Margin="6,6,6,0" MaxHeight="{Binding MaxImageHeight}" />
                       <TextBlock Classes="dim" Text="{l:T 'Waiting for a picture…'}" IsVisible="{Binding ShowWaiting}"
                                  HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" />
-                      <StackPanel IsVisible="{Binding ScreenOff}" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
+                      <StackPanel IsVisible="{Binding ShowSleeping}" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8" Margin="8">
                         <TextBlock Text="{l:T 'Screen off'}" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                        <Button Content="{l:T 'Wake'}" Command="{Binding Wall.WakeCommand}" CommandParameter="{Binding}" HorizontalAlignment="Center"
-                                ToolTip.Tip="{l:T 'Turns the screen on. Pictures of a screen that is off would only be black.'}" />
+                        <Button Content="{Binding WakeButtonText}" Command="{Binding Wall.WakeOrUnlockCommand}" CommandParameter="{Binding}"
+                                IsEnabled="{Binding CanClickWake}" HorizontalAlignment="Center"
+                                ToolTip.Tip="{Binding WakeButtonTip}" />
+                      </StackPanel>
+                      <StackPanel IsVisible="{Binding ShowMirroringScreenOff}" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8" Margin="8">
+                        <TextBlock Text="{l:T 'Screen off (mirroring)'}" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
+                        <Button Content="{l:T 'Show mirror'}" Command="{Binding Wall.MirrorCommand}" CommandParameter="{Binding}"
+                                HorizontalAlignment="Center"
+                                ToolTip.Tip="{l:T 'Brings this device’s mirror window to the front without waking its physical screen.'}" />
                       </StackPanel>
                       <Border Background="{DynamicResource AccentBrush}" CornerRadius="4" Padding="6,1" Margin="10" HorizontalAlignment="Left" VerticalAlignment="Top"
                               IsVisible="{Binding IsMirroring}">

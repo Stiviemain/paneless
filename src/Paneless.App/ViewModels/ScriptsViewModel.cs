@@ -153,6 +153,7 @@ public sealed partial class ScriptsViewModel : ObservableObject
     public bool NoTargets => !AllTargets.Any();
     public string RunLabel => AllTargets.Count(t => t.IsChecked) is var n and > 0 ? Loc.Count(n, "Run on {0} device", "Run on {0} devices") : Loc.T("Run");
     public string OutputFolder => ScriptRunner.OutputDir;
+    public string CommandsHint => Loc.T("Commands: one per line. # starts a comment. {name} or {name=default} asks for a value when it runs.");
 
     partial void OnIsMineChanged(bool value) => OnPropertyChanged(nameof(IsBuiltIn));
     partial void OnHasScriptChanged(bool value) => OnPropertyChanged(nameof(IsBuiltIn));

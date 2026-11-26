@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Platform.Storage;
 using Paneless.App.Localization;
 using Paneless.App.ViewModels;
@@ -16,6 +17,20 @@ public partial class FilesWindow : Window
             if (DataContext is FilesViewModel vm && vm.Selected is { } item)
                 _ = vm.ActivateItemAsync(item);
         };
+        FileDropArea.AddHandler(DragDrop.DragOverEvent, (_, e) =>
+        {
+            var ok = e.DataTransfer.Contains(DataFormat.File);
+            e.DragEffects = ok ? DragDropEffects.Copy : DragDropEffects.None;
+            FileDropArea.Classes.Set("dragover", ok);
+        });
+        FileDropArea.AddHandler(DragDrop.DragLeaveEvent, (_, _) => FileDropArea.Classes.Set("dragover", false));
+        FileDropArea.AddHandler(DragDrop.DropEvent, async (_, e) =>
+        {
+            FileDropArea.Classes.Set("dragover", false);
+            if (DataContext is not FilesViewModel vm) return;
+            var files = e.DataTransfer.TryGetFiles()?.Select(f => f.TryGetLocalPath()).OfType<string>().ToList() ?? [];
+            if (files.Count > 0) await vm.UploadFilesAsync(files);
+        });
         Closed += (_, _) =>
         {
             if (DataContext is FilesViewModel vm) vm.Dispose();

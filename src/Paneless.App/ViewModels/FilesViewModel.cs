@@ -78,6 +78,14 @@ public sealed partial class FilesViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(DownloadCommand), nameof(DeleteCommand), nameof(OpenFolderCommand))]
     public partial DeviceFileItem? Selected { get; set; }
 
+    public bool IsSelectedDir => Selected is { IsDir: true };
+    public bool IsSelectedFile => Selected is { IsDir: false };
+    partial void OnSelectedChanged(DeviceFileItem? value)
+    {
+        OnPropertyChanged(nameof(IsSelectedDir));
+        OnPropertyChanged(nameof(IsSelectedFile));
+    }
+
     public bool CanGoUp => CurrentPath.TrimEnd('/').Count(c => c == '/') > 1;
     partial void OnCurrentPathChanged(string value) => OnPropertyChanged(nameof(CanGoUp));
 
@@ -226,6 +234,13 @@ public sealed partial class FilesViewModel : ObservableObject
         if (PickUploadFilesAsync == null) return;
         var files = await PickUploadFilesAsync();
         if (files.Count == 0) return;
+        await UploadFilesAsync(files);
+    }
+
+    public async Task UploadFilesAsync(IReadOnlyList<string> paths)
+    {
+        var files = paths.Where(File.Exists).ToList();
+        if (files.Count == 0) { Say(Loc.T("Drop files (not folders) to upload them."), StatusKind.Warn); return; }
         if (_s.Demo) { Say(Loc.F("Demo mode: would upload {0} file(s).", files.Count), StatusKind.Ok); return; }
 
         var serial = await _s.Directory!.ConnectAsync(_row);

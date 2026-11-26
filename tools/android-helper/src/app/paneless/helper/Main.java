@@ -58,10 +58,11 @@ public final class Main {
                 registerSafe("clipboard", () -> new ClipboardModule(server).register(server));
                 registerSafe("files", () -> new FilesModule(server).register(server));
                 registerSafe("tasks", () -> new TasksModule(server).register(server));
-                registerSafe("screen", () -> new ScreenModule(server).register(server));
+                ScreenModule[] screenHolder = new ScreenModule[1];
+                registerSafe("screen", () -> { screenHolder[0] = new ScreenModule(server); screenHolder[0].register(server); });
                 registerSafe("telemetry", () -> new TelemetryModule(server).register(server));
                 registerSafe("utils", () -> new DeviceUtilsModule(server).register(server));
-                registerSafe("controls", () -> new ControlsModule(server, uiHolder[0]).register(server));
+                registerSafe("controls", () -> new ControlsModule(server, uiHolder[0], screenHolder[0]).register(server));
                 server.run(args[1]);
                 System.exit(0);
             } catch (Throwable t) {

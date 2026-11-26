@@ -36,6 +36,19 @@
         <Border Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
           <Panel>
             <ListBox x:Name="AppList" ItemsSource="{Binding Apps}" SelectedItem="{Binding Selected}" Background="Transparent">
+              <ListBox.ContextMenu>
+                <ContextMenu>
+                  <MenuItem Header="{l:T 'Open'}" Command="{Binding OpenCommand}" />
+                  <MenuItem Header="{l:T 'Open in its own window'}" Command="{Binding OpenInWindowCommand}" />
+                  <MenuItem Header="{l:T 'Add to Remote apps'}" Command="{Binding AddToRemoteAppsCommand}" />
+                  <Separator />
+                  <MenuItem Header="{l:T 'Force stop'}" Command="{Binding ForceStopCommand}" />
+                  <MenuItem Header="{Binding ToggleLabel}" Command="{Binding ToggleEnabledCommand}" />
+                  <Separator />
+                  <MenuItem Classes="danger" Header="{l:T 'Clear data…'}" Command="{Binding ClearDataCommand}" />
+                  <MenuItem Classes="danger" Header="{l:T 'Uninstall…'}" Command="{Binding UninstallCommand}" />
+                </ContextMenu>
+              </ListBox.ContextMenu>
               <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:AppItem">
                   <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
@@ -69,8 +82,9 @@
                 ToolTip.Tip="{l:T 'Runs the app on a separate, resizable screen of the device and shows it in a window here. The device’s own screen stays as it is.'}" />
         <Button HorizontalAlignment="Stretch" Content="{l:T 'Force stop'}" Command="{Binding ForceStopCommand}" />
         <Button HorizontalAlignment="Stretch" Content="{Binding ToggleLabel}" Command="{Binding ToggleEnabledCommand}" />
-        <Button HorizontalAlignment="Stretch" Content="{l:T 'Clear data…'}" Command="{Binding ClearDataCommand}" />
-        <Button HorizontalAlignment="Stretch" Content="{l:T 'Uninstall…'}" Command="{Binding UninstallCommand}" />
+        <Border Height="1" Background="{DynamicResource LineBrush}" Margin="0,4" />
+        <Button Classes="danger" HorizontalAlignment="Stretch" Content="{l:T 'Clear data…'}" Command="{Binding ClearDataCommand}" />
+        <Button Classes="danger" HorizontalAlignment="Stretch" Content="{l:T 'Uninstall…'}" Command="{Binding UninstallCommand}" />
         <Border Height="1" Background="{DynamicResource LineBrush}" Margin="0,8" />
         <Button HorizontalAlignment="Stretch" Content="{l:T 'Install an APK…'}" Command="{Binding InstallCommand}" />
         <CheckBox IsChecked="{Binding AlsoOnGroup}" IsVisible="{Binding InGroup}">

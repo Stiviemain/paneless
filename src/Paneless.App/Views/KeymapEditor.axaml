@@ -18,7 +18,7 @@
         <ComboBox x:Name="ProfileBox" Width="200" />
         <TextBox x:Name="NameBox" Width="190" PlaceholderText="{l:T 'Profile name'}" />
         <Button x:Name="NewButton" Content="{l:T 'New profile'}" />
-        <Button x:Name="DeleteButton" Content="{l:T 'Delete'}" />
+        <Button x:Name="DeleteButton" Classes="danger" Content="{l:T 'Delete'}" />
       </StackPanel>
     </Grid>
 

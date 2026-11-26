@@ -65,6 +65,7 @@ public sealed partial class AssistantsViewModel : ObservableObject
         server.ClientsChanged += () => Dispatcher.UIThread.Post(UpdateStatus);
         main.DevicesChanged += RebuildDevicesIfChanged;
         s.Groups.Changed += () => Dispatcher.UIThread.Post(RebuildAccess);
+        s.Profiles.Changed += () => Dispatcher.UIThread.Post(RebuildAccess);
         RebuildAccess();
         if (Enabled && !s.Demo) server.Start();
         UpdateStatus();

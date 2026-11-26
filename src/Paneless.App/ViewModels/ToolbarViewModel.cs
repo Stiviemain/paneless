@@ -34,10 +34,29 @@ public sealed partial class ToolbarViewModel : ObservableObject, IAsyncDisposabl
     /// on that display, and the ones only meaningful for the device's own screen are hidden.</summary>
     public bool IsSecondary { get; }
     public bool IsPrimary => !IsSecondary;
+    /// <summary>True when hosted inside EmbeddedSessionWindow (--open-app / --mirror) without a MainWindow host.</summary>
+    public bool IsStandaloneEmbedded { get; init; }
+    public bool HasMainHost => !IsStandaloneEmbedded;
+    public bool ShowSecondScreen => IsPrimary && HasMainHost;
+    public bool ShowPopOutApp => IsPrimary && HasMainHost;
+    public bool ShowCamera => IsPrimary && HasMainHost;
+    public bool ShowMainDisplayItems => IsPrimary && HasMainHost;
+    public bool ShowQuickControls => HasMainHost;
+    public bool ShowScripts => HasMainHost;
+    public bool ShowKeymap => IsPrimary && KeymapSupported && HasMainHost;
+    public bool ShowGroupControl => GroupControlAvailable && HasMainHost;
+    public bool ShowLiveModes => ShowGroupControl || ShowKeymap;
+    public string GroupControlMenuLabel => IsGroupControl ? Loc.T("Stop group control") : Loc.T("Group control");
+    public string KeymapMenuLabel => IsKeymapOn ? Loc.T("Turn off key mapping") : Loc.T("Key mapping");
     /// <summary>Set by the main window: opens a second screen of this device.</summary>
     public Action? OpenSecondScreen { get; set; }
     /// <summary>Set by the main window: pulls the phone's current foreground app into its own PC window.</summary>
     public Action? PopOutCurrentApp { get; set; }
+    /// <summary>Set by the main window: opens the Quick controls &amp; media window for this device.</summary>
+    public Action? OpenControls { get; set; }
+
+    [RelayCommand]
+    void QuickControls() => OpenControls?.Invoke();
 
     [RelayCommand]
     void SecondScreen()
@@ -90,7 +109,9 @@ public sealed partial class ToolbarViewModel : ObservableObject, IAsyncDisposabl
     public Action? OpenKeymapEditor { get; set; }
     public Action? OpenScripts { get; set; }
 
-    [ObservableProperty] public partial bool IsKeymapOn { get; set; }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(KeymapMenuLabel))]
+    public partial bool IsKeymapOn { get; set; }
     [ObservableProperty] public partial bool IsScreenOff { get; set; }
     [ObservableProperty] public partial string Hint { get; set; } = "";
 
@@ -147,7 +168,9 @@ public sealed partial class ToolbarViewModel : ObservableObject, IAsyncDisposabl
     public Action? OpenCamera { get; set; }
 
     [ObservableProperty] public partial bool IsRecording { get; set; }
-    [ObservableProperty] public partial bool IsGroupControl { get; set; }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(GroupControlMenuLabel))]
+    public partial bool IsGroupControl { get; set; }
     public bool GroupControlAvailable => OperatingSystem.IsWindows() && IsPrimary;
 
     MirrorSession? _recording;

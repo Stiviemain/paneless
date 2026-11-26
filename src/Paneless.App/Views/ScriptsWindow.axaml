@@ -111,7 +111,7 @@
                 </MenuFlyout>
               </DropDownButton.Flyout>
             </DropDownButton>
-            <Button Content="{l:T 'Delete'}" Command="{Binding DeleteScriptCommand}" IsVisible="{Binding IsMine}" />
+            <Button Classes="danger" Content="{l:T 'Delete'}" Command="{Binding DeleteScriptCommand}" IsVisible="{Binding IsMine}" />
           </StackPanel>
         </Grid>
 
@@ -120,7 +120,7 @@
         <TextBlock Text="{Binding Warning}" Foreground="{DynamicResource AmberBrush}" TextWrapping="Wrap" IsVisible="{Binding HasWarning}" />
 
         <StackPanel>
-          <TextBlock Classes="label" Text="Commands: one per line. # starts a comment. {name} or {name=default} asks for a value when it runs." />
+          <TextBlock Classes="label" Text="{Binding CommandsHint}" />
           <TextBox Classes="mono" Text="{Binding EditCommands}" AcceptsReturn="True" TextWrapping="NoWrap"
                    Height="112" IsReadOnly="{Binding IsBuiltIn}"
                    PlaceholderText="{l:T 'adb shell dumpsys deviceidle disable'}" />

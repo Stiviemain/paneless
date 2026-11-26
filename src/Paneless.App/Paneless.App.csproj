@@ -8,7 +8,7 @@
     <AssemblyName>Paneless</AssemblyName>
     <RootNamespace>Paneless.App</RootNamespace>
     <!-- The single version number: the window title, the installer and updates all read it. -->
-    <Version>1.0.0-beta.6</Version>
+    <Version>1.0.0-beta.7</Version>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Product>Paneless</Product>
     <Authors>Stiviemain</Authors>

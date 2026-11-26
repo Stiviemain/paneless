@@ -38,42 +38,57 @@ public sealed class RemoteApp
     };
 
     /// <summary>Scales <paramref name="targetW"/>×<paramref name="targetH"/> down proportionally if needed so it fits
-    /// inside <paramref name="maxW"/>×<paramref name="maxH"/>, keeping both sides even and at least 320 px.</summary>
+    /// inside <paramref name="maxW"/>×<paramref name="maxH"/>, keeping both sides 8-pixel aligned (encoder-friendly)
+    /// and at least 320 px.</summary>
     public static (int W, int H) FitToArea(int targetW, int targetH, int maxW, int maxH)
     {
         int limW = Math.Max(320, maxW), limH = Math.Max(320, maxH);
         double fit = Math.Min(1.0, Math.Min((double)limW / targetW, (double)limH / targetH));
-        int w = Math.Max(320, ((int)Math.Round(targetW * fit)) & ~1);
-        int h = Math.Max(320, ((int)Math.Round(targetH * fit)) & ~1);
+        int w = Math.Max(320, ((int)Math.Round(targetW * fit)) & ~7);
+        int h = Math.Max(320, ((int)Math.Round(targetH * fit)) & ~7);
         return (w, h);
     }
 
     /// <summary>Natural display density (DPI) for a virtual screen of <paramref name="w"/>×<paramref name="h"/> pixels:
     /// scrcpy defaults virtual displays to 160 dpi, which makes 1080×1920 look like a giant 1080dp desktop monitor
     /// (tiny UI, and triggers FREEFORM floating windows on tablets). Scaling around ~412 dp for portrait windows and
-    /// ~800 dp for landscape tablet windows, multiplied by <see cref="ScalePercent"/>, keeps layouts crisp and lets
-    /// users pack more content on desktop screens (down to Android's 120 dpi floor).</summary>
+    /// ~800 dp for landscape tablet windows (interpolated smoothly across aspect ratios for custom/tablet windows),
+    /// multiplied by <see cref="ScalePercent"/>, keeps layouts crisp down to Android's 120 dpi floor.</summary>
     public int DisplayDpi(int w, int h)
     {
         var shortSide = Math.Min(w, h);
-        var isTablet = w >= h && Shape != "phone";
-        var targetDp = isTablet ? 800.0 : 412.0;
+        double targetDp;
+        int maxDpi;
+        if (Shape == "phone")
+        {
+            targetDp = 412.0;
+            maxDpi = 480;
+        }
+        else
+        {
+            var aspect = (double)w / Math.Max(1, h);
+            var t = Math.Clamp((aspect - 0.75) / 0.60, 0.0, 1.0);
+            targetDp = 412.0 + t * (800.0 - 412.0);
+            maxDpi = t >= 0.5 ? 360 : 480;
+        }
         var scale = (ScalePercent is >= 50 and <= 200 ? ScalePercent : 100) / 100.0;
         var raw = (int)Math.Round(shortSide * 160.0 / targetDp * scale);
-        return Math.Clamp((raw / 20) * 20, 120, isTablet ? 360 : 480);
+        return Math.Clamp((raw / 20) * 20, 120, maxDpi);
     }
 
     /// <summary>The scrcpy options for this app's window (after "-s serial").</summary>
     public List<string> ScrcpyArgs(string title, MirrorOptions quality, bool embedded = false)
     {
-        var (w, h) = !embedded && Window is { W: > 100, H: > 100 } place
+        var (rawW, rawH) = !embedded && Window is { W: > 100, H: > 100 } place
             ? (Math.Clamp(place.W, 320, 3840), Math.Clamp(place.H, 320, 3840))
             : DisplaySize();
+        int w = Math.Max(320, rawW & ~7);
+        int h = Math.Max(320, rawH & ~7);
         var dpi = DisplayDpi(w, h);
         // Standalone windows use --flex-display so dragging the window border adapts the virtual display.
         // Embedded tabs (e.g. RDM) are much wider than a phone, so omit --flex-display and let --render-fit=letterbox
         // preserve the configured phone/tablet/custom shape crisply centered inside the tab.
-        var args = new List<string> { "--window-title", title, $"--new-display={w & ~1}x{h & ~1}/{dpi}", "--render-fit=letterbox",
+        var args = new List<string> { "--window-title", title, $"--new-display={w}x{h}/{dpi}", "--render-fit=letterbox",
             "--start-app=" + Package, "--no-audio", "--no-vd-system-decorations" };
         if (embedded) args.Add("--window-borderless");
         else args.Add("--flex-display");

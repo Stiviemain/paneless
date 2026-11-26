@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Platform.Storage;
+using Avalonia.VisualTree;
 using Paneless.App.Assistants;
 using Paneless.App.Platform;
 using Paneless.App.ViewModels;
@@ -24,7 +25,7 @@ public partial class MainWindow : Window
         DeviceList.SelectionChanged += (_, _) => OnSelectionChanged();
         DeviceList.DoubleTapped += (_, e) =>
         {
-            if (IsInHeading(e.Source)) return;
+            if (IsInHeading(e.Source) || (e.Source as Visual)?.FindAncestorOfType<Button>(includeSelf: true) != null) return;
             if (Vm?.MirrorCommand.CanExecute(null) == true) Vm.MirrorCommand.Execute(null);
         };
         DeviceList.KeyDown += (_, e) =>
@@ -76,7 +77,7 @@ public partial class MainWindow : Window
         {
             if (_opened || Vm == null) return;
             _opened = true;
-            Vm.ShowSettings = () => ShowSettings();
+            Vm.ShowSettings = category => ShowSettings(category);
             Vm.ShowDeviceSettings = (id, name, group) => ShowDeviceSettings(id, name, group);
             Vm.ShowApps = row => ShowApps(row);
             Vm.ShowFiles = row => ShowFiles(row);
@@ -196,7 +197,11 @@ public partial class MainWindow : Window
             Vm.ShowPairDialog = ShowPairAsync;
             Vm.ShowUnlockDialog = ShowUnlockAsync;
             Vm.ShowScripts = keys => ShowScripts(keys);
-            Vm.MirrorStarted = (session, row) => AddToolbar(session, row);
+            Vm.MirrorStarted = (session, row) =>
+            {
+                if (session.Kind == SessionKind.Mirror) _ = Wall?.RestoreDimAsync(session.Serial);
+                AddToolbar(session, row);
+            };
             Vm.PromptAsync = (title, message, initial) => PromptWindow.AskAsync(this, title, message, initial);
             Vm.ConfirmAsync = (title, message) => ConfirmWindow.AskAsync(this, title, message, null, Loc.T("Delete"));
             Vm.ListSynced += RestoreSelection;
@@ -210,6 +215,29 @@ public partial class MainWindow : Window
     void OpenLink(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => AppLinks.OpenTag(sender, e);
 
     static bool IsInHeading(object? source) => (source as StyledElement)?.DataContext is GroupHeaderViewModel;
+
+    void OpenDeviceRowMenu(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is Control c && c.DataContext is DeviceItemViewModel item && Vm is { } vm)
+        {
+            if (!vm.SelectedKeys.Contains(item.Key))
+            {
+                vm.SetSelection([item]);
+                RestoreSelection();
+            }
+            DeviceList.ContextMenu?.Open(c);
+            e.Handled = true;
+        }
+    }
+
+    void OpenGroupRowMenu(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is Control c && c.FindAncestorOfType<Grid>() is { ContextMenu: { } menu })
+        {
+            menu.Open(c);
+            e.Handled = true;
+        }
+    }
 
     // ---------------------------------------------------------------- selection
 
@@ -273,6 +301,7 @@ public partial class MainWindow : Window
     public AutomationViewModel? Automation { get; private set; }
     public AssistantsViewModel? Assistants { get; private set; }
     public RemoteAppsViewModel? RemoteApps { get; private set; }
+    public SettingsViewModel? Settings { get; private set; }
     McpServer? _mcp;
     HelperCoordinator? _helperCoord;
 
@@ -305,6 +334,34 @@ public partial class MainWindow : Window
             ConfirmAsync = (t, m) => ConfirmWindow.AskAsync(this, t, m, null, Localization.Loc.T("Remove")),
             ExportConnectionsAsync = ExportRemoteAppsAsync,
         };
+        SettingsPage.DataContext = Settings = new SettingsViewModel(s)
+        {
+            CheckUpdatesAsync = async () => (await Updates.CheckAsync(s, interactive: true)).Message,
+            ConfirmAsync = (title, message, confirmLabel) => ConfirmWindow.AskAsync(this, title, message, null, confirmLabel ?? Loc.T("Go ahead")),
+            PickSaveFileAsync = async suggestedName =>
+            {
+                var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+                {
+                    Title = Loc.T("Export Paneless settings"),
+                    SuggestedFileName = suggestedName + ".json",
+                    DefaultExtension = "json",
+                    FileTypeChoices = [new FilePickerFileType(Loc.T("Paneless settings backup")) { Patterns = ["*.json"] }],
+                });
+                return file?.TryGetLocalPath();
+            },
+            PickOpenFileAsync = async () =>
+            {
+                var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+                {
+                    Title = Loc.T("Import Paneless settings"),
+                    AllowMultiple = false,
+                    FileTypeFilter = [new FilePickerFileType(Loc.T("Paneless settings backup")) { Patterns = ["*.json"] }],
+                });
+                return files.FirstOrDefault()?.TryGetLocalPath();
+            },
+        };
+        Settings.Saved += () => { vm.SettingsChanged(); _ = _helperCoord?.SyncWatchersAsync(); };
+        Settings.Reloaded += () => { _ = vm.RefreshCommand.ExecuteAsync(null); };
         vm.AddRemoteApp = RemoteApps.AddAsync;
         if (OperatingSystem.IsWindows()) TrackRemoteApps(vm);
         automation.Start();
@@ -357,6 +414,7 @@ public partial class MainWindow : Window
                 inv.ShowCached();
                 if (inv.IsEmpty) await inv.Refresh();
             }
+            if (vm.IsSettingsPage) Settings?.RefreshFromStore();
         };
         PropertyChanged += (_, e) => { if (e.Property == IsVisibleProperty || e.Property == WindowStateProperty) UpdateActive(); };
         Closed += (_, _) => { Wall?.SetActive(false); Logs?.Dispose(); _mcp?.Stop(); _helperCoord?.Dispose(); };
@@ -367,28 +425,50 @@ public partial class MainWindow : Window
     [System.Runtime.Versioning.SupportedOSPlatform("windows")]
     void TrackRemoteApps(MainViewModel vm)
     {
-        var open = new Dictionary<MirrorSession, (RemoteApp App, int Dressed, int LastW, int LastH, int LastDpi)>();
+        var open = new Dictionary<MirrorSession, (RemoteApp App, int Dressed, bool FullscreenEnsured)>();
+        var reopening = new HashSet<string>();
         vm.RemoteAppStarted = (session, app) =>
         {
-            var (iw, ih) = app.Window is { W: > 100, H: > 100 } p
-                ? (Math.Clamp(p.W, 320, 3840), Math.Clamp(p.H, 320, 3840))
-                : app.DisplaySize();
-            open[session] = (app, 0, 0, 0, app.DisplayDpi(iw, ih));
+            open[session] = (app, 0, false);
             RemoteApps?.UpdateStates();
         };
         if (RemoteApps != null)
-            RemoteApps.ResizeLiveWindow = app =>
+            RemoteApps.ReopenLiveWindowAsync = async (app, applyConfiguredShape) =>
             {
-                var entry = open.FirstOrDefault(kv => kv.Key.IsRunning && kv.Value.App.Id == app.Id);
-                if (entry.Key == null) return;
-                try { entry.Key.Process.Refresh(); } catch { return; }
-                var h = entry.Key.Process.MainWindowHandle;
-                if (h == 0) return;
-                var (tw, th) = app.DisplaySize();
-                if (Platform.Win32.ResizeClientOnScreen(h, tw, th) is not null && Platform.Win32.ClientBounds(h) is { } c)
+                if (!reopening.Add(app.Id)) return;
+                try
                 {
-                    app.Window = new WindowPlace { X = c.Left, Y = c.Top, W = c.Right - c.Left, H = c.Bottom - c.Top };
+                    var session = _services?.Mirrors?.RemoteAppSession(app.Id);
+                    if (session == null) return;
+                    nint h = 0;
+                    try { session.Process.Refresh(); h = session.Process.MainWindowHandle; } catch { }
+
+                    if (applyConfiguredShape)
+                    {
+                        var (tw, th) = app.DisplaySize();
+                        app.Window = h != 0 && Platform.Win32.ComputeClientPlaceOnScreen(h, tw, th) is { } place
+                            ? new WindowPlace { X = place.X, Y = place.Y, W = place.W, H = place.H }
+                            : null;
+                    }
+                    else if (h != 0 && !Platform.Win32.IsIconic(h) && Platform.Win32.ClientBounds(h) is { } c
+                             && c.Right - c.Left > 100 && c.Bottom - c.Top > 100)
+                    {
+                        app.Window = new WindowPlace { X = c.Left, Y = c.Top, W = c.Right - c.Left, H = c.Bottom - c.Top };
+                    }
                     _services?.RemoteApps.Save();
+
+                    // Reopen cleanly with the new --new-display size/DPI instead of overriding density live
+                    // (live `wm density` conflicts with scrcpy --flex-display and leaves stale input hitboxes).
+                    open.Remove(session);
+                    session.SuppressLockOnClose = true;
+                    MirrorManager.Stop(session);
+                    await Task.Run(() => { try { session.Process.WaitForExit(2000); } catch { } });
+                    await Task.Delay(250);
+                    await vm.OpenRemoteAppAsync(app);
+                }
+                finally
+                {
+                    reopening.Remove(app.Id);
                 }
             };
         if (_services?.Mirrors != null)
@@ -400,7 +480,7 @@ public partial class MainWindow : Window
         timer.Tick += (_, _) =>
         {
             if (open.Count == 0) return;
-            foreach (var (session, (app, dressed, lastW, lastH, lastDpi)) in open.ToList())
+            foreach (var (session, (app, dressed, fullscreenEnsured)) in open.ToList())
             {
                 if (!session.IsRunning)
                 {
@@ -425,32 +505,19 @@ public partial class MainWindow : Window
                     }
                     catch { /* cosmetic: the app works without it */ }
                 }
-                int curW = lastW, curH = lastH, curDpi = lastDpi;
+                int curW = 0, curH = 0;
                 if (!Platform.Win32.IsIconic(h) && Platform.Win32.ClientBounds(h) is { } c && c.Right - c.Left > 100 && c.Bottom - c.Top > 100)
                 {
                     curW = c.Right - c.Left;
                     curH = c.Bottom - c.Top;
                     app.Window = new WindowPlace { X = c.Left, Y = c.Top, W = curW, H = curH };
                 }
-                // Keep DPI matched to the actual window size and the user's ScalePercent: scrcpy's --flex-display
-                // resizes pixels without updating density, which otherwise blows up UI when a window is shrunk.
-                var dpiChanged = false;
-                if (session.DisplayId is { } didDpi && didDpi > 0 && curW > 100 && curH > 100 && _services?.Adb is { } adb)
+                // On tablets with Desktop/Freeform mode (e.g. Xiaomi HyperOS), force the virtual display to fullscreen
+                // once it appears (after MirrorManager's startup retries finish) instead of re-applying on every drag resize.
+                var ensured = fullscreenEnsured;
+                if (!ensured && dressed >= 2 && session.DisplayId is { } did && did > 0 && _services?.Helpers != null)
                 {
-                    var wantDpi = app.DisplayDpi(curW, curH);
-                    if (wantDpi != curDpi)
-                    {
-                        curDpi = wantDpi;
-                        dpiChanged = true;
-                        var serial = session.Serial;
-                        _ = Task.Run(async () => { try { await adb.SetDisplayDensityAsync(serial, didDpi, wantDpi); } catch { } });
-                    }
-                }
-                // On tablets with Desktop/Freeform mode (e.g. Xiaomi HyperOS), force the virtual display & task
-                // to fill the entire window once the display appears and whenever the window is resized.
-                var resized = lastW > 0 && (Math.Abs(curW - lastW) > 12 || Math.Abs(curH - lastH) > 12);
-                if (session.DisplayId is { } did && did > 0 && (dressed is 0 or 2 || resized || dpiChanged) && _services?.Helpers != null)
-                {
+                    ensured = true;
                     var serial = session.Serial;
                     var pkg = app.Package;
                     var w = curW; var ht = curH;
@@ -461,7 +528,7 @@ public partial class MainWindow : Window
                             try { await helper.EnsureDisplayFullscreenAsync(did, pkg, w, ht); } catch { }
                     });
                 }
-                open[session] = (app, Math.Min(dressed + 1, 5), curW, curH, curDpi);
+                open[session] = (app, Math.Min(dressed + 1, 5), ensured);
             }
         };
         timer.Start();
@@ -582,19 +649,11 @@ public partial class MainWindow : Window
         return files.Select(f => f.TryGetLocalPath()).OfType<string>().ToList();
     }
 
-    SettingsWindow? _settings;
-
-    public SettingsWindow ShowSettings()
+    public void ShowSettings(string? category = null)
     {
-        if (_settings != null) { _settings.Activate(); return _settings; }
-        var vm = new SettingsViewModel(_services!);
-        vm.Saved += () => { Vm?.SettingsChanged(); _ = _helperCoord?.SyncWatchersAsync(); };
-        vm.Reloaded += () => { if (Vm != null) _ = Vm.RefreshCommand.ExecuteAsync(null); };
-        vm.CheckUpdatesAsync = async () => (await Updates.CheckAsync(_services!, interactive: true)).Message;
-        _settings = new SettingsWindow { DataContext = vm };
-        _settings.Closed += (_, _) => _settings = null;
-        _settings.Show(this);
-        return _settings;
+        if (!string.IsNullOrEmpty(category) && Settings != null) Settings.Category = category;
+        if (Vm != null) Vm.Page = "Settings";
+        Settings?.RefreshFromStore();
     }
 
     readonly Dictionary<string, DeviceSettingsWindow> _deviceSettings = new();
@@ -603,7 +662,21 @@ public partial class MainWindow : Window
     {
         var key = deviceId ?? "group:" + group?.Name;
         if (_deviceSettings.TryGetValue(key, out var open)) { open.Activate(); return open; }
-        var w = new DeviceSettingsWindow { DataContext = new ProfileEditorViewModel(_services!, deviceId, name, group) };
+        var editorVm = new ProfileEditorViewModel(_services!, deviceId, name, group);
+        var w = new DeviceSettingsWindow { DataContext = editorVm };
+        if (deviceId != null)
+        {
+            editorVm.OpenAutoUnlockAsync = async () =>
+            {
+                var row = Vm?.NetworkRows.FirstOrDefault(r => r.GroupId == deviceId)
+                          ?? new DeviceRow(deviceId, null, deviceId, true, name, "", "", "", DeviceState.NotFound, null, null, UnlockStatus.None);
+                var uvm = new UnlockViewModel(_services?.Unlock, row);
+                var dlg = new UnlockWindow { DataContext = uvm };
+                uvm.Close = () => dlg.Close();
+                await dlg.ShowDialog(w);
+                if (Vm != null) await Vm.RefreshCommand.ExecuteAsync(null);
+            };
+        }
         _deviceSettings[key] = w;
         w.Closed += (_, _) => _deviceSettings.Remove(key);
         w.Show(this);
@@ -699,6 +772,7 @@ public partial class MainWindow : Window
         var vm = new ToolbarViewModel(_services!, session, row);
         var toolbar = new MirrorToolbar(session, vm);
         vm.OpenScripts = () => ShowScripts([row.Key]);
+        vm.OpenControls = () => ShowControls(Vm?.NetworkRows.FirstOrDefault(r => r.GroupId == row.GroupId) ?? row);
         vm.OpenKeymapEditor = () => OpenKeymapEditor(session.Serial, row, vm);
         vm.OpenSecondScreen = () => _ = Vm?.OpenSecondScreenAsync(Vm.NetworkRows.FirstOrDefault(r => r.GroupId == row.GroupId) ?? row);
         vm.PopOutCurrentApp = () => _ = Vm?.PopOutCurrentAppAsync(Vm.NetworkRows.FirstOrDefault(r => r.GroupId == row.GroupId) ?? row);

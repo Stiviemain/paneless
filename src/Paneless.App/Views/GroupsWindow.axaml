@@ -48,7 +48,7 @@
           <Button Classes="small" Content="{l:T 'Rename…'}" Command="{Binding RenameCommand}" />
           <Button Classes="small" Content="↑" Command="{Binding MoveUpCommand}" ToolTip.Tip="{l:T 'Move up (order in the device list)'}" />
           <Button Classes="small" Content="↓" Command="{Binding MoveDownCommand}" ToolTip.Tip="{l:T 'Move down'}" />
-          <Button Classes="small" Content="{l:T 'Delete'}" Command="{Binding DeleteCommand}" />
+          <Button Classes="small danger" Content="{l:T 'Delete'}" Command="{Binding DeleteCommand}" />
         </StackPanel>
         <Border Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
           <Panel>

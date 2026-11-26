@@ -32,7 +32,7 @@
             <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="6" Margin="0,8,0,0">
               <Button Content="{l:T '+ New'}" Command="{Binding NewCommand}" />
               <Button Content="{l:T 'Duplicate'}" Command="{Binding DuplicateCommand}" IsEnabled="{Binding HasRecipe}" />
-              <Button Content="{l:T 'Delete'}" Command="{Binding DeleteCommand}" IsEnabled="{Binding HasRecipe}" />
+              <Button Classes="danger" Content="{l:T 'Delete'}" Command="{Binding DeleteCommand}" IsEnabled="{Binding HasRecipe}" />
             </StackPanel>
             <Border Classes="card" ClipToBounds="True">
               <Panel>
@@ -130,7 +130,7 @@
           <DockPanel>
             <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="6" Margin="0,8,0,0">
               <Button Content="{l:T '+ New'}" Command="{Binding NewCommand}" />
-              <Button Content="{l:T 'Delete'}" Command="{Binding DeleteCommand}" IsEnabled="{Binding HasTask}" />
+              <Button Classes="danger" Content="{l:T 'Delete'}" Command="{Binding DeleteCommand}" IsEnabled="{Binding HasTask}" />
             </StackPanel>
             <Border Classes="card" ClipToBounds="True">
               <Panel>

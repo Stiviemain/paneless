@@ -5,14 +5,14 @@
         x:Class="Paneless.App.Views.DeviceSettingsWindow"
         x:DataType="vm:ProfileEditorViewModel"
         Title="{Binding Title}" Icon="/Assets/Paneless.ico"
-        Width="880" Height="740" MinWidth="760" MinHeight="480"
+        Width="740" Height="700" MinWidth="620" MinHeight="500"
         WindowStartupLocation="CenterOwner">
 
   <Window.Styles>
-    <Style Selector="TextBlock.section">
-      <Setter Property="FontSize" Value="15" />
-      <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Margin" Value="0,4,0,8" />
+    <Style Selector="TabItem">
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="Padding" Value="10,0" />
     </Style>
     <Style Selector="TextBlock.label">
       <Setter Property="Foreground" Value="{DynamicResource DimBrush}" />
@@ -20,8 +20,8 @@
     </Style>
   </Window.Styles>
 
-  <DockPanel Margin="22,18">
-    <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,14">
+  <DockPanel Margin="22,16">
+    <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,10">
       <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="SemiBold" />
       <TextBlock Text="{Binding Subtitle}" Classes="dim" TextWrapping="Wrap" />
     </StackPanel>
@@ -32,81 +32,148 @@
       <Button Grid.Column="2" x:Name="CloseButton" Classes="accent" Content="{l:T 'Done'}" MinWidth="90" IsCancel="True" IsDefault="True" />
     </Grid>
 
-    <Grid ColumnDefinitions="*,24,*">
-      <!-- left: mirroring -->
-      <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Spacing="10" Margin="0,0,14,0">
-          <TextBlock Classes="section" Text="{l:T 'Mirroring'}" />
-          <ItemsControl ItemsSource="{Binding Rows}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:SettingRow">
-                <Grid ColumnDefinitions="170,*" Margin="0,0,0,8" ToolTip.Tip="{Binding Tip}">
-                  <TextBlock Text="{Binding Label}" VerticalAlignment="Center" TextWrapping="Wrap" />
-                  <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding Choices}" SelectedItem="{Binding Selected}" />
-                </Grid>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
+    <TabControl Padding="0,10,0,0">
 
-          <TextBlock Classes="section" Text="{l:T 'Files'}" Margin="0,10,0,4" />
-          <TextBlock Classes="label" Text="{l:T 'Folder on the device for files you drop on it'}" />
-          <TextBox Text="{Binding PushTarget}" PlaceholderText="{Binding PushPlaceholder}" />
+      <!-- Tab 1: Mirroring & quality -->
+      <TabItem Header="{l:T 'Mirroring &amp; quality'}">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Spacing="10" Margin="0,0,12,8">
+            <Border Classes="card" Padding="14,12">
+              <StackPanel Spacing="8">
+                <TextBlock Classes="heading" Text="{l:T 'Display &amp; behavior'}" />
+                <ItemsControl ItemsSource="{Binding BehaviorRows}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:SettingRow">
+                      <Grid ColumnDefinitions="265,*" Margin="0,0,0,5" ToolTip.Tip="{Binding Tip}">
+                        <TextBlock Text="{Binding Label}" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0" />
+                        <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding Choices}" SelectedItem="{Binding Selected}" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
 
-          <TextBlock Classes="section" Text="{l:T 'Background sync'}" Margin="0,10,0,4" />
-          <ItemsControl ItemsSource="{Binding SyncRows}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:SettingRow">
-                <Grid ColumnDefinitions="170,*" Margin="0,0,0,8" ToolTip.Tip="{Binding Tip}">
-                  <TextBlock Text="{Binding Label}" VerticalAlignment="Center" TextWrapping="Wrap" />
-                  <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding Choices}" SelectedItem="{Binding Selected}" />
-                </Grid>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-
-          <StackPanel IsVisible="{Binding IsDevice}" Spacing="6" Margin="0,10,0,0">
-            <TextBlock Classes="section" Text="{l:T 'Shortcut'}" Margin="0,0,0,0" />
-            <TextBlock Classes="label" TextWrapping="Wrap"
-                       Text="{l:T 'Click the box and press a key combination, e.g. Ctrl+Alt+P. It mirrors this device from anywhere (or brings its mirror to the front).'}" />
-            <Grid ColumnDefinitions="*,8,Auto">
-              <TextBox x:Name="HotkeyBox" Text="{Binding Hotkey}" IsReadOnly="True" PlaceholderText="{l:T 'No shortcut'}" />
-              <Button Grid.Column="2" Content="{l:T 'Clear'}" Command="{Binding ClearHotkeyCommand}" />
-            </Grid>
+            <Border Classes="card" Padding="14,12">
+              <StackPanel Spacing="8">
+                <TextBlock Classes="heading" Text="{l:T 'Video quality'}" />
+                <ItemsControl ItemsSource="{Binding QualityRows}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:SettingRow">
+                      <Grid ColumnDefinitions="265,*" Margin="0,0,0,5" ToolTip.Tip="{Binding Tip}">
+                        <TextBlock Text="{Binding Label}" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0" />
+                        <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding Choices}" SelectedItem="{Binding Selected}" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
           </StackPanel>
-        </StackPanel>
-      </ScrollViewer>
+        </ScrollViewer>
+      </TabItem>
 
-      <!-- right: when it connects -->
-      <DockPanel Grid.Column="2">
-        <StackPanel DockPanel.Dock="Top" Spacing="8">
-          <TextBlock Classes="section" Text="{l:T 'When it connects'}" />
-          <Grid ColumnDefinitions="170,*" ToolTip.Tip="{Binding AutoMirror.Tip}">
-            <TextBlock Text="{Binding AutoMirror.Label}" VerticalAlignment="Center" TextWrapping="Wrap" />
-            <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding AutoMirror.Choices}" SelectedItem="{Binding AutoMirror.Selected}" />
-          </Grid>
-          <TextBlock Classes="label" TextWrapping="Wrap" Margin="0,8,0,0"
-                     Text="{l:T 'Run these scripts every time it connects (also after a restart of the device or of Paneless). Only scripts that need no values are listed.'}" />
-          <TextBox Text="{Binding ScriptFilter}" PlaceholderText="{l:T 'Filter scripts'}" />
-        </StackPanel>
-        <Border Margin="0,8,0,0" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="8">
-          <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-            <ItemsControl ItemsSource="{Binding ShownScripts}" Margin="10,6">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:ScriptPick">
-                  <Grid ColumnDefinitions="Auto,*,Auto" MinHeight="30">
-                    <CheckBox IsChecked="{Binding IsChecked}" IsEnabled="{Binding Editable}" MinWidth="0" Margin="0,0,6,0" />
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                      <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
-                      <TextBlock Text="{Binding Category}" Classes="dim" FontSize="11" />
-                    </StackPanel>
-                    <TextBlock Grid.Column="2" Text="{Binding Note}" Classes="dim" FontSize="11" VerticalAlignment="Center" Margin="8,0,0,0" />
-                  </Grid>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-          </ScrollViewer>
-        </Border>
-      </DockPanel>
-    </Grid>
+      <!-- Tab 2: Sync & files -->
+      <TabItem Header="{l:T 'Sync &amp; files'}">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Spacing="14" Margin="0,0,12,8">
+            <Border Classes="card" Padding="14">
+              <StackPanel Spacing="8">
+                <TextBlock Classes="heading" Text="{l:T 'Files'}" />
+                <TextBlock Classes="label" Text="{l:T 'Folder on the device for files you drop on it'}" />
+                <TextBox Text="{Binding PushTarget}" PlaceholderText="{Binding PushPlaceholder}" />
+              </StackPanel>
+            </Border>
+
+            <Border Classes="card" Padding="14">
+              <StackPanel Spacing="8">
+                <TextBlock Classes="heading" Text="{l:T 'Background sync'}" />
+                <ItemsControl ItemsSource="{Binding SyncRows}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:SettingRow">
+                      <Grid ColumnDefinitions="200,*" Margin="0,0,0,6" ToolTip.Tip="{Binding Tip}">
+                        <TextBlock Text="{Binding Label}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                        <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding Choices}" SelectedItem="{Binding Selected}" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- Tab 3: On connect -->
+      <TabItem Header="{l:T 'On connect'}">
+        <DockPanel Margin="0,0,4,0">
+          <StackPanel DockPanel.Dock="Top" Spacing="8">
+            <Grid ColumnDefinitions="200,*" ToolTip.Tip="{Binding AutoMirror.Tip}">
+              <TextBlock Text="{Binding AutoMirror.Label}" VerticalAlignment="Center" TextWrapping="Wrap" />
+              <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding AutoMirror.Choices}" SelectedItem="{Binding AutoMirror.Selected}" />
+            </Grid>
+            <TextBlock Classes="label" TextWrapping="Wrap" Margin="0,6,0,0"
+                       Text="{l:T 'Run these scripts every time it connects (also after a restart of the device or of Paneless). Only scripts that need no values are listed.'}" />
+            <TextBox Text="{Binding ScriptFilter}" PlaceholderText="{l:T 'Filter scripts'}" />
+          </StackPanel>
+          <Border Margin="0,8,0,0" Classes="card">
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+              <ItemsControl ItemsSource="{Binding ShownScripts}" Margin="10,6">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:ScriptPick">
+                    <Grid ColumnDefinitions="Auto,*,Auto" MinHeight="30">
+                      <CheckBox IsChecked="{Binding IsChecked}" IsEnabled="{Binding Editable}" MinWidth="0" Margin="0,0,6,0" />
+                      <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Category}" Classes="dim" FontSize="11" />
+                      </StackPanel>
+                      <TextBlock Grid.Column="2" Text="{Binding Note}" Classes="dim" FontSize="11" VerticalAlignment="Center" Margin="8,0,0,0" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </Border>
+        </DockPanel>
+      </TabItem>
+
+      <!-- Tab 4: Access & shortcut -->
+      <TabItem Header="{l:T 'Access &amp; shortcut'}">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Spacing="14" Margin="0,0,12,8">
+            <Border Classes="card" Padding="14" IsVisible="{Binding IsDevice}">
+              <StackPanel Spacing="8">
+                <TextBlock Classes="heading" Text="{l:T 'Auto-unlock'}" />
+                <TextBlock Text="{Binding UnlockStatusText}" Foreground="{Binding UnlockStatusBrush}" TextWrapping="Wrap" />
+                <Button HorizontalAlignment="Left" Content="{l:T 'Auto-unlock settings…'}" Command="{Binding OpenAutoUnlockCommand}" />
+              </StackPanel>
+            </Border>
+
+            <Border Classes="card" Padding="14">
+              <StackPanel Spacing="8">
+                <TextBlock Classes="heading" Text="{l:T 'AI assistants'}" />
+                <TextBlock Classes="label" Text="{Binding AssistantHeading}" />
+                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AssistantRow.Choices}" SelectedItem="{Binding AssistantRow.Selected}" />
+                <TextBlock Classes="label" TextWrapping="Wrap"
+                           Text="{l:T 'You can also manage AI permissions across all devices on the AI page.'}" />
+              </StackPanel>
+            </Border>
+
+            <Border Classes="card" Padding="14" IsVisible="{Binding IsDevice}">
+              <StackPanel Spacing="8">
+                <TextBlock Classes="heading" Text="{l:T 'Shortcut'}" />
+                <TextBlock Classes="label" TextWrapping="Wrap"
+                           Text="{l:T 'Click the box and press a key combination, e.g. Ctrl+Alt+P. It mirrors this device from anywhere (or brings its mirror to the front).'}" />
+                <Grid ColumnDefinitions="*,8,Auto">
+                  <TextBox x:Name="HotkeyBox" Text="{Binding Hotkey}" IsReadOnly="True" PlaceholderText="{l:T 'No shortcut'}" />
+                  <Button Grid.Column="2" Content="{l:T 'Clear'}" Command="{Binding ClearHotkeyCommand}" />
+                </Grid>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+    </TabControl>
   </DockPanel>
 </Window>

@@ -116,6 +116,8 @@ public partial class App : Application
                 };
                 desktop.ShutdownRequested += (_, _) =>
                 {
+                    if (window.Wall != null)
+                        try { window.Wall.RestoreAllDimmedAsync().Wait(TimeSpan.FromSeconds(1)); } catch { }
                     if (services.Helpers != null)
                         try { services.Helpers.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(2)); } catch { }
                 };
@@ -341,7 +343,7 @@ public partial class App : Application
             var row = AppServices.DemoRows()[0];
             var session = new Paneless.Core.MirrorSession { Serial = "demo", Name = row.Name, Process = System.Diagnostics.Process.GetCurrentProcess(), LogPath = "",
                 Kind = view == "toolbar2" ? Paneless.Core.SessionKind.Screen : Paneless.Core.SessionKind.Mirror };
-            var tb = new MirrorToolbar(session, new ToolbarViewModel(s, session, row)) { Height = 640, Position = new PixelPoint(60, 60) };
+            var tb = new MirrorToolbar(session, new ToolbarViewModel(s, session, row)) { Height = view == "toolbar2" ? 310 : 430, Position = new PixelPoint(60, 60) };
             tb.Show(); target = tb;
         }
         else if (view == "keymap")
@@ -360,6 +362,16 @@ public partial class App : Application
                 svm.SelectedEntry = svm.Items.OfType<ScriptEntry>().FirstOrDefault(e => e.Script.Name == name);
                 if (view == "scripts-run") await svm.RunCommand.ExecuteAsync(null);   // read-only script, first selected device
             }
+        }
+        else if (view == "settings" || view.StartsWith("page-settings"))
+        {
+            main.Height = 780; main.Width = 1140;
+            string[] cats = ["General", "Mirroring", "Sync", "Connecting", "Updates", "About"];
+            string? cat = null;
+            if (view.StartsWith("page-settings-") && int.TryParse(view[14..], out var idx) && idx >= 0 && idx < cats.Length)
+                cat = cats[idx];
+            main.ShowSettings(cat);
+            await Task.Delay(400);
         }
         else if (view.StartsWith("page-") && main.DataContext is MainViewModel pvm)
         {
@@ -473,8 +485,14 @@ public partial class App : Application
             desktop.Shutdown();
             return;
         }
-        else if (view == "settings") target = main.ShowSettings();
-        else if (view == "device-settings") target = main.ShowDeviceSettings("A", "Pixel 11 Pro", null);
+        else if (view == "device-settings" || view.StartsWith("device-settings-"))
+        {
+            var dw = main.ShowDeviceSettings("A", "Pixel 11 Pro", null);
+            target = dw;
+            if (view.StartsWith("device-settings-") && int.TryParse(view[16..], out var ti)
+                && dw.GetVisualDescendants().OfType<TabControl>().FirstOrDefault() is { } dtabs)
+                dtabs.SelectedIndex = ti;
+        }
         else if (view == "group-settings") target = main.ShowDeviceSettings(null, "Test lab", s.Groups.Find("Test lab"));
         else if (view == "apps") { target = main.ShowApps(AppServices.DemoRows()[0]); await Task.Delay(500); }
         else if (view == "menus")

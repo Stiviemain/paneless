@@ -1,10 +1,12 @@
 package app.paneless.helper;
 
+import android.content.ContentResolver;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.hardware.display.DisplayManager;
 import android.os.PowerManager;
+import android.provider.Settings;
 import android.view.Display;
 
 import org.json.JSONArray;
@@ -14,6 +16,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Fast, lightweight screen capture (on-device downscaled JPEG) and event-driven display/screen-state
@@ -27,13 +30,25 @@ public final class ScreenModule {
     private PowerManager power;
     private DisplayManager displayManager;
     private final Object watchLock = new Object();
+    private final Object dimIoLock = new Object();
     private DisplayManager.DisplayListener displayListener;
     private Boolean lastDisplayOn;
+    private boolean displayWatchRequested;
+    private boolean dimActive;
+    private boolean dimSawScreenOn;
+    private String savedBrightness;
+    private String savedBrightnessMode;
 
     public ScreenModule(DaemonServer server) {
         this.server = server;
         this.context = server.context();
-        server.addCloseHook(this::stopDisplayWatch);
+        server.addCloseHook(() -> {
+            restoreIfDimmed(false);
+            synchronized (watchLock) {
+                displayWatchRequested = false;
+                maybeStopDisplayListenerLocked();
+            }
+        });
     }
 
     private PowerManager power() {
@@ -55,12 +70,18 @@ public final class ScreenModule {
         server.handle("capture", (req, bin) -> handleCapture(req));
         server.handle("display_watch", (req, bin) -> {
             boolean enabled = req.optBoolean("enabled", false);
-            if (enabled) startDisplayWatch();
-            else stopDisplayWatch();
+            boolean watching;
+            synchronized (watchLock) {
+                displayWatchRequested = enabled;
+                if (enabled) ensureDisplayListenerLocked();
+                else maybeStopDisplayListenerLocked();
+                watching = displayWatchRequested && displayListener != null;
+            }
             JSONObject res = new JSONObject();
-            res.put("watching", displayListener != null);
+            res.put("watching", watching);
             return DaemonServer.Result.ok(res);
         });
+        server.handle("screen_dim", (req, bin) -> handleScreenDim(req));
     }
 
     public boolean isDisplayOn(int displayId) {
@@ -211,42 +232,167 @@ public final class ScreenModule {
         return out.toByteArray();
     }
 
-    private void startDisplayWatch() {
-        synchronized (watchLock) {
-            DisplayManager dm = displayManager();
-            if (displayListener != null || dm == null) return;
-            lastDisplayOn = isDisplayOn(0);
-            displayListener = new DisplayManager.DisplayListener() {
-                @Override public void onDisplayAdded(int displayId) { }
-                @Override public void onDisplayRemoved(int displayId) { }
-                @Override
-                public void onDisplayChanged(int displayId) {
-                    if (displayId != 0) return;
-                    boolean on = isDisplayOn(0);
-                    if (lastDisplayOn == null || lastDisplayOn != on) {
-                        lastDisplayOn = on;
-                        try {
-                            JSONObject ev = new JSONObject();
-                            ev.put("on", on);
-                            server.sendEvent("screen_state", ev);
-                        } catch (Throwable ignored) { }
-                    }
+    private DaemonServer.Result handleScreenDim(JSONObject req) throws Exception {
+        boolean enabled = req.optBoolean("enabled", false);
+        if (!enabled) {
+            boolean restored = restoreIfDimmed(false);
+            JSONObject res = new JSONObject();
+            res.put("dimmed", false);
+            res.put("restored", restored);
+            return DaemonServer.Result.ok(res);
+        }
+
+        int target = Math.max(0, Math.min(255, req.optInt("brightness", 1)));
+        synchronized (dimIoLock) {
+            boolean needSnapshot;
+            synchronized (watchLock) {
+                needSnapshot = !dimActive;
+            }
+            String curBrightness = needSnapshot ? readSystemSetting("screen_brightness") : null;
+            String curMode = needSnapshot ? readSystemSetting("screen_brightness_mode") : null;
+            synchronized (watchLock) {
+                if (!dimActive) {
+                    savedBrightness = curBrightness;
+                    savedBrightnessMode = curMode;
+                    dimActive = true;
+                    dimSawScreenOn = isDisplayOn(0);
+                    ensureDisplayListenerLocked();
                 }
-            };
-            try { dm.registerDisplayListener(displayListener, server.handler()); }
-            catch (Throwable ignored) { displayListener = null; }
+            }
+            runCmd("settings", "put", "system", "screen_brightness_mode", "0");
+            runCmd("settings", "put", "system", "screen_brightness", String.valueOf(target));
+        }
+        JSONObject res = new JSONObject();
+        res.put("dimmed", true);
+        return DaemonServer.Result.ok(res);
+    }
+
+    private boolean restoreIfDimmed(boolean onlyIfScreenOff) {
+        synchronized (dimIoLock) {
+            String b;
+            String m;
+            synchronized (watchLock) {
+                if (!dimActive) return false;
+                if (onlyIfScreenOff && (!dimSawScreenOn || isDisplayOn(0))) return false;
+                b = savedBrightness;
+                m = savedBrightnessMode;
+                dimActive = false;
+                dimSawScreenOn = false;
+                savedBrightness = null;
+                savedBrightnessMode = null;
+                maybeStopDisplayListenerLocked();
+            }
+            try {
+                if (b != null && !b.isEmpty() && !"null".equals(b)) {
+                    runCmd("settings", "put", "system", "screen_brightness", b);
+                }
+                if (m != null && !m.isEmpty() && !"null".equals(m)) {
+                    runCmd("settings", "put", "system", "screen_brightness_mode", m);
+                }
+            } catch (Throwable ignored) { }
+            return true;
         }
     }
 
-    private void stopDisplayWatch() {
-        synchronized (watchLock) {
-            DisplayManager dm = displayManager();
-            if (displayListener != null && dm != null) {
-                try { dm.unregisterDisplayListener(displayListener); } catch (Throwable ignored) { }
+    public void abandonDim() {
+        synchronized (dimIoLock) {
+            synchronized (watchLock) {
+                dimActive = false;
+                dimSawScreenOn = false;
+                savedBrightness = null;
+                savedBrightnessMode = null;
+                maybeStopDisplayListenerLocked();
             }
-            displayListener = null;
-            lastDisplayOn = null;
         }
+    }
+
+    private String readSystemSetting(String key) {
+        try {
+            ContentResolver cr = context.getContentResolver();
+            if (cr != null) {
+                String v = Settings.System.getString(cr, key);
+                if (v != null && !v.isEmpty()) return v.trim();
+            }
+        } catch (Throwable ignored) { }
+        try {
+            String v = runCmdOut("settings", "get", "system", key).trim();
+            if (!v.isEmpty() && !"null".equals(v)) return v;
+        } catch (Throwable ignored) { }
+        return null;
+    }
+
+    private static void runCmd(String... args) throws Exception {
+        Process p = new ProcessBuilder(args).redirectErrorStream(true).start();
+        try {
+            p.getInputStream().readAllBytes();
+            p.waitFor();
+        } finally {
+            p.destroy();
+        }
+    }
+
+    private static String runCmdOut(String... args) throws Exception {
+        Process p = new ProcessBuilder(args).redirectErrorStream(true).start();
+        try {
+            byte[] out = p.getInputStream().readAllBytes();
+            p.waitFor();
+            return new String(out, StandardCharsets.UTF_8);
+        } finally {
+            p.destroy();
+        }
+    }
+
+    private void ensureDisplayListenerLocked() {
+        DisplayManager dm = displayManager();
+        if (displayListener != null || dm == null) return;
+        if (!displayWatchRequested && !dimActive) return;
+        lastDisplayOn = isDisplayOn(0);
+        displayListener = new DisplayManager.DisplayListener() {
+            @Override public void onDisplayAdded(int displayId) { }
+            @Override public void onDisplayRemoved(int displayId) { }
+            @Override
+            public void onDisplayChanged(int displayId) {
+                if (displayId != 0) return;
+                boolean on = isDisplayOn(0);
+                boolean shouldRestore = false;
+                boolean sendEvent = false;
+                synchronized (watchLock) {
+                    if (dimActive) {
+                        if (on) {
+                            dimSawScreenOn = true;
+                        } else if (dimSawScreenOn) {
+                            shouldRestore = true;
+                        }
+                    }
+                    if (displayWatchRequested && (lastDisplayOn == null || lastDisplayOn != on)) {
+                        lastDisplayOn = on;
+                        sendEvent = true;
+                    }
+                }
+                if (shouldRestore) {
+                    new Thread(() -> restoreIfDimmed(true), "paneless-dim-restore").start();
+                }
+                if (sendEvent) {
+                    try {
+                        JSONObject ev = new JSONObject();
+                        ev.put("on", on);
+                        server.sendEvent("screen_state", ev);
+                    } catch (Throwable ignored) { }
+                }
+            }
+        };
+        try { dm.registerDisplayListener(displayListener, server.handler()); }
+        catch (Throwable ignored) { displayListener = null; }
+    }
+
+    private void maybeStopDisplayListenerLocked() {
+        if (displayWatchRequested || dimActive) return;
+        DisplayManager dm = displayManager();
+        if (displayListener != null && dm != null) {
+            try { dm.unregisterDisplayListener(displayListener); } catch (Throwable ignored) { }
+        }
+        displayListener = null;
+        lastDisplayOn = null;
     }
 
     private static String stateName(int s) {

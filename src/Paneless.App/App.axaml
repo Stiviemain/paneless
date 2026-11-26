@@ -22,6 +22,7 @@
           <SolidColorBrush x:Key="GreenBrush" Color="#157f4b" />
           <SolidColorBrush x:Key="AmberBrush" Color="#b4690e" />
           <SolidColorBrush x:Key="RedBrush" Color="#c93434" />
+          <SolidColorBrush x:Key="RedHoverBrush" Color="#fce8e8" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="Dark">
           <SolidColorBrush x:Key="BgBrush" Color="#17181c" />
@@ -39,6 +40,7 @@
           <SolidColorBrush x:Key="GreenBrush" Color="#4cc38a" />
           <SolidColorBrush x:Key="AmberBrush" Color="#e8b75a" />
           <SolidColorBrush x:Key="RedBrush" Color="#f07272" />
+          <SolidColorBrush x:Key="RedHoverBrush" Color="#3a2024" />
         </ResourceDictionary>
       </ResourceDictionary.ThemeDictionaries>
     </ResourceDictionary>
@@ -93,6 +95,22 @@
     <Style Selector="Button.flat:pointerover /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
       <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+    </Style>
+    <Style Selector="Button.danger">
+      <Setter Property="Foreground" Value="{DynamicResource RedBrush}" />
+    </Style>
+    <Style Selector="Button.danger:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource RedHoverBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource RedBrush}" />
+    </Style>
+    <Style Selector="MenuItem.danger">
+      <Setter Property="Foreground" Value="{DynamicResource RedBrush}" />
+    </Style>
+    <Style Selector="Button.danger:disabled">
+      <Setter Property="Opacity" Value="0.45" />
+    </Style>
+    <Style Selector="MenuItem.danger:disabled">
+      <Setter Property="Opacity" Value="0.45" />
     </Style>
     <Style Selector="ListBox.plain ListBoxItem">
       <Setter Property="Padding" Value="12,7" />

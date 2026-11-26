@@ -69,10 +69,11 @@ public sealed partial class MainViewModel : ObservableObject
     public bool IsInventoryPage => Page == "Inventory";
     public bool IsAssistantsPage => Page == "Assistants";
     public bool IsRemoteAppsPage => Page == "RemoteApps";
+    public bool IsSettingsPage => Page == "Settings";
 
     partial void OnPageChanged(string value)
     {
-        foreach (var p in new[] { nameof(IsDevicesPage), nameof(IsWallPage), nameof(IsLogsPage), nameof(IsAutomationPage), nameof(IsInventoryPage), nameof(IsAssistantsPage), nameof(IsRemoteAppsPage) })
+        foreach (var p in new[] { nameof(IsDevicesPage), nameof(IsWallPage), nameof(IsLogsPage), nameof(IsAutomationPage), nameof(IsInventoryPage), nameof(IsAssistantsPage), nameof(IsRemoteAppsPage), nameof(IsSettingsPage) })
             OnPropertyChanged(p);
     }
 
@@ -132,8 +133,8 @@ public sealed partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(MirrorCommand), nameof(PairCommand), nameof(AutoUnlockCommand),
-                                nameof(UnlockNowCommand), nameof(RefreshCommand), nameof(ConnectCommand),
-                                nameof(SwitchToWifiCommand))]
+                                nameof(UnlockNowCommand), nameof(WakeScreenCommand), nameof(TurnScreenOffCommand),
+                                nameof(RefreshCommand), nameof(ConnectCommand), nameof(SwitchToWifiCommand))]
     public partial bool IsBusy { get; set; }
 
     bool Ready => _s.Tools != null || _s.Demo;
@@ -631,6 +632,8 @@ public sealed partial class MainViewModel : ObservableObject
         MirrorCommand.NotifyCanExecuteChanged();
         AutoUnlockCommand.NotifyCanExecuteChanged();
         UnlockNowCommand.NotifyCanExecuteChanged();
+        WakeScreenCommand.NotifyCanExecuteChanged();
+        TurnScreenOffCommand.NotifyCanExecuteChanged();
         MoveToGroupCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(CanSwitchToWifi));
         SwitchToWifiCommand.NotifyCanExecuteChanged();
@@ -759,6 +762,37 @@ public sealed partial class MainViewModel : ObservableObject
         await RefreshListAsync();
     }
 
+    bool CanPowerTargets() => Ready && !IsBusy && Targets.Any(r => r.CanMirror);
+
+    [RelayCommand(CanExecute = nameof(CanPowerTargets))]
+    Task WakeScreenAsync() => SendPowerKeyAsync("KEYCODE_WAKEUP", "Demo mode: would wake {0}.", "Woke {0}.");
+
+    [RelayCommand(CanExecute = nameof(CanPowerTargets))]
+    Task TurnScreenOffAsync() => SendPowerKeyAsync("KEYCODE_SLEEP", "Demo mode: would turn off the screen on {0}.", "Turned off the screen on {0}.");
+
+    async Task SendPowerKeyAsync(string keycode, string demoKey, string doneKey)
+    {
+        var rows = Targets.Where(r => r.CanMirror).ToList();
+        if (rows.Count == 0) return;
+        var who = rows.Count == 1 ? rows[0].Name : Loc.Count(rows.Count, "{0} device", "{0} devices");
+        if (_s.Demo) { SetStatus(Loc.F(demoKey, who), StatusKind.Ok); return; }
+        IsBusy = true;
+        try
+        {
+            var count = 0;
+            await Task.WhenAll(rows.Select(async r =>
+            {
+                var serial = await _s.Directory!.ConnectAsync(r);
+                if (serial == null || _s.Adb == null) return;
+                await _s.Adb.ShellAsync(serial, "input keyevent " + keycode, TimeSpan.FromSeconds(5));
+                Interlocked.Increment(ref count);
+            }));
+            if (count > 0) SetStatus(Loc.F(doneKey, who), StatusKind.Ok);
+            else SetStatus(Loc.F("Couldn't connect to {0}.", who), StatusKind.Error);
+        }
+        finally { IsBusy = false; }
+    }
+
     [RelayCommand(CanExecute = nameof(CanAct))]
     async Task RefreshAsync()
     {
@@ -799,8 +833,8 @@ public sealed partial class MainViewModel : ObservableObject
 
     // ---------------------------------------------------------------- settings, apps, windows
 
-    /// <summary>Set by the window.</summary>
-    public Action? ShowSettings { get; set; }
+    /// <summary>Opens the Settings page (optionally focused on a category).</summary>
+    public Action<string?>? ShowSettings { get; set; }
     public Action<string?, string, DeviceGroup?>? ShowDeviceSettings { get; set; }
     public Action<DeviceRow>? ShowApps { get; set; }
     public Action<DeviceRow>? ShowFiles { get; set; }
@@ -840,7 +874,7 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    void OpenSettings() => ShowSettings?.Invoke();
+    void OpenSettings(string? category = null) => ShowSettings?.Invoke(category);
 
     [RelayCommand]
     void DeviceSettings()

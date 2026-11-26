@@ -26,15 +26,6 @@ public partial class MirrorToolbar : Window
         DataContext = vm;
         vm.MirrorWindow = () => _mirror;
         vm.ReadClipboardAsync = async () => Clipboard is { } cb ? await Avalonia.Input.Platform.ClipboardExtensions.TryGetTextAsync(cb) : null;
-        var hideToast = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
-        hideToast.Tick += (_, _) => { hideToast.Stop(); Toast.IsOpen = false; };
-        vm.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName != nameof(ToolbarViewModel.Hint) || vm.Hint.Length == 0 || !IsVisible) return;
-            ToastText.Text = vm.Hint;
-            Toast.IsOpen = true;
-            hideToast.Stop(); hideToast.Start();
-        };
         if (OperatingSystem.IsWindows())
         {
             WindowDecorations = Avalonia.Controls.WindowDecorations.None;

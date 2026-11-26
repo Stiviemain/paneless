@@ -15,4 +15,14 @@ public static class Reveal
         }
         catch { /* the status line still says where it is */ }
     }
+
+    public static void Folder(string dir)
+    {
+        try
+        {
+            Directory.CreateDirectory(dir);
+            Process.Start(new ProcessStartInfo(dir) { UseShellExecute = true });
+        }
+        catch { }
+    }
 }

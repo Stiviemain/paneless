@@ -580,6 +580,13 @@ public sealed class DeviceHelperClient : IAsyncDisposable
     public async Task<bool> WatchDisplayAsync(bool enabled, CancellationToken ct = default) =>
         (await CallAsync("display_watch", new JsonObject { ["enabled"] = enabled }, timeout: TimeSpan.FromSeconds(6), ct: ct)).Ok;
 
+    public async Task<bool> SetScreenDimAsync(bool enabled, int brightness = 1, CancellationToken ct = default)
+    {
+        var args = new JsonObject { ["enabled"] = enabled };
+        if (enabled) args["brightness"] = Math.Clamp(brightness, 0, 255);
+        return (await CallAsync("screen_dim", args, timeout: TimeSpan.FromSeconds(6), ct: ct)).Ok;
+    }
+
     // ---------------------------------------------------------------- typed helpers (Step 6: Telemetry & rich app details)
 
     public async Task<DeviceInventory?> GetInventoryAsync(string name, CancellationToken ct = default)
@@ -766,6 +773,7 @@ public sealed class DeviceHelperClient : IAsyncDisposable
         try { _tcp?.Dispose(); } catch { }
         if (_proc != null)
         {
+            try { if (!_proc.HasExited) _proc.WaitForExit(500); } catch { }
             try { if (!_proc.HasExited) _proc.Kill(entireProcessTree: true); } catch { }
             try { _proc.Dispose(); } catch { }
         }

@@ -89,6 +89,30 @@ internal static class Win32
         return (cw, ch);
     }
 
+    /// <summary>Computes the 8-aligned client size and screen coordinates that fit <paramref name="targetClientW"/>×<paramref name="targetClientH"/>
+    /// inside 88 % of the current monitor's work area at the window's position, without moving or resizing it yet.</summary>
+    public static (int X, int Y, int W, int H)? ComputeClientPlaceOnScreen(nint hWnd, int targetClientW, int targetClientH)
+    {
+        if (!IsWindow(hWnd)) return null;
+        var work = WorkArea(hWnd);
+        var vis = Bounds(hWnd);
+        var cli = ClientBounds(hWnd);
+        if (vis is not { } v || cli is not { } c) return null;
+
+        int leftFrame = Math.Max(0, c.Left - v.Left);
+        int topFrame = Math.Max(0, c.Top - v.Top);
+        int frameW = Math.Max(0, (v.Right - v.Left) - (c.Right - c.Left));
+        int frameH = Math.Max(0, (v.Bottom - v.Top) - (c.Bottom - c.Top));
+        int maxW = (int)((work.Right - work.Left - frameW) * 0.88);
+        int maxH = (int)((work.Bottom - work.Top - frameH) * 0.88);
+        var (cw, ch) = Paneless.Core.RemoteApp.FitToArea(targetClientW, targetClientH, maxW, maxH);
+        int outerW = cw + frameW, outerH = ch + frameH;
+
+        int vx = Math.Clamp(v.Left, work.Left, Math.Max(work.Left, work.Right - outerW));
+        int vy = Math.Clamp(v.Top, work.Top, Math.Max(work.Top, work.Bottom - outerH));
+        return (vx + leftFrame, vy + topFrame, cw, ch);
+    }
+
     /// <summary>The client area (inside the title bar and borders) in screen pixels.</summary>
     public static RECT? ClientBounds(nint hWnd)
     {

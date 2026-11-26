@@ -33,12 +33,14 @@ public final class ControlsModule {
     private final DaemonServer server;
     private final Context context;
     private final UiModule uiModule;
+    private final ScreenModule screenModule;
     private volatile boolean watchingNotifications;
 
-    public ControlsModule(DaemonServer server, UiModule uiModule) {
+    public ControlsModule(DaemonServer server, UiModule uiModule, ScreenModule screenModule) {
         this.server = server;
         this.context = server.context();
         this.uiModule = uiModule;
+        this.screenModule = screenModule;
         server.addCloseHook(() -> {
             if (watchingNotifications) {
                 watchingNotifications = false;
@@ -113,11 +115,13 @@ public final class ControlsModule {
                 return DaemonServer.Result.ok();
             }
             case "autoBrightness": {
+                if (screenModule != null) screenModule.abandonDim();
                 boolean on = req.optBoolean("value", false);
                 runCmd("settings", "put", "system", "screen_brightness_mode", on ? "1" : "0");
                 return DaemonServer.Result.ok();
             }
             case "brightness": {
+                if (screenModule != null) screenModule.abandonDim();
                 int val = Math.max(0, Math.min(255, req.optInt("value", 128)));
                 runCmd("settings", "put", "system", "screen_brightness_mode", "0");
                 runCmd("settings", "put", "system", "screen_brightness", String.valueOf(val));

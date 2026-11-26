@@ -19,6 +19,8 @@ public sealed class MirrorSession
     public bool StoppedByUs { get; set; }
     /// <summary>Put the device to sleep when this session closes and no other display window remains open for it.</summary>
     public bool LockOnClose { get; init; }
+    /// <summary>Skip LockOnClose when reopening a session in place (e.g. applying a new UI scale).</summary>
+    public bool SuppressLockOnClose { get; set; }
     /// <summary>Remote app windows: which remote app this is (<see cref="RemoteApp.Id"/>).</summary>
     public string? RemoteAppId { get; init; }
     /// <summary>App and second-screen windows: the number of the virtual display scrcpy created (from its log).</summary>
@@ -118,7 +120,7 @@ public sealed partial class MirrorManager(ToolPaths tools)
     {
         var title = $"{name} – second screen";
         var (w, h) = embedded && embeddedSize is { W: > 100, H: > 100 } es
-            ? (Math.Clamp(es.W, 320, 3840) & ~1, Math.Clamp(es.H, 320, 3840) & ~1)
+            ? (Math.Max(320, Math.Clamp(es.W, 320, 3840) & ~7), Math.Max(320, Math.Clamp(es.H, 320, 3840) & ~7))
             : (1600, 1000);
         var args = new List<string> { "--window-title", title, $"--new-display={w}x{h}", "--flex-display", "--render-fit=letterbox", "--no-audio" };
         if (embedded) args.Add("--window-borderless");
@@ -280,7 +282,8 @@ public sealed partial class MirrorManager(ToolPaths tools)
             {
                 _sessions.Remove(session);
                 // Put the device to sleep only when its last display window (mirror, second screen, app window) closes.
-                shouldLock = session.LockOnClose
+                shouldLock = !session.SuppressLockOnClose
+                    && session.LockOnClose
                     && session.Kind is SessionKind.Mirror or SessionKind.Screen or SessionKind.App
                     && !_sessions.Any(s => s.IsRunning && s.Serial == session.Serial && s.Kind is SessionKind.Mirror or SessionKind.Screen or SessionKind.App);
             }

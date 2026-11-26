@@ -71,8 +71,8 @@ public static class SettingChoices
     public static string Codec(string v) => Codecs.FirstOrDefault(c => c.Value == v).Label?.Split(' ')[0] ?? v;
     public static string FpsText(int v) => v == 0 ? Loc.T("No limit") : $"{v} fps";
 
-    /// <summary>The rows for the mirroring options. With <paramref name="inherited"/>, each row starts with "Default (…)".</summary>
-    public static List<SettingRow> MirrorRows(Func<DeviceProfile>? profile, EffectiveProfile? inherited, AppSettings? global, Action save)
+    /// <summary>Mirroring display &amp; behavior rows. With <paramref name="inherited"/>, each row starts with "Default (…)".</summary>
+    public static List<SettingRow> MirrorBehaviorRows(Func<DeviceProfile>? profile, EffectiveProfile? inherited, AppSettings? global, Action save)
     {
         var rows = new List<SettingRow>();
         void Bool(string label, string? tip, bool? current, bool fallback, Action<bool?> set)
@@ -82,13 +82,6 @@ public static class SettingChoices
             choices.Add(new Choice(Loc.T("On"), true));
             choices.Add(new Choice(Loc.T("Off"), false));
             rows.Add(new SettingRow(label, tip, choices, inherited != null ? current : fallback, v => { set((bool?)v); save(); }));
-        }
-        void Pick<T>(string label, string? tip, IEnumerable<(string Label, T Value)> options, T? current, string fallbackLabel, Action<T?> set) where T : notnull
-        {
-            var choices = new List<Choice>();
-            if (inherited != null) choices.Add(new Choice(Loc.F("Default ({0})", fallbackLabel), null));
-            choices.AddRange(options.Select(o => new Choice(o.Label, o.Value)));
-            rows.Add(new SettingRow(label, tip, choices, current, v => { set(v is T t ? t : default); save(); }));
         }
 
         var p = profile?.Invoke();
@@ -108,6 +101,24 @@ public static class SettingChoices
             v => { if (p != null) p.Audio = v; else g!.Audio = v ?? false; });
         Bool(Loc.T("Mirror window always on top"), null, p?.OnTop, e?.OnTop ?? g!.OnTop,
             v => { if (p != null) p.OnTop = v; else g!.OnTop = v ?? false; });
+        return rows;
+    }
+
+    /// <summary>Mirroring video quality rows. With <paramref name="inherited"/>, each row starts with "Default (…)".</summary>
+    public static List<SettingRow> MirrorQualityRows(Func<DeviceProfile>? profile, EffectiveProfile? inherited, AppSettings? global, Action save)
+    {
+        var rows = new List<SettingRow>();
+        void Pick<T>(string label, string? tip, IEnumerable<(string Label, T Value)> options, T? current, string fallbackLabel, Action<T?> set) where T : notnull
+        {
+            var choices = new List<Choice>();
+            if (inherited != null) choices.Add(new Choice(Loc.F("Default ({0})", fallbackLabel), null));
+            choices.AddRange(options.Select(o => new Choice(o.Label, o.Value)));
+            rows.Add(new SettingRow(label, tip, choices, current, v => { set(v is T t ? t : default); save(); }));
+        }
+
+        var p = profile?.Invoke();
+        var g = global;
+        var e = inherited;
         Pick(Loc.T("Max size"), Loc.T("Longer side of the picture. Smaller is smoother on slow Wi-Fi."), Sizes.Select(s => (Loc.T(s), s)),
             p != null ? p.MaxSize : g!.MaxSize, Loc.T(e?.MaxSize ?? ""), v => { if (p != null) p.MaxSize = v; else if (v != null) g!.MaxSize = v; });
         Pick(Loc.T("Video codec"), Loc.T("H.265 and AV1 look better at the same bit rate if the device can encode them."), Codecs.Select(c => (c.Label, c.Value)),
@@ -117,6 +128,22 @@ public static class SettingChoices
         Pick(Loc.T("Frame rate limit"), Loc.T("Lower saves battery and Wi-Fi."), Fps.Select(f => (FpsText(f), (object)f)),
             p != null ? p.MaxFps : g!.MaxFps, e != null ? FpsText(e.MaxFps) : "", v => { if (p != null) p.MaxFps = (int?)v; else if (v is int i) g!.MaxFps = i; });
         return rows;
+    }
+
+    public static string AssistantLevelName(AssistantAccess a) => a switch
+    {
+        AssistantAccess.Off => Loc.T("Nothing (hidden from AI)"),
+        AssistantAccess.Read => Loc.T("Read: status, apps, logs"),
+        AssistantAccess.Screen => Loc.T("See: also screenshots"),
+        AssistantAccess.Control => Loc.T("Control: also taps, typing, apps"),
+        _ => Loc.T("Manage: also installs, files, commands"),
+    };
+
+    public static SettingRow AssistantRow(Func<DeviceProfile> profile, AssistantAccess inherited, Action save)
+    {
+        var choices = new List<Choice> { new(Loc.F("Default ({0})", AssistantLevelName(inherited).Split(':')[0]), null) };
+        choices.AddRange(Enum.GetValues<AssistantAccess>().Select(a => new Choice(AssistantLevelName(a), a)));
+        return new SettingRow(Loc.T("AI assistants"), null, choices, profile().Assistant, v => { profile().Assistant = (AssistantAccess?)v; save(); });
     }
 
     /// <summary>Opt-in background features powered by the on-device helper daemon (global, group or per-device).</summary>
@@ -174,11 +201,14 @@ public sealed partial class ProfileEditorViewModel : ObservableObject
 
         // What "Default" means here: for a device, its group's settings over the global ones; for a group, the global ones.
         var inherited = EffectiveProfile.Resolve(_s.Data.Settings, deviceId != null ? memberOf?.Profile : null, null);
-        Rows = new(SettingChoices.MirrorRows(Profile, inherited, null, Save));
+        BehaviorRows = new(SettingChoices.MirrorBehaviorRows(Profile, inherited, null, Save));
+        QualityRows = new(SettingChoices.MirrorQualityRows(Profile, inherited, null, Save));
         SyncRows = new(SettingChoices.SyncRows(Profile, inherited, null, Save));
         AutoMirror = new SettingRow(Loc.T("Mirror by itself when it connects"), Loc.T("Opens the mirror as soon as the device is on the network and connected. Once per connection."),
             [new Choice(Loc.F("Default ({0})", SettingChoices.OnOff(inherited.AutoMirror)), null), new Choice(Loc.T("On"), true), new Choice(Loc.T("Off"), false)],
             Profile().AutoMirror, v => { Profile().AutoMirror = (bool?)v; Save(); });
+        AssistantRow = SettingChoices.AssistantRow(Profile, inherited.Assistant, Save);
+        RefreshUnlockStatus();
 
         var p = Profile();
         _loading = true;
@@ -201,17 +231,64 @@ public sealed partial class ProfileEditorViewModel : ObservableObject
     public string Title { get; }
     public string Subtitle { get; }
     public bool IsDevice { get; }
-    public ObservableCollection<SettingRow> Rows { get; }
+    public ObservableCollection<SettingRow> BehaviorRows { get; }
+    public ObservableCollection<SettingRow> QualityRows { get; }
     public ObservableCollection<SettingRow> SyncRows { get; }
     public SettingRow AutoMirror { get; }
+    public SettingRow AssistantRow { get; }
+    public string AssistantHeading => IsDevice
+        ? Loc.T("What AI assistants may do on this device")
+        : Loc.T("What AI assistants may do on this group");
+    public Func<Task>? OpenAutoUnlockAsync { get; set; }
     public ObservableCollection<ScriptPick> Scripts { get; } = new();
     public string PushPlaceholder { get; }
 
+    [ObservableProperty] public partial string UnlockStatusText { get; set; } = "";
+    [ObservableProperty] public partial IBrush UnlockStatusBrush { get; set; } = Theme.Dim;
     [ObservableProperty] public partial string PushTarget { get; set; }
     [ObservableProperty] public partial string Hotkey { get; set; }
     [ObservableProperty] public partial string ScriptFilter { get; set; } = "";
     [ObservableProperty] public partial string Message { get; set; } = "";
     [ObservableProperty] public partial IBrush MessageBrush { get; set; } = Theme.Dim;
+
+    public void RefreshUnlockStatus()
+    {
+        if (!IsDevice || _deviceId == null) return;
+        if (_s.Demo)
+        {
+            var st = AppServices.DemoRows().FirstOrDefault(r => r.GroupId == _deviceId)?.Unlock ?? UnlockStatus.None;
+            (UnlockStatusText, UnlockStatusBrush) = st switch
+            {
+                UnlockStatus.On => (Loc.T("Auto-unlock is on (code saved)."), Theme.Green),
+                UnlockStatus.Paused => (Loc.T("Auto-unlock is paused after a failed try. Save the code again to turn it back on."), Theme.Amber),
+                _ => (Loc.T("No unlock code saved yet."), Theme.Dim),
+            };
+            return;
+        }
+        if (_s.Unlock?.IsReady(_deviceId) == true)
+        {
+            UnlockStatusText = Loc.T("Auto-unlock is on (code saved).");
+            UnlockStatusBrush = Theme.Green;
+        }
+        else if (_s.Unlock?.HasCode(_deviceId) == true)
+        {
+            UnlockStatusText = Loc.T("Auto-unlock is paused after a failed try. Save the code again to turn it back on.");
+            UnlockStatusBrush = Theme.Amber;
+        }
+        else
+        {
+            UnlockStatusText = Loc.T("No unlock code saved yet.");
+            UnlockStatusBrush = Theme.Dim;
+        }
+    }
+
+    [RelayCommand]
+    async Task OpenAutoUnlock()
+    {
+        if (OpenAutoUnlockAsync == null) return;
+        await OpenAutoUnlockAsync();
+        RefreshUnlockStatus();
+    }
 
     public IEnumerable<ScriptPick> ShownScripts => ScriptFilter.Trim() is { Length: > 0 } q
         ? Scripts.Where(s => s.Name.Contains(q, StringComparison.OrdinalIgnoreCase) || s.Category.Contains(q, StringComparison.OrdinalIgnoreCase))
@@ -266,13 +343,16 @@ public sealed partial class ProfileEditorViewModel : ObservableObject
         var keepHotkey = p.Hotkey;
         p.ScreenOff = p.Audio = p.OnTop = p.KeepAwake = p.LockOnClose = p.KeepScreensOn = p.AutoMirror = null;
         p.ClipboardSync = p.AutoDownloadMedia = p.AutoCopyOtp = null;
+        p.Assistant = null;
         p.MaxSize = p.VideoCodec = p.PushTarget = null;
         p.BitrateMbps = p.MaxFps = null;
         p.OnConnectScripts.Clear();
         p.Hotkey = keepHotkey;
-        foreach (var r in Rows) r.Selected = r.Choices[0];
+        foreach (var r in BehaviorRows) r.Selected = r.Choices[0];
+        foreach (var r in QualityRows) r.Selected = r.Choices[0];
         foreach (var r in SyncRows) r.Selected = r.Choices[0];
         AutoMirror.Selected = AutoMirror.Choices[0];
+        AssistantRow.Selected = AssistantRow.Choices[0];
         foreach (var s in Scripts.Where(s => s.Editable)) s.IsChecked = false;
         PushTarget = "";
         Save();
@@ -280,7 +360,7 @@ public sealed partial class ProfileEditorViewModel : ObservableObject
     }
 }
 
-/// <summary>Paneless settings: defaults for every device, start-up and tray, updates.</summary>
+/// <summary>Paneless settings: defaults for every device, background sync, updates, backup and diagnostics.</summary>
 public sealed partial class SettingsViewModel : ObservableObject
 {
     readonly AppServices _s;
@@ -289,8 +369,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     {
         _s = services;
         var g = _s.Data.Settings;
-        Rows = new(SettingChoices.MirrorRows(null, null, g, Save));
-        SyncRows = new(SettingChoices.SyncRows(null, null, g, Save));
+        QualityRows = new(SettingChoices.MirrorQualityRows(null, null, g, Save));
         _pushTarget = g.PushTarget;
         _updateSource = g.UpdateSource;
         _startLanguage = g.Language;
@@ -309,17 +388,65 @@ public sealed partial class SettingsViewModel : ObservableObject
     /// <summary>Set by the window: file pickers and confirmation dialog for backup & reset.</summary>
     public Func<string, Task<string?>>? PickSaveFileAsync { get; set; }
     public Func<Task<string?>>? PickOpenFileAsync { get; set; }
-    public Func<string, string, Task<bool>>? ConfirmAsync { get; set; }
+    public Func<string, string, string?, Task<bool>>? ConfirmAsync { get; set; }
 
-    public ObservableCollection<SettingRow> Rows { get; }
-    public ObservableCollection<SettingRow> SyncRows { get; }
+    [ObservableProperty] public partial string Category { get; set; } = "General";
+    public bool IsGeneral => Category == "General";
+    public bool IsMirroring => Category == "Mirroring";
+    public bool IsSync => Category == "Sync";
+    public bool IsConnecting => Category == "Connecting";
+    public bool IsUpdates => Category == "Updates";
+    public bool IsAbout => Category == "About";
+
+    partial void OnCategoryChanged(string value)
+    {
+        foreach (var p in new[] { nameof(IsGeneral), nameof(IsMirroring), nameof(IsSync), nameof(IsConnecting), nameof(IsUpdates), nameof(IsAbout) })
+            OnPropertyChanged(p);
+    }
+
+    [RelayCommand]
+    void SelectCategory(string category) => Category = category;
+
+    public ObservableCollection<SettingRow> QualityRows { get; }
     public bool AutostartSupported => Platform.Autostart.IsSupported;
+
+    public bool ScreenOff
+    {
+        get => G.ScreenOff;
+        set { G.ScreenOff = value; Save(); OnPropertyChanged(); OnPropertyChanged(nameof(KeepAwake)); OnPropertyChanged(nameof(KeepAwakeEnabled)); }
+    }
+    public bool KeepAwake { get => G.ScreenOff || G.KeepAwake; set { G.KeepAwake = value; Save(); OnPropertyChanged(); } }
+    public bool KeepAwakeEnabled => !G.ScreenOff;
+    public bool LockOnClose { get => G.LockOnClose; set { G.LockOnClose = value; Save(); OnPropertyChanged(); } }
+    public bool KeepScreensOn { get => G.KeepScreensOn; set { G.KeepScreensOn = value; Save(); OnPropertyChanged(); } }
+    public bool Audio { get => G.Audio; set { G.Audio = value; Save(); OnPropertyChanged(); } }
+    public bool OnTop { get => G.OnTop; set { G.OnTop = value; Save(); OnPropertyChanged(); } }
+
+    public bool ClipboardSync { get => G.ClipboardSync; set { G.ClipboardSync = value; Save(); OnPropertyChanged(); } }
+    public bool AutoDownloadMedia { get => G.AutoDownloadMedia; set { G.AutoDownloadMedia = value; Save(); OnPropertyChanged(); } }
+    public bool AutoCopyOtp { get => G.AutoCopyOtp; set { G.AutoCopyOtp = value; Save(); OnPropertyChanged(); } }
 
     public bool AutoConnect { get => G.AutoConnect; set { G.AutoConnect = value; Save(); OnPropertyChanged(); } }
     public bool DisconnectInBackground { get => G.DisconnectInBackground; set { G.DisconnectInBackground = value; Save(); OnPropertyChanged(); } }
     public bool CloseToTray { get => G.CloseToTray; set { G.CloseToTray = value; Save(); OnPropertyChanged(); } }
     public bool AutoUpdate { get => G.AutoUpdate; set { G.AutoUpdate = value; Save(); OnPropertyChanged(); } }
     public bool BetaUpdates { get => G.BetaUpdates; set { G.BetaUpdates = value; Save(); OnPropertyChanged(); } }
+
+    public string ScreenOffHint => Loc.T("The device's own screen stays dark while it's mirrored.");
+    public string KeepAwakeHint => Loc.T("The device doesn't time out and lock while it's mirrored.");
+    public string LockOnCloseHint => Loc.T("Puts the device to sleep (and locks it) when its last mirror or second-screen window closes.");
+    public string KeepScreensOnHint => Loc.T("Second screens and app windows (also remote apps) stay visible while the device is locked. Without it, some devices turn them black a few seconds after their own screen goes off. The device still locks and its own screen stays off.");
+    public string ClipboardSyncHint => Loc.T("Keeps plain-text clipboard in sync between this PC and the device even without a mirror open. Off on watches unless turned on per device.");
+    public string AutoDownloadMediaHint => Loc.T("Copies newly taken photos and screenshots to Documents\\Paneless\\Media automatically as you take them.");
+    public string AutoCopyOtpHint => Loc.T("Opt-in: watches incoming notifications on the device to copy 2FA verification codes straight to your PC clipboard (uses on-device accessibility while connected).");
+    public string AutoConnectHint => Loc.T("Devices you’ve paired before are connected as soon as they show up on the network. On Android 17, wireless debugging also turns itself back on when the device returns to a trusted Wi-Fi.");
+    public string DisconnectInBackgroundHint => Loc.T("Saves phone battery when Paneless is minimized or in the notification area by dropping idle Wi-Fi connections after 5 minutes (unless a mirror, app window, tool or background sync is active). Reconnects automatically when you open Paneless or launch a shortcut.");
+    public string CloseToTrayHint => Loc.T("Shortcuts, auto-connect and on-connect scripts keep working. Quit from the notification-area icon.");
+    public string AutoUpdateHint => Loc.T("Paneless looks for a new version at start-up and every few hours, downloads it in the background and installs it when you close Paneless.");
+
+    public string VersionText => $"Paneless {AppServices.Version}";
+    [RelayCommand] void OpenLogsFolder() => Reveal.Folder(AppPaths.LogDir);
+    [RelayCommand] void OpenDataFolder() => Reveal.Folder(AppPaths.DataDir);
 
     /// <summary>Appearance: applies immediately to every open window.</summary>
     public IReadOnlyList<Choice> ThemeChoices { get; } = Paneless.App.Theme.Modes.Select(m => new Choice(Loc.T(m.Name), m.Code)).ToList();
@@ -403,15 +530,23 @@ public sealed partial class SettingsViewModel : ObservableObject
         BackupStatusBrush = Paneless.App.Theme.For(kind);
     }
 
-    void ReloadFromStore()
+    public void RefreshFromStore()
     {
-        Rows.Clear();
-        foreach (var r in SettingChoices.MirrorRows(null, null, G, Save)) Rows.Add(r);
-        SyncRows.Clear();
-        foreach (var r in SettingChoices.SyncRows(null, null, G, Save)) SyncRows.Add(r);
+        QualityRows.Clear();
+        foreach (var r in SettingChoices.MirrorQualityRows(null, null, G, Save)) QualityRows.Add(r);
         _pushTarget = G.PushTarget;
         _updateSource = G.UpdateSource;
         _startWithSystem = Platform.Autostart.IsEnabled;
+        OnPropertyChanged(nameof(ScreenOff));
+        OnPropertyChanged(nameof(KeepAwake));
+        OnPropertyChanged(nameof(KeepAwakeEnabled));
+        OnPropertyChanged(nameof(LockOnClose));
+        OnPropertyChanged(nameof(KeepScreensOn));
+        OnPropertyChanged(nameof(Audio));
+        OnPropertyChanged(nameof(OnTop));
+        OnPropertyChanged(nameof(ClipboardSync));
+        OnPropertyChanged(nameof(AutoDownloadMedia));
+        OnPropertyChanged(nameof(AutoCopyOtp));
         OnPropertyChanged(nameof(AutoConnect));
         OnPropertyChanged(nameof(DisconnectInBackground));
         OnPropertyChanged(nameof(CloseToTray));
@@ -491,7 +626,7 @@ public sealed partial class SettingsViewModel : ObservableObject
                     backup.RemoteApps?.Count ?? 0)
                 : Loc.T("Replace your Paneless settings, scripts and automation with this backup? Your saved devices, groups and remote apps stay untouched.");
 
-            if (ConfirmAsync != null && !await ConfirmAsync(Loc.T("Import settings"), prompt)) return;
+            if (ConfirmAsync != null && !await ConfirmAsync(Loc.T("Import settings"), prompt, null)) return;
 
             if (_s.Demo)
             {
@@ -512,7 +647,7 @@ public sealed partial class SettingsViewModel : ObservableObject
                 _s.RemoteApps);
 
             Paneless.App.Theme.Apply(G.Theme);
-            ReloadFromStore();
+            RefreshFromStore();
             Saved?.Invoke();
             Reloaded?.Invoke();
 
@@ -533,7 +668,8 @@ public sealed partial class SettingsViewModel : ObservableObject
     {
         if (ConfirmAsync != null && !await ConfirmAsync(
             Loc.T("Reset to factory defaults"),
-            Loc.T("Reset all Paneless settings, scripts, automation, saved devices, groups, remote apps and unlock codes back to factory defaults? This can't be undone.")))
+            Loc.T("Reset all Paneless settings, scripts, automation, saved devices, groups, remote apps and unlock codes back to factory defaults? This can't be undone."),
+            Loc.T("Reset")))
             return;
 
         if (_s.Demo)
@@ -560,7 +696,7 @@ public sealed partial class SettingsViewModel : ObservableObject
                 Platform.Autostart.Set(false);
 
             Paneless.App.Theme.Apply(G.Theme);
-            ReloadFromStore();
+            RefreshFromStore();
             Saved?.Invoke();
             Reloaded?.Invoke();
             SetBackupStatus(Loc.T("Everything was reset to factory defaults."), StatusKind.Ok);

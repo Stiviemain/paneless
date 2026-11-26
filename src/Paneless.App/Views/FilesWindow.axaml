@@ -16,6 +16,9 @@
     <Style Selector="ListBox#FileList ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="{DynamicResource SelBrush}" />
     </Style>
+    <Style Selector="Border#FileDropArea.dragover">
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+    </Style>
   </Window.Styles>
 
   <DockPanel Margin="20,18">
@@ -41,9 +44,20 @@
     </Grid>
 
     <Grid ColumnDefinitions="*,16,210">
-      <Border Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
+      <Border x:Name="FileDropArea" DragDrop.AllowDrop="True" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
         <Panel>
           <ListBox x:Name="FileList" ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" Background="Transparent">
+            <ListBox.ContextMenu>
+              <ContextMenu>
+                <MenuItem Header="{l:T 'Open folder'}" Command="{Binding OpenFolderCommand}" IsVisible="{Binding IsSelectedDir}" />
+                <MenuItem Header="{l:T 'Save to PC…'}" Command="{Binding DownloadCommand}" IsVisible="{Binding IsSelectedFile}" />
+                <Separator />
+                <MenuItem Header="{l:T 'Upload files…'}" Command="{Binding UploadCommand}" />
+                <MenuItem Header="{l:T 'New folder…'}" Command="{Binding NewFolderCommand}" />
+                <Separator />
+                <MenuItem Classes="danger" Header="{l:T 'Delete…'}" Command="{Binding DeleteCommand}" />
+              </ContextMenu>
+            </ListBox.ContextMenu>
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="vm:DeviceFileItem">
                 <Grid ColumnDefinitions="48,*,Auto,Auto" ColumnSpacing="10">
@@ -73,9 +87,9 @@
         <Button HorizontalAlignment="Stretch" Content="{l:T 'Upload files…'}" Command="{Binding UploadCommand}" />
         <Button HorizontalAlignment="Stretch" Content="{l:T 'New folder…'}" Command="{Binding NewFolderCommand}" />
         <Border Height="1" Background="{DynamicResource LineBrush}" Margin="0,6" />
-        <Button HorizontalAlignment="Stretch" Content="{l:T 'Delete…'}" Command="{Binding DeleteCommand}" />
+        <Button Classes="danger" HorizontalAlignment="Stretch" Content="{l:T 'Delete…'}" Command="{Binding DeleteCommand}" />
         <TextBlock Classes="dim" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0"
-                   Text="{l:T 'Double-click a folder to open it, or a file to save it to your PC. Tip: turn on Auto-save new photos in Settings to copy new shots automatically.'}" />
+                   Text="{l:T 'Double-click a folder to open it, or a file to save it to your PC. Drop files here to upload them. Tip: turn on Auto-save new photos in Settings to copy new shots automatically.'}" />
       </StackPanel>
     </Grid>
   </DockPanel>

@@ -568,11 +568,11 @@ if (args.Contains("--remote-apps"))
     Check(a.Contains("--new-display=1920x1200/240") && !a.Contains("--display-ime-policy=hide") && !a.Contains("--turn-screen-off") && a.Contains("--always-on-top"), "a tablet app: wide screen with tablet DPI, options off");
     app.Window = new WindowPlace { X = -8, Y = 40, W = 500, H = 1000 };
     a = app.ScrcpyArgs("t", quality);
-    Check(a.Any(x => x.StartsWith("--new-display=500x1000/")) && a.Contains("--render-fit=letterbox") && a.Contains("--window-x=0") && a.Contains("--window-y=40")
+    Check(a.Any(x => x.StartsWith("--new-display=496x1000/")) && a.Contains("--render-fit=letterbox") && a.Contains("--window-x=0") && a.Contains("--window-y=40")
           && !a.Any(x => x.StartsWith("--window-width") || x.StartsWith("--window-height")),
-          "a remembered window: same place and exact display size with natural DPI (no --window-width/height with --flex-display)");
+          "a remembered window: same place and 8-aligned display size with natural DPI (no --window-width/height with --flex-display)");
     app.Window = null; app.Shape = "custom"; app.CustomWidth = 99999; app.CustomHeight = 801;
-    Check(app.ScrcpyArgs("t", quality).Any(x => x.StartsWith("--new-display=3840x800/")), "a custom size is kept within limits and even");
+    Check(app.ScrcpyArgs("t", quality).Any(x => x.StartsWith("--new-display=3840x800/")), "a custom size is kept within limits and 8-aligned");
     var scaled = new RemoteApp { Package = "com.example.demo", Shape = "tablet" };
     Check(scaled.DisplayDpi(560, 1000) == 200
           && (scaled.ScalePercent = 75) == 75 && scaled.DisplayDpi(560, 1000) == 160
@@ -581,11 +581,14 @@ if (args.Contains("--remote-apps"))
           && (scaled.ScalePercent = 150) == 150 && scaled.DisplayDpi(560, 1000) == 320
           && (scaled.ScalePercent = 0) == 0 && scaled.DisplayDpi(560, 1000) == 200,
           "remote app UI scale adjusts virtual display DPI cleanly (down to 120 dpi floor)");
+    var smooth = new RemoteApp { Package = "com.example.demo", Shape = "custom" };
+    Check(Math.Abs(smooth.DisplayDpi(790, 800) - smooth.DisplayDpi(810, 800)) <= 20,
+          "custom DisplayDpi transitions smoothly across square aspect ratios without a sudden jump");
     var fitPhone = RemoteApp.FitToArea(1080, 1920, 1680, 915);
     var fitCustom = RemoteApp.FitToArea(700, 800, 1680, 915);
-    Check(fitPhone.W <= 1680 && fitPhone.H <= 915 && fitPhone.W % 2 == 0 && fitPhone.H % 2 == 0 && Math.Abs((double)fitPhone.W / fitPhone.H - 1080.0 / 1920.0) < 0.01
-          && fitCustom == (700, 800),
-          "live shape resize fits display aspect ratio inside monitor work area");
+    Check(fitPhone.W <= 1680 && fitPhone.H <= 915 && fitPhone.W % 8 == 0 && fitPhone.H % 8 == 0 && Math.Abs((double)fitPhone.W / fitPhone.H - 1080.0 / 1920.0) < 0.02
+          && fitCustom == (696, 800),
+          "live shape resize fits display aspect ratio inside monitor work area and aligns to 8 px");
     Check(RemoteApp.ShortcutFileName("Chat: \"work\" / home?") == "Chat   work    home.lnk" && RemoteApp.ShortcutFileName("...") == "App.lnk"
           && RemoteApp.ShortcutFileName(new string('x', 200)).Length == 84, "shortcut file names are safe for Windows");
 
@@ -611,6 +614,8 @@ if (args.Contains("--remote-apps"))
     Check(ea.Contains("--new-display=1080x1920/400") && ea.Contains("--window-borderless") && ea.Contains("--render-fit=letterbox")
           && !ea.Contains("--flex-display") && !ea.Contains("--always-on-top") && !ea.Any(x => x.StartsWith("--window-x")),
           "embedded remote app keeps configured shape with letterbox and borderless window");
+    var probeSession = new MirrorSession { Serial = "SN1", Name = "Books", Process = System.Diagnostics.Process.GetCurrentProcess(), LogPath = "" };
+    Check(!probeSession.SuppressLockOnClose, "MirrorSession.SuppressLockOnClose defaults to false");
 
     // Extensible connection exporter + Devolutions RDM XML output.
     var rdm = ConnectionExporters.Find("rdm");
@@ -740,7 +745,7 @@ if (args.Contains("--helper"))
                                 "ui_tree", "ui_action", "clipboard_get", "clipboard_set", "clipboard_watch",
                                 "files_ls", "files_thumb", "files_read", "files_write", "files_delete", "files_mkdir", "media_watch",
                                 "tasks_list", "task_move", "launch_intent",
-                                "capture", "screen_state", "display_watch",
+                                "capture", "screen_state", "display_watch", "screen_dim",
                                 "inventory", "apps_detail", "telemetry_watch",
                                 "camera_info", "camera_watch", "locate",
                                 "sys_get", "sys_set", "media_state", "media_control", "notifications_watch"),
@@ -803,6 +808,13 @@ if (args.Contains("--helper"))
                     case "media_control":
                     case "notifications_watch":
                         await HelperProtocol.WriteFrameAsync(serverStream, new System.Text.Json.Nodes.JsonObject { ["id"] = id, ["ok"] = true }, null, CancellationToken.None);
+                        break;
+                    case "screen_dim":
+                        var dimOn = frame.Header["enabled"]!.GetValue<bool>();
+                        await HelperProtocol.WriteFrameAsync(serverStream, new System.Text.Json.Nodes.JsonObject
+                        {
+                            ["id"] = id, ["ok"] = true, ["dimmed"] = dimOn, ["restored"] = !dimOn,
+                        }, null, CancellationToken.None);
                         break;
                     case "capture":
                         var off = frame.Header["displayId"]?.GetValue<int>() == 99;
@@ -937,10 +949,11 @@ if (args.Contains("--helper"))
     var tasks = await client.ListTasksAsync();
     Check(tasks is [{ TaskId: 77, DisplayId: 2, Label: "Chat" }] && await client.MoveTaskToDisplayAsync(77, 0) && (await client.LaunchIntentAsync(uri: "https://example.com")).Ok, "helper Feature 4: tasks_list, task_move & launch_intent");
 
-    // Feature 5: Fast Wall capture & screenOff
+    // Feature 5: Fast Wall capture, screenOff & screen_dim
     var capOn = await client.CaptureJpegAsync(480, 0);
     var capOff = await client.CaptureJpegAsync(480, 99);
-    Check(capOn is { ScreenOff: false, Jpeg.Length: 4 } && capOff is { ScreenOff: true, Jpeg: null }, "helper Feature 5: capture JPEG & screenOff");
+    Check(capOn is { ScreenOff: false, Jpeg.Length: 4 } && capOff is { ScreenOff: true, Jpeg: null }
+          && client.Supports("screen_dim") && await client.SetScreenDimAsync(true, 1) && await client.SetScreenDimAsync(false), "helper Feature 5: capture JPEG, screenOff & screen_dim");
 
     // Feature 6: Telemetry inventory & detailed apps
     var inv = await client.GetInventoryAsync("My Pixel");

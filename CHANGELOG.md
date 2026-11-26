@@ -2,6 +2,29 @@
 
 All notable changes to Paneless. Versions follow [Semantic Versioning](https://semver.org).
 
+## 1.0.0-beta.7 (2026-11-26)
+
+A full UI/UX overhaul with an in-app Settings page, 4-tab Device/Group settings, streamlined menus and toolbars, smarter Wall wake/unlock handling, and crisp Remote apps resizing.
+
+**In-app Settings & Device/Group settings**
+- **6-category Settings page:** replaced the modal Settings window with an in-app **Settings** page (`General`, `Mirroring & quality`, `Sync & files`, `Connecting & battery`, `Updates & backup`, `About & support`) featuring `ToggleSwitch` controls and quick **Open logs folder** / **Open data folder** buttons.
+- **4-tab Device & Group settings:** reorganized per-device/group overrides into `Mirroring & quality`, `Sync & files`, `On connect`, and `Access & shortcut`, integrating live **Auto-unlock** setup and per-device/group **AI assistants** permissions.
+
+**Streamlined menus, toolbars, Quick controls & Files drag-and-drop**
+- **Cleaner action bars & context menus:** organized the Devices toolbar into `Mirror`, `Tools`, `Power & unlock`, and `More`, added a subtle `⋯` menu button to every device row, categorized context menus across Devices, Wall, Apps, Files, and Remote apps, and styled destructive actions consistently.
+- **Shared compact mirror toolbar:** unified the floating and embedded mirror toolbars into a 4-zone strip with active state indicators and a `⋯` **More tools** menu (Notifications, Quick settings, Type clipboard, Second screen, Pop out app, Camera, **Quick controls & media…**, **Run a script…**, Group control, Key mapping).
+- **Upgraded Quick controls & Files upload:** **Quick controls & media** now uses a 2×3 `ToggleSwitch` grid (adding **Auto-brightness**) and debounced live sliders for brightness and volume; **Files & photos** now supports OS drag-and-drop file uploads.
+
+**Wall smart wake/unlock & screen-off mirroring**
+- **Smart wake & crash-safe dimming:** sleeping Wall tiles show **Wake & unlock** when auto-unlock is ready (plus **Wake all** in the header) and temporarily dim devices using *Keep device screen off* to minimum brightness while awake, restoring brightness automatically when turned off, left, or closed.
+- **Screen-off mirroring indicator:** tiles actively mirrored with *Keep device screen off* now show **Screen off (mirroring)** with a **Show mirror** button that brings the mirror window forward without waking the physical screen.
+
+**Remote apps resize & scaling fix**
+- Fixed stale/unclickable touch regions and visual artifacts when resizing Remote app windows or changing **UI scale** / **Window shape** (clean debounced in-place virtual-display recreate on shape/scale changes, pure `--flex-display` on border drags, one-shot tablet fullscreen enforcement, 8-pixel encoder alignment, and smooth aspect-ratio DPI scaling).
+
+**Localization & docs**
+- Completed English, German, and French translations (`1,252` keys), balanced column widths on Devices so German labels fit cleanly, and updated `README.md`, `docs/DEVELOPMENT.md`, and all 14 screenshots.
+
 ## 1.0.0-beta.6 (2026-11-24)
 
 Embedded sessions for connection managers (Devolutions RDM), live UI scaling and live window-shape resizing for Remote apps, and a branded installer splash screen with WinGet automation.

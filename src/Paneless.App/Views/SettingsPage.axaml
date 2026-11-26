@@ -1,0 +1,350 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="using:Paneless.App.Localization"
+             xmlns:vm="using:Paneless.App.ViewModels"
+             xmlns:app="using:Paneless.App"
+             x:Class="Paneless.App.Views.SettingsPage"
+             x:DataType="vm:SettingsViewModel">
+  <UserControl.Styles>
+    <Style Selector="Button.catnav">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="Padding" Value="0,9" />
+    </Style>
+    <Style Selector="Button.catnav:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+    </Style>
+    <Style Selector="Button.catnav.on /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource SelBrush}" />
+    </Style>
+    <Style Selector="Border.catpill">
+      <Setter Property="Width" Value="3" />
+      <Setter Property="Height" Value="18" />
+      <Setter Property="CornerRadius" Value="2" />
+      <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Margin" Value="2,0,0,0" />
+      <Setter Property="Opacity" Value="0" />
+    </Style>
+    <Style Selector="Button.catnav.on Border.catpill">
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="TextBlock.catlabel">
+      <Setter Property="Foreground" Value="{DynamicResource DimBrush}" />
+      <Setter Property="Margin" Value="14,0,10,0" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.catnav:pointerover TextBlock.catlabel">
+      <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+    </Style>
+    <Style Selector="Button.catnav.on TextBlock.catlabel">
+      <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Border.rowsep">
+      <Setter Property="Height" Value="1" />
+      <Setter Property="Background" Value="{DynamicResource LineBrush}" />
+      <Setter Property="Opacity" Value="0.6" />
+      <Setter Property="Margin" Value="0,4" />
+    </Style>
+    <Style Selector="Button.linkish">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Foreground" Value="{DynamicResource LinkBrush}" />
+      <Setter Property="FontSize" Value="12.5" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+  </UserControl.Styles>
+
+  <DockPanel>
+    <StackPanel DockPanel.Dock="Top" Spacing="3" Margin="0,0,0,14">
+      <TextBlock Classes="pagetitle" Text="{l:T 'Settings'}" />
+      <TextBlock Classes="pagehint" Text="{l:T 'Defaults for every device, background sync, updates and backups. Devices and groups can have their own settings.'}" />
+    </StackPanel>
+
+    <Grid ColumnDefinitions="210,20,*">
+      <StackPanel Spacing="3">
+        <Button Classes="catnav" Classes.on="{Binding IsGeneral}" Command="{Binding SelectCategoryCommand}" CommandParameter="General">
+          <Panel><Border Classes="catpill" /><TextBlock Classes="catlabel" Text="{l:T 'General'}" /></Panel>
+        </Button>
+        <Button Classes="catnav" Classes.on="{Binding IsMirroring}" Command="{Binding SelectCategoryCommand}" CommandParameter="Mirroring">
+          <Panel><Border Classes="catpill" /><TextBlock Classes="catlabel" Text="{l:T 'Mirroring &amp; quality'}" /></Panel>
+        </Button>
+        <Button Classes="catnav" Classes.on="{Binding IsSync}" Command="{Binding SelectCategoryCommand}" CommandParameter="Sync">
+          <Panel><Border Classes="catpill" /><TextBlock Classes="catlabel" Text="{l:T 'Sync &amp; files'}" /></Panel>
+        </Button>
+        <Button Classes="catnav" Classes.on="{Binding IsConnecting}" Command="{Binding SelectCategoryCommand}" CommandParameter="Connecting">
+          <Panel><Border Classes="catpill" /><TextBlock Classes="catlabel" Text="{l:T 'Connecting &amp; battery'}" /></Panel>
+        </Button>
+        <Button Classes="catnav" Classes.on="{Binding IsUpdates}" Command="{Binding SelectCategoryCommand}" CommandParameter="Updates">
+          <Panel><Border Classes="catpill" /><TextBlock Classes="catlabel" Text="{l:T 'Updates &amp; backup'}" /></Panel>
+        </Button>
+        <Button Classes="catnav" Classes.on="{Binding IsAbout}" Command="{Binding SelectCategoryCommand}" CommandParameter="About">
+          <Panel><Border Classes="catpill" /><TextBlock Classes="catlabel" Text="{l:T 'About &amp; support'}" /></Panel>
+        </Button>
+      </StackPanel>
+
+      <ScrollViewer Grid.Column="2" HorizontalScrollBarVisibility="Disabled">
+        <Panel MaxWidth="680" HorizontalAlignment="Left" Margin="0,0,16,12">
+
+          <!-- General -->
+          <StackPanel Spacing="14" IsVisible="{Binding IsGeneral}">
+            <Border Classes="card" Padding="16">
+              <StackPanel Spacing="12">
+                <TextBlock Classes="heading" Text="{l:T 'Appearance'}" />
+                <Grid ColumnDefinitions="180,*">
+                  <TextBlock Text="{l:T 'Appearance'}" VerticalAlignment="Center" />
+                  <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding ThemeChoices}" SelectedItem="{Binding Theme}" />
+                </Grid>
+                <Grid ColumnDefinitions="180,*">
+                  <TextBlock Text="{l:T 'Language'}" VerticalAlignment="Center" />
+                  <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding LanguageChoices}" SelectedItem="{Binding Language}" />
+                </Grid>
+                <TextBlock Classes="small" TextWrapping="Wrap" Text="{Binding LanguageNote}" IsVisible="{Binding LanguageChanged}" Foreground="{DynamicResource AmberBrush}" />
+              </StackPanel>
+            </Border>
+
+            <Border Classes="card" Padding="16">
+              <StackPanel Spacing="10">
+                <TextBlock Classes="heading" Text="{l:T 'Start-up and notification area'}" />
+                <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding AutostartSupported}">
+                  <TextBlock Text="{l:T 'Start Paneless with Windows (in the notification area)'}" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,16,0" />
+                  <ToggleSwitch Grid.Column="1" OnContent="" OffContent="" MinWidth="0" IsChecked="{Binding StartWithSystem}" />
+                </Grid>
+                <Border Classes="rowsep" IsVisible="{Binding AutostartSupported}" />
+                <Grid ColumnDefinitions="*,Auto">
+                  <StackPanel Spacing="2" Margin="0,0,16,0">
+                    <TextBlock Text="{l:T 'Keep running in the notification area when the window is closed'}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock Classes="small" TextWrapping="Wrap" Text="{Binding CloseToTrayHint}" />
+                  </StackPanel>
+                  <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" OnContent="" OffContent="" MinWidth="0" IsChecked="{Binding CloseToTray}" />
+                </Grid>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+
+          <!-- Mirroring & quality -->
+          <StackPanel Spacing="14" IsVisible="{Binding IsMirroring}">
+            <Border Classes="card" Padding="16">
+              <StackPanel Spacing="10">
+                <TextBlock Classes="heading" Text="{l:T 'Display &amp; behavior'}" />
+                <Grid ColumnDefinitions="*,Auto">
+                  <StackPanel Spacing="2" Margin="0,0,16,0">
+                    <TextBlock Text="{l:T 'Keep device screen off'}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock Classes="small" TextWrapping="Wrap" Text="{Binding ScreenOffHint}" />
+                  </StackPanel>
+                  <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" OnContent="" OffContent="" MinWidth="0" IsChecked="{Binding ScreenOff}" />
+                </Grid>
+                <Border Classes="rowsep" />
+                <Grid ColumnDefinitions="*,Auto" IsEnabled="{Binding KeepAwakeEnabled}">
+                  <StackPanel Spacing="2" Margin="0,0,16,0">
+                    <TextBlock Text="{l:T 'Keep awake'}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock Classes="small" TextWrapping="Wrap" Text="{Binding KeepAwakeHint}" />
+                  </StackPanel>
+                  <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" OnContent="" OffContent="" MinWidth="0" IsChecked="{Binding KeepAwake}" />
+                </Grid>
+                <Border Classes="rowsep" />
+                <Grid ColumnDefinitions="*,Auto">
+                  <StackPanel Spacing="2" Margin="0,0,16,0">
+                    <TextBlock Text="{l:T 'Lock device when mirror closes'}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock Classes="small" TextWrapping="Wrap" Text="{Binding LockOnCloseHint}" />
+                  </StackPanel>
+                  <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" OnContent="" OffContent="" MinWidth="0" IsChecked="{Binding LockOnClose}" />
+                </Grid>
+                <Border Classes="rowsep" />
+                <Grid ColumnDefinitions="*,Auto">
+                  <StackPanel Spacing="2" Margin="0,0,16,0">
+                    <TextBlock Text="{l:T 'Keep app windows on when locked'}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock Classes="small" TextWrapping="Wrap" Text="{Binding KeepScreensOnHint}" />
+                  </StackPanel>
+                  <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" OnContent="" OffContent="" MinWidth="0" IsChecked="{Binding KeepScreensOn}" />
+                </Grid>
+                <Border Classes="rowsep" />
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Text="{l:T 'Play device audio here'}" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,16,0" />
+                  <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" OnContent="" OffContent="" MinWidth="0" IsChecked="{Binding Audio}" />
+                </Grid>
+                <Border Classes="rowsep" />
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Text="{l:T 'Mirror window always on top'}" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,16,0" />
+                  <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" OnContent="" OffContent="" MinWidth="0" IsChecked="{Binding OnTop}" />
+                </Grid>
+              </StackPanel>
+            </Border>
+
+            <Border Classes="card" Padding="16">
+              <StackPanel Spacing="10">
+                <TextBlock Classes="heading" Text="{l:T 'Video quality'}" />
+                <ItemsControl ItemsSource="{Binding QualityRows}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:SettingRow">
+                      <Grid ColumnDefinitions="180,*" Margin="0,0,0,8" ToolTip.Tip="{Binding Tip}">
+                        <TextBlock Text="{Binding Label}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                        <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding Choices}" SelectedItem="{Binding Selected}" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+
+          <!-- Sync & files -->
+          <StackPanel Spacing="14" IsVisible="{Binding IsSync}">
+            <Border Classes="card" Padding="16">
+              <StackPanel Spacing="8">
+                <TextBlock Classes="heading" Text="{l:T 'Files'}" />
+                <TextBlock Classes="small" Text="{l:T 'Folder on the device for files you drop on it'}" />
+                <TextBox Text="{Binding PushTarget}" PlaceholderText="{l:T '/sdcard/Download/'}" />
+              </StackPanel>
+            </Border>
+
+            <Border Classes="card" Padding="16">
+              <StackPanel Spacing="10">
+                <TextBlock Classes="heading" Text="{l:T 'Background sync'}" />
+                <Grid ColumnDefinitions="*,Auto">
+                  <StackPanel Spacing="2" Margin="0,0,16,0">
+                    <TextBlock Text="{l:T 'Sync clipboard automatically'}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock Classes="small" TextWrapping="Wrap" Text="{Binding ClipboardSyncHint}" />
+                  </StackPanel>
+                  <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" OnContent="" OffContent="" MinWidth="0" IsChecked="{Binding ClipboardSync}" />
+                </Grid>
+                <Border Classes="rowsep" />
+                <Grid ColumnDefinitions="*,Auto">
+                  <StackPanel Spacing="2" Margin="0,0,16,0">
+                    <TextBlock Text="{l:T 'Auto-save new photos &amp; screenshots'}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock Classes="small" TextWrapping="Wrap" Text="{Binding AutoDownloadMediaHint}" />
+                  </StackPanel>
+                  <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" OnContent="" OffContent="" MinWidth="0" IsChecked="{Binding AutoDownloadMedia}" />
+                </Grid>
+                <Border Classes="rowsep" />
+                <Grid ColumnDefinitions="*,Auto">
+                  <StackPanel Spacing="2" Margin="0,0,16,0">
+                    <TextBlock Text="{l:T 'Auto-copy 2FA codes from notifications'}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock Classes="small" TextWrapping="Wrap" Text="{Binding AutoCopyOtpHint}" />
+                  </StackPanel>
+                  <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" OnContent="" OffContent="" MinWidth="0" IsChecked="{Binding AutoCopyOtp}" />
+                </Grid>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+
+          <!-- Connecting & battery -->
+          <StackPanel Spacing="14" IsVisible="{Binding IsConnecting}">
+            <Border Classes="card" Padding="16">
+              <StackPanel Spacing="10">
+                <TextBlock Classes="heading" Text="{l:T 'Connecting'}" />
+                <Grid ColumnDefinitions="*,Auto">
+                  <StackPanel Spacing="2" Margin="0,0,16,0">
+                    <TextBlock Text="{l:T 'Connect to known devices by themselves'}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock Classes="small" TextWrapping="Wrap" Text="{Binding AutoConnectHint}" />
+                  </StackPanel>
+                  <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" OnContent="" OffContent="" MinWidth="0" IsChecked="{Binding AutoConnect}" />
+                </Grid>
+                <Border Classes="rowsep" />
+                <Grid ColumnDefinitions="*,Auto">
+                  <StackPanel Spacing="2" Margin="0,0,16,0">
+                    <TextBlock Text="{l:T 'Disconnect idle Wi-Fi devices while in the background'}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock Classes="small" TextWrapping="Wrap" Text="{Binding DisconnectInBackgroundHint}" />
+                  </StackPanel>
+                  <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" OnContent="" OffContent="" MinWidth="0" IsChecked="{Binding DisconnectInBackground}" />
+                </Grid>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+
+          <!-- Updates & backup -->
+          <StackPanel Spacing="14" IsVisible="{Binding IsUpdates}">
+            <Border Classes="card" Padding="16">
+              <StackPanel Spacing="10">
+                <TextBlock Classes="heading" Text="{l:T 'Updates'}" />
+                <Grid ColumnDefinitions="*,Auto">
+                  <StackPanel Spacing="2" Margin="0,0,16,0">
+                    <TextBlock Text="{l:T 'Install new versions automatically (from GitHub)'}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock Classes="small" TextWrapping="Wrap" Text="{Binding AutoUpdateHint}" />
+                  </StackPanel>
+                  <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" OnContent="" OffContent="" MinWidth="0" IsChecked="{Binding AutoUpdate}" />
+                </Grid>
+                <Border Classes="rowsep" />
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Text="{l:T 'Include beta versions'}" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,16,0" />
+                  <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" OnContent="" OffContent="" MinWidth="0" IsChecked="{Binding BetaUpdates}" />
+                </Grid>
+                <Expander Header="{l:T 'Other update source'}" Padding="0,6,0,0">
+                  <StackPanel Spacing="6">
+                    <TextBlock Classes="small" TextWrapping="Wrap"
+                               Text="{l:T 'Only if your organisation publishes its own builds: a web address or a folder with the releases. Leave empty for GitHub.'}" />
+                    <TextBox Text="{Binding UpdateSource}" PlaceholderText="{l:T 'https://… or C:\…\releases'}" />
+                  </StackPanel>
+                </Expander>
+                <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,4,0,0">
+                  <Button Content="{l:T 'Check for updates now'}" Command="{Binding CheckUpdatesCommand}" IsEnabled="{Binding !IsChecking}" />
+                  <TextBlock Text="{Binding UpdateStatus}" Classes="dim" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="360" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <Border Classes="card" Padding="16">
+              <StackPanel Spacing="10">
+                <TextBlock Classes="heading" Text="{l:T 'Backup and reset'}" />
+                <CheckBox IsChecked="{Binding ExportIncludeDevices}"
+                          ToolTip.Tip="{l:T 'When unchecked, only Paneless settings, scripts and automation are exported. Unlock codes are never exported.'}">
+                  <TextBlock Text="{l:T 'Also include saved devices, groups, device settings and remote apps'}" TextWrapping="Wrap" />
+                </CheckBox>
+                <WrapPanel Orientation="Horizontal">
+                  <Button Content="{l:T 'Export settings…'}" Command="{Binding ExportSettingsCommand}" Margin="0,0,8,8" />
+                  <Button Content="{l:T 'Import settings…'}" Command="{Binding ImportSettingsCommand}" Margin="0,0,8,8" />
+                </WrapPanel>
+                <Border Classes="rowsep" />
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                  <Button Classes="danger" Content="{l:T 'Reset to defaults…'}" Command="{Binding ResetToDefaultsCommand}" />
+                </StackPanel>
+                <TextBlock Text="{Binding BackupStatus}" Foreground="{Binding BackupStatusBrush}"
+                           IsVisible="{Binding HasBackupStatus}" FontSize="12" TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+
+          <!-- About & support -->
+          <StackPanel Spacing="14" IsVisible="{Binding IsAbout}">
+            <Border Classes="card" Padding="16">
+              <StackPanel Spacing="10">
+                <TextBlock Classes="heading" Text="{Binding VersionText}" />
+                <TextBlock Classes="small" Text="{l:T 'Folders &amp; diagnostics'}" FontWeight="SemiBold" />
+                <TextBlock Classes="small" TextWrapping="Wrap"
+                           Text="{l:T 'Settings and saved devices live in your local user folder. Logs are written to your temp folder.'}" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Content="{l:T 'Open data folder'}" Command="{Binding OpenDataFolderCommand}" />
+                  <Button Content="{l:T 'Open logs folder'}" Command="{Binding OpenLogsFolderCommand}" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <Border Classes="card" Padding="16">
+              <StackPanel Spacing="10">
+                <TextBlock Classes="heading" Text="{l:T 'Support Paneless'}" />
+                <TextBlock Classes="small" TextWrapping="Wrap"
+                           Text="{l:T 'Paneless is free and open source. If it saves you time, you can support its development. It never asks by itself.'}" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Tag="{x:Static app:AppLinks.KoFi}" Click="OpenLink" ToolTip.Tip="{l:T 'ko-fi.com/Stiviemain: a one-off coffee, no account needed'}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <TextBlock Text="☕" />
+                      <TextBlock Text="{l:T 'Buy me a coffee on Ko-fi'}" />
+                    </StackPanel>
+                  </Button>
+                </StackPanel>
+                <Button Classes="linkish" Tag="{x:Static app:AppLinks.Repository}" Click="OpenLink" Content="{l:T 'Paneless on GitHub: star it, report a bug, suggest an idea'}" Padding="0,4" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+
+        </Panel>
+      </ScrollViewer>
+    </Grid>
+  </DockPanel>
+</UserControl>

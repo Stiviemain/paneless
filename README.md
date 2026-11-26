@@ -93,19 +93,15 @@ The interface is built with [Avalonia](https://avaloniaui.net/), a cross-platfor
 - **Arrange windows:** tile all mirrors, or one group's, across the screen.
 
 **Toolbar on every mirror**
-- Rotate, back, home, recent apps, volume, power.
-- Screen off, notifications, quick settings.
-- Screenshot, record, camera, type the PC clipboard.
-- **App handoff:** *Pop out current app* moves the app on your phone into its own PC window; *Send back to phone* returns a virtual-display app to the device screen.
-- **Key mapping** for games: keys become taps and a WASD or arrow-key joystick.
-- **Group control:** what you do on one device happens on the whole group.
+- Quick-access strip: Back, Home, Recent apps, Volume, Power, Screen off, Rotate (or *Send back to device*), Screenshot, and Record.
+- **`⋯` More tools menu:** Notifications, Quick settings, Type clipboard text, Second screen, Pop out current app, Back camera, Quick controls & media, Scripts, **Key mapping** (WASD / arrow joystick + tap keys for games), and **Group control** (what you do on one device happens on the whole group). Active live modes also appear directly on the strip for one-click toggle-off.
 
 <p align="center"><img src="docs/images/toolbar.png" height="420" alt="Mirror toolbar">&nbsp;&nbsp;<img src="docs/images/groups.png" width="560" alt="Group manager"></p>
 
 **Phone-to-PC tools (zero Android app installed)**
-- **Files & photos browser:** browse folders with EXIF-aware photo and video thumbnails, upload or download files, and optionally auto-download new photos and screenshots straight to `Documents\Paneless\Media\<Device>`.
+- **Files & photos browser:** browse folders with EXIF-aware photo and video thumbnails, drag and drop files directly to upload (or download with a double-click), and optionally auto-download new photos and screenshots straight to `Documents\Paneless\Media\<Device>`.
 - **Always-on clipboard sync** *(opt-in per device or group)*: instant two-way text clipboard sync between Windows and Android without mirroring open.
-- **Quick controls & media:** toggle Dark mode, Do Not Disturb, Auto-rotate, Wi-Fi and Bluetooth, adjust brightness and volume sliders, and control Now Playing media.
+- **Quick controls & media:** toggle Dark mode, Do Not Disturb, Auto-rotate, Auto-brightness, Wi-Fi and Bluetooth, adjust live brightness and volume sliders, and control Now Playing media.
 - **Locate device:** blink the flashlight, vibrate and chime a misplaced device from the Devices or Wall menu.
 - **Opt-in 2FA / OTP auto-copy:** copies incoming verification codes from Android notifications straight to your Windows clipboard (EN, DE, FR).
 
@@ -130,7 +126,7 @@ The interface is built with [Avalonia](https://avaloniaui.net/), a cross-platfor
 - **Alerts:** a Windows notification when a battery runs low, storage gets full, a device gets hot, drops off the network, or an app crashes. Each alert fires once, not every minute.
 
 **Overviews**
-- **Wall:** a live picture of every device, refreshed every few seconds while the page is open. Click one to mirror it, drag pictures into your own order, drag a picture's corner to resize it (or make them all one size), and right-click for more: wake or unlock the screen, save a screenshot, open a second screen or apps, hide a device. Screens that are off show a Wake button instead of a black picture.
+- **Wall:** a live picture of every device, refreshed every few seconds while the page is open. Click one to mirror it, drag pictures into your own order, drag a picture's corner to resize it (or make them all one size), and right-click for more: wake or unlock the screen, save a screenshot, open a second screen, apps, files or quick controls, or hide a device. Sleeping screens show a **Wake** (or **Wake & unlock** / **Wake all**) button instead of a black picture, while actively mirrored screen-off devices offer **Show mirror** without waking the physical display.
 - **Logs:** the live log (logcat) of a device, filtered by importance, text or app, with crashes in red. Save it to a file.
 - **Inventory:** model, Android version, security patch, battery, storage, RAM, address and uptime of every device. Export it as CSV for Excel or as an HTML report.
 
@@ -183,32 +179,32 @@ From then on, plugged-in USB devices appear immediately, and paired Wi-Fi device
 | Mirror a device | Double-click it, or select it and press **Mirror** / Enter |
 | Mirror several | Ctrl- or Shift-click them, then **Mirror** |
 | Mirror a whole group | **Mirror all** on the group's heading |
-| Unplug a USB device and keep mirroring | Right-click › **Switch to Wi-Fi** (or **More › Switch to Wi-Fi**) |
+| Unplug a USB device and keep mirroring | Right-click › **Device utilities › Switch to Wi-Fi** (or **More › Device utilities › Switch to Wi-Fi**) |
 | Make or edit groups | **Groups…**, or right-click devices › **Move to group** |
-| Change settings for one device | Right-click › **Device settings…** (a group: its ⋯ › **Group settings…**) |
-| Run a command on devices | **Run script…** (on a group: its ⋯ menu) |
-| Run something every time a device connects | **Device settings › When it connects** |
-| Install an app | Drop the APK on a device or group, or **More › Apps…** |
+| Change settings for one device | Right-click (or row `⋯`) › **Device settings…** (a group: its `⋯` › **Group settings…**) |
+| Run a command on devices | **Tools › Run a script…** (on a group: its `⋯` menu › **Run a script on this group…**) |
+| Run something every time a device connects | **Device settings › On connect** |
+| Install an app | Drop the APK on a device or group, or **Tools › Apps…** |
 | Turn the camera picture | It follows the phone; Alt+← / Alt+→ in the camera window turn it by hand |
-| Repeat your taps on a group | Toolbar › **Group control** |
+| Repeat your taps on a group | Toolbar › **⋯ › Group control** |
 | Set up new devices the same way | **Automation › Recipes**, then **Run recipe** |
 | Restart devices every night | **Automation › Scheduled tasks › + New** |
 | Get told about low batteries or crashes | **Automation › Alerts** |
 | Use an Android app like a PC program | **Remote apps › Add an app…**, then **Open** or **Create shortcut** |
 | Open devices or Remote apps as tabs in RDM | Right-click a device / group (or on **Remote apps**) › **Export for remote tools…** |
-| Browse files and photos on a device | Right-click › **Files and photos…** (or **More › Files and photos…**) |
-| Toggle Dark mode, DND, volume or media | Right-click › **Quick controls…** (or **More › Quick controls…**) |
-| Sync clipboard, photos or 2FA codes | **Device settings…** (or **Group settings…**), tick the sync options you want |
-| Pop the phone's current app into a PC window | Right-click › **Pop out current app** (or the mirror toolbar) |
-| Ring & flash a misplaced phone | Right-click › **Locate device** (also on the **Wall**) |
+| Browse files and photos on a device | Right-click › **Files & photos…** (or **Tools › Files & photos…**) |
+| Toggle Dark mode, DND, Auto-brightness, volume or media | Right-click › **Quick controls & media…** (or **Tools › Quick controls & media…**) |
+| Sync clipboard, photos or 2FA codes | **Device settings › Sync & files** (or **Group settings…**), pick the sync options you want |
+| Pop the phone's current app into a PC window | Right-click › **Displays & camera › Pop out current app** (or toolbar › **⋯**) |
+| Ring & flash a misplaced phone | Right-click › **Device utilities › Locate device** (also on the **Wall**) |
 | See every screen at once | **Wall** |
 | Find out why an app crashes | **Logs** (at the bottom of the left bar), then **Crashes only** |
 | Get a list of all devices for Excel | **Inventory › Read devices › Export** |
 | Share a script | **Scripts**, select it, **Share** (to add one: **Import**) |
-| Back up or reset Paneless settings | **Settings › Backup and reset** |
+| Back up or reset Paneless settings | **Settings › Updates & backup** |
 | Switch pages with the keyboard | `Ctrl+1`–`Ctrl+7` for pages, `Ctrl+,` for **Settings** |
-| Switch light / dark mode | **Settings › Appearance** (follows the system theme by default) |
-| Change the language | **Settings › Language**, then restart Paneless |
+| Switch light / dark mode | **Settings › General** (follows the system theme by default) |
+| Change the language | **Settings › General**, then restart Paneless |
 
 <p align="center"><img src="docs/images/device-settings.png" width="640" alt="Device settings"></p>
 
@@ -236,7 +232,7 @@ Use Android apps like programs on your PC, the way Windows' RemoteApp works over
 - **Remembers its window:** size and place, per app. Choose a phone or tablet shape, or your own size — **Window shape** and **UI scale** (`65 %`–`150 %`) apply live while the app is open.
 - **PC keyboard only:** Android's on-screen keyboard stays out of the window (can be switched off per app).
 - The device is unlocked first if you saved its PIN.
-- **Keeps showing when you lock the device:** the app window stays live while the device is locked and its own screen is off (*Settings › Keep app windows on when locked*, on by default). Without it, some devices (e.g. Pixels with Android 17) turn the window black a few seconds after their screen goes off.
+- **Keeps showing when you lock the device:** the app window stays live while the device is locked and its own screen is off (*Settings › Mirroring & quality › Keep app windows on when locked*, on by default). Without it, some devices (e.g. Pixels with Android 17) turn the window black a few seconds after their screen goes off.
 
 What Android doesn't allow: apps that block screen capture (banking, some video apps) show a black window, an app can only be open in one place at a time (opening it on the PC takes it off the phone's screen), and there's no sound per app. A few apps don't like a second screen and jump back to the phone.
 
@@ -256,7 +252,7 @@ Open your Android mirrors and Remote apps right alongside your RDP, SSH and VPN 
 3. In RDM, import it via **File › Import › Import (.rdm)**.
 
 - **True embedded tabs (Windows):** devices and Remote apps dock directly inside RDM tabs with no extra terminal window, and closing the tab closes the session cleanly.
-- **Inline mirror toolbar:** embedded device mirrors include a compact right-hand toolbar inside the tab (Rotate, Back, Home, Recents, Volume, Power, Screen off, Notifications, Quick settings, Screenshot, Record, Type clipboard).
+- **Inline mirror toolbar:** embedded device mirrors include a compact right-hand toolbar inside the tab (Navigation, Volume/Power/Screen off, Rotate/Screenshot/Record, plus **`⋯`** for Notifications, Quick settings, and Type clipboard).
 - **Real icons & folder structure:** Remote apps keep their real Android icon with the Paneless corner badge, mirrors get the Paneless icon, and your Paneless groups become vault folders.
 - **Preserves your configured shape:** embedded Remote apps keep their phone, tablet or custom shape centered inside the tab instead of stretching across wide monitors.
 - **Re-import friendly:** every entry gets a stable ID, so exporting again later updates existing entries in place instead of creating duplicates.
@@ -323,7 +319,7 @@ Paneless has to be running (it starts in the notification area by itself when an
 ## Privacy and security
 
 - **Local only.** Paneless talks to your devices over your own network with adb, scrcpy and its local in-RAM helper (no APK installed, no wakelocks, auto-stops when idle). It sends nothing anywhere else, with two exceptions:
-  - Update checks ask GitHub for the newest release (switch off in **Settings › Updates**).
+  - Update checks ask GitHub for the newest release (switch off in **Settings › Updates & backup**).
   - If you connect an AI assistant, what it reads through Paneless (device facts, logs, screenshots, UI tree) becomes part of your conversation with that AI service. Only the devices and levels you allow are visible to it.
 - **Unlock codes** are encrypted with Windows DPAPI, the protection Credential Manager and browsers use. Only your Windows account on this PC can read them (on macOS the keychain, on Linux the Secret Service).
   - A code is typed only after Paneless confirms the device is locked and its lock screen is in front.
@@ -391,7 +387,7 @@ Paneless is free and open source, and stays that way. If it saves you time, you 
 
 **[Ko-fi](https://ko-fi.com/Stiviemain):** a one-off "coffee" or a monthly membership, no account needed.
 
-Not into donating? A ⭐ on the repo, a bug report or telling a friend helps just as much. The links are also in the app: the ♥ button in the main window, and *Settings › Support Paneless*. Paneless never asks by itself.
+Not into donating? A ⭐ on the repo, a bug report or telling a friend helps just as much. The links are also in the app: the ♥ button in the main window, and *Settings › About & support*. Paneless never asks by itself.
 
 ## Credits and license
 

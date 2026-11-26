@@ -27,17 +27,39 @@ public sealed partial class WallTile(WallViewModel wall, string id, string name)
     [ObservableProperty] public partial bool ScreenOff { get; set; }
     /// <summary>An auto-unlock code is saved (and not paused) for this device.</summary>
     [ObservableProperty] public partial bool CanUnlock { get; set; }
+    [ObservableProperty] public partial bool IsWaking { get; set; }
+    [ObservableProperty] public partial string BusyLabel { get; set; } = "";
     /// <summary>The user resized this picture on its own.</summary>
     [ObservableProperty] public partial bool HasOwnSize { get; set; }
     [ObservableProperty] public partial bool IsDragging { get; set; }
 
     public bool HasImage => Image != null;
     public bool ShowWaiting => Image == null && !ScreenOff;
+    public bool ShowSleeping => ScreenOff && !IsMirroring;
+    public bool ShowMirroringScreenOff => ScreenOff && IsMirroring;
+    public bool CanClickWake => !IsWaking;
+    public string WakeButtonText => IsWaking && BusyLabel.Length > 0 ? BusyLabel : (CanUnlock ? Loc.T("Wake & unlock") : Loc.T("Wake"));
+    public string WakeButtonTip => CanUnlock
+        ? Loc.T("Wakes and unlocks the device using your saved code.")
+        : Loc.T("Turns the screen on. Pictures of a screen that is off would only be black.");
     /// <summary>Lets a phone picture grow with its tile, while a landscape tablet stays short.</summary>
     public double MaxImageHeight => Width * 2.4;
 
     partial void OnImageChanged(Bitmap? value) { OnPropertyChanged(nameof(HasImage)); OnPropertyChanged(nameof(ShowWaiting)); }
-    partial void OnScreenOffChanged(bool value) => OnPropertyChanged(nameof(ShowWaiting));
+    partial void OnScreenOffChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowWaiting));
+        OnPropertyChanged(nameof(ShowSleeping));
+        OnPropertyChanged(nameof(ShowMirroringScreenOff));
+    }
+    partial void OnIsMirroringChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowSleeping));
+        OnPropertyChanged(nameof(ShowMirroringScreenOff));
+    }
+    partial void OnCanUnlockChanged(bool value) { OnPropertyChanged(nameof(WakeButtonText)); OnPropertyChanged(nameof(WakeButtonTip)); }
+    partial void OnIsWakingChanged(bool value) { OnPropertyChanged(nameof(CanClickWake)); OnPropertyChanged(nameof(WakeButtonText)); }
+    partial void OnBusyLabelChanged(string value) => OnPropertyChanged(nameof(WakeButtonText));
     partial void OnWidthChanged(double value) => OnPropertyChanged(nameof(MaxImageHeight));
 }
 
@@ -51,6 +73,8 @@ public sealed partial class WallViewModel : ObservableObject
     CancellationTokenSource? _loop;
     readonly SemaphoreSlim _gate = new(4);
     readonly ConcurrentDictionary<string, byte> _capturing = new();
+    readonly ConcurrentDictionary<string, byte> _waking = new();
+    readonly ConcurrentDictionary<string, byte> _dimmedSerials = new();
 
     WallLayout Layout => _s.Data.Settings.Wall;
 
@@ -69,20 +93,24 @@ public sealed partial class WallViewModel : ObservableObject
             GroupFilter = GroupChoices.Contains(keep) ? keep : GroupChoices[0];
         });
         if (s.Helpers != null)
+        {
+            s.Helpers.Disconnected += serial => _dimmedSerials.TryRemove(serial, out _);
             s.Helpers.EventReceived += ev =>
             {
                 if (ev.Name != "screen_state" || _loop == null) return;
                 var on = ev.Data["on"]?.GetValue<bool>();
                 if (on == null) return;
+                if (!on.Value) _dimmedSerials.TryRemove(ev.Serial, out _);
                 Dispatcher.UIThread.Post(() =>
                 {
                     var row = _main.NetworkRows.FirstOrDefault(r => r.Serial == ev.Serial);
                     var tile = row != null ? Tiles.FirstOrDefault(t => t.Id == row.GroupId) : null;
-                    if (tile == null) return;
+                    if (tile == null || _waking.ContainsKey(tile.Id)) return;
                     tile.ScreenOff = !on.Value;
                     if (on.Value && !IsPaused) _ = CaptureAsync(row!, tile, CancellationToken.None);
                 });
             };
+        }
     }
 
     public ObservableCollection<WallTile> Tiles { get; } = new();
@@ -96,6 +124,7 @@ public sealed partial class WallViewModel : ObservableObject
 
     public bool IsEmpty => Tiles.Count == 0 && HiddenCount == 0;
     public bool AllHidden => Tiles.Count == 0 && HiddenCount > 0;
+    public bool HasSleepingTiles => Tiles.Any(t => t.ScreenOff && !t.IsMirroring);
     public string ShowHiddenText => Loc.Count(HiddenCount, "Show {0} hidden device", "Show {0} hidden devices");
 
     partial void OnGroupFilterChanged(string value) => SyncTiles();
@@ -128,17 +157,23 @@ public sealed partial class WallViewModel : ObservableObject
         {
             var r = shown[order[i]];
             var t = Tiles.FirstOrDefault(x => x.Id == r.GroupId);
-            if (t == null) { t = new WallTile(this, r.GroupId, r.Name); Tiles.Insert(Math.Min(i, Tiles.Count), t); }
+            if (t == null)
+            {
+                t = new WallTile(this, r.GroupId, r.Name);
+                t.PropertyChanged += (_, e) => { if (e.PropertyName is nameof(WallTile.ScreenOff) or nameof(WallTile.IsMirroring)) OnPropertyChanged(nameof(HasSleepingTiles)); };
+                Tiles.Insert(Math.Min(i, Tiles.Count), t);
+            }
             else if (Tiles.IndexOf(t) is var at && at != i) Tiles.Move(at, i);
             t.Name = r.Name;
             t.IsMirroring = r.State == DeviceState.Mirroring;
-            t.CanUnlock = _s.Unlock?.IsReady(r.Sn) == true;
+            t.CanUnlock = _s.Demo ? r.Unlock == UnlockStatus.On : _s.Unlock?.IsReady(r.Sn) == true;
             t.HasOwnSize = Layout.HasOwnWidth(t.Id);
             t.Width = Layout.WidthOf(t.Id);
             result.Add((r, t));
         }
         OnPropertyChanged(nameof(IsEmpty));
         OnPropertyChanged(nameof(AllHidden));
+        OnPropertyChanged(nameof(HasSleepingTiles));
         return result;
     }
 
@@ -158,6 +193,7 @@ public sealed partial class WallViewModel : ObservableObject
                 foreach (var serial in _s.Helpers.ConnectedSerials)
                     if (_s.Helpers.TryGet(serial) is { } h && h.Supports("display_watch"))
                         _ = Task.Run(async () => { try { await h.WatchDisplayAsync(false); } catch { } });
+            _ = RestoreAllDimmedAsync();
         }
     }
 
@@ -176,6 +212,7 @@ public sealed partial class WallViewModel : ObservableObject
     async Task CaptureAsync(DeviceRow r, WallTile tile, CancellationToken ct)
     {
         if (_s.Adb is not { } adb || r.Serial is not { } serial) return;
+        if (_waking.ContainsKey(tile.Id)) return;
         if (!_capturing.TryAdd(tile.Id, 0)) return;   // the last picture of this device is still on its way
         try
         {
@@ -234,20 +271,76 @@ public sealed partial class WallViewModel : ObservableObject
 
     Task RefreshAsync(WallTile tile) => RowOf(tile) is { } r && !_s.Demo ? CaptureAsync(r, tile, CancellationToken.None) : Task.CompletedTask;
 
+    async Task RefreshAfterWakeAsync(WallTile tile)
+    {
+        if (_s.Demo || RowOf(tile) is not { } r) return;
+        for (var i = 0; i < 20 && _capturing.ContainsKey(tile.Id); i++) await Task.Delay(50);
+        await CaptureAsync(r, tile, CancellationToken.None);
+    }
+
+    bool ShouldDimForWall(DeviceRow r) => _s.EffectiveFor(r.GroupId).ScreenOff;
+
+    async Task<bool> TryDimForWallAsync(DeviceRow r, CancellationToken ct = default)
+    {
+        if (_s.Demo || _s.Helpers == null || r.Serial is not { } serial || !ShouldDimForWall(r)) return false;
+        var helper = await _s.Helpers.GetOrStartAsync(serial, r.Type == "Watch", ct);
+        if (helper == null || !helper.Supports("screen_dim")) return false;
+        if (!await helper.SetScreenDimAsync(true, brightness: 1, ct)) return false;
+        _dimmedSerials[serial] = 0;
+        return true;
+    }
+
+    public async Task RestoreDimAsync(string serial)
+    {
+        if (!_dimmedSerials.TryRemove(serial, out _)) return;
+        if (_s.Helpers?.TryGet(serial) is { } h && h.Supports("screen_dim"))
+            try { await h.SetScreenDimAsync(false); } catch { }
+    }
+
+    public Task RestoreAllDimmedAsync()
+    {
+        var serials = _dimmedSerials.Keys.ToList();
+        return Task.WhenAll(serials.Select(RestoreDimAsync));
+    }
+
     // ---------------------------------------------------------------- right-click menu
 
     [RelayCommand]
     Task Mirror(WallTile tile) => _main.MirrorByIdAsync(tile.Id);
 
     [RelayCommand]
+    Task WakeAll()
+    {
+        var targets = Tiles.Where(t => t.ScreenOff && !t.IsMirroring && !t.IsWaking).ToList();
+        return Task.WhenAll(targets.Select(WakeOrUnlock));
+    }
+
+    [RelayCommand]
+    Task WakeOrUnlock(WallTile tile) => tile.CanUnlock ? Unlock(tile) : Wake(tile);
+
+    [RelayCommand]
     async Task Wake(WallTile tile)
     {
         if (_s.Demo) { tile.ScreenOff = false; return; }
-        if (RowOf(tile) is not { Serial: { } serial } || _s.Adb is not { } adb) return;
-        await adb.ShellAsync(serial, "input keyevent KEYCODE_WAKEUP", TimeSpan.FromSeconds(5));
+        if (RowOf(tile) is not { Serial: { } serial } r || _s.Adb is not { } adb) return;
+        if (!_waking.TryAdd(tile.Id, 0)) return;
+        tile.BusyLabel = Loc.T("Waking…");
+        tile.IsWaking = true;
+        try
+        {
+            var dimmed = await TryDimForWallAsync(r);
+            await adb.ShellAsync(serial, "input keyevent KEYCODE_WAKEUP", TimeSpan.FromSeconds(5));
+            await Task.Delay(700);   // let the lock screen draw
+            if (dimmed && await adb.IsScreenOnAsync(serial) == false) await RestoreDimAsync(serial);
+        }
+        finally
+        {
+            _waking.TryRemove(tile.Id, out _);
+            tile.IsWaking = false;
+            tile.BusyLabel = "";
+        }
         tile.ScreenOff = false;
-        await Task.Delay(700);   // let the lock screen draw
-        await RefreshAsync(tile);
+        await RefreshAfterWakeAsync(tile);
     }
 
     [RelayCommand]
@@ -255,11 +348,26 @@ public sealed partial class WallViewModel : ObservableObject
     {
         if (_s.Demo) { tile.ScreenOff = false; _main.Report(Loc.F("Demo mode: would unlock {0}.", tile.Name), StatusKind.Ok); return; }
         if (RowOf(tile) is not { Serial: { } serial, Sn: { } sn } r || _s.Unlock is not { } unlock) return;
-        _main.Report(Loc.F("Unlocking {0}…", r.Name));
-        var res = await unlock.UnlockAsync(serial, sn, r.Name);
-        _main.Report(res.Message, res.Ok ? StatusKind.Ok : StatusKind.Warn);
+        if (!_waking.TryAdd(tile.Id, 0)) return;
+        tile.BusyLabel = Loc.T("Unlocking…");
+        tile.IsWaking = true;
+        try
+        {
+            _main.Report(Loc.F("Unlocking {0}…", r.Name));
+            var dimmed = await TryDimForWallAsync(r);
+            var res = await unlock.UnlockAsync(serial, sn, r.Name);
+            tile.CanUnlock = unlock.IsReady(sn);
+            _main.Report(res.Message, res.Ok ? StatusKind.Ok : StatusKind.Warn);
+            if (!res.Ok && dimmed) await RestoreDimAsync(serial);
+        }
+        finally
+        {
+            _waking.TryRemove(tile.Id, out _);
+            tile.IsWaking = false;
+            tile.BusyLabel = "";
+        }
         tile.ScreenOff = false;
-        await RefreshAsync(tile);
+        await RefreshAfterWakeAsync(tile);
     }
 
     [RelayCommand]
@@ -268,6 +376,7 @@ public sealed partial class WallViewModel : ObservableObject
         if (_s.Demo) { tile.ScreenOff = true; return; }
         if (RowOf(tile) is not { Serial: { } serial } || _s.Adb is not { } adb) return;
         await adb.ShellAsync(serial, "input keyevent KEYCODE_SLEEP", TimeSpan.FromSeconds(5));
+        await RestoreDimAsync(serial);
         tile.ScreenOff = true;
     }
 
@@ -301,6 +410,21 @@ public sealed partial class WallViewModel : ObservableObject
 
     [RelayCommand]
     void Files(WallTile tile) { if (RowOf(tile) is { } r) _main.ShowFiles?.Invoke(r); }
+
+    [RelayCommand]
+    void QuickControls(WallTile tile) { if (RowOf(tile) is { } r) _main.ShowControls?.Invoke(r); }
+
+    [RelayCommand]
+    Task PopOutCurrentApp(WallTile tile) => _main.PopOutCurrentAppAsync(RowOf(tile));
+
+    [RelayCommand]
+    Task CameraBack(WallTile tile) => _main.OpenCameraAsync(RowOf(tile), false);
+
+    [RelayCommand]
+    Task CameraFront(WallTile tile) => _main.OpenCameraAsync(RowOf(tile), true);
+
+    [RelayCommand]
+    void RunScript(WallTile tile) { if (RowOf(tile) is { } r) _main.ShowScripts?.Invoke([r.Key]); }
 
     [RelayCommand]
     Task Locate(WallTile tile) => RowOf(tile) is { } r ? _main.LocateAsync(r) : Task.CompletedTask;
@@ -392,7 +516,7 @@ public sealed partial class WallViewModel : ObservableObject
         foreach (var (r, t) in work)
         {
             if (t.Image != null) continue;
-            if (r.Name == "Lab phone 03") t.ScreenOff = true;
+            if (r.Name is "Lab phone 03" or "Lab phone 02") t.ScreenOff = true;
             t.Image = DemoPicture(r.Name.Sum(c => c) * 37 % 360, r.Type == "Tablet");   // same colours every run
             t.Status = DateTime.Today.AddHours(9).AddMinutes(41).ToString("T");
         }

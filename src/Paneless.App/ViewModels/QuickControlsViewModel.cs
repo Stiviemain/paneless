@@ -8,11 +8,15 @@ using Paneless.Core;
 namespace Paneless.App.ViewModels;
 
 /// <summary>Quick system toggles, brightness/volume sliders, and media playback controls for one device.</summary>
-public sealed partial class QuickControlsViewModel : ObservableObject
+public sealed partial class QuickControlsViewModel : ObservableObject, IDisposable
 {
     readonly AppServices _s;
     readonly DeviceRow _row;
     bool _loading;
+    bool _suppressAutoBrightnessSync;
+    CancellationTokenSource? _brightnessDebounce;
+    CancellationTokenSource? _musicDebounce;
+    CancellationTokenSource? _ringDebounce;
 
     public QuickControlsViewModel(AppServices services, DeviceRow row)
     {
@@ -27,6 +31,7 @@ public sealed partial class QuickControlsViewModel : ObservableObject
     [ObservableProperty] public partial bool DarkMode { get; set; }
     [ObservableProperty] public partial bool Dnd { get; set; }
     [ObservableProperty] public partial bool AutoRotate { get; set; }
+    [ObservableProperty] public partial bool AutoBrightness { get; set; }
     [ObservableProperty] public partial bool Wifi { get; set; }
     [ObservableProperty] public partial bool Bluetooth { get; set; }
     [ObservableProperty] public partial double Brightness { get; set; } = 128;
@@ -34,6 +39,10 @@ public sealed partial class QuickControlsViewModel : ObservableObject
     [ObservableProperty] public partial double MusicMax { get; set; } = 15;
     [ObservableProperty] public partial double RingVolume { get; set; } = 4;
     [ObservableProperty] public partial double RingMax { get; set; } = 7;
+
+    public string BrightnessText => $"{(int)Math.Round(Brightness * 100.0 / 255.0)} %";
+    public string MusicVolumeText => $"{(int)Math.Round(MusicVolume)} / {(int)Math.Round(MusicMax)}";
+    public string RingVolumeText => $"{(int)Math.Round(RingVolume)} / {(int)Math.Round(RingMax)}";
 
     [ObservableProperty] public partial bool MediaPlaying { get; set; }
     [ObservableProperty] public partial string MediaTitle { get; set; } = Loc.T("Nothing playing");
@@ -63,7 +72,7 @@ public sealed partial class QuickControlsViewModel : ObservableObject
         {
             if (_s.Demo)
             {
-                DarkMode = true; Dnd = false; AutoRotate = true; Wifi = true; Bluetooth = true;
+                DarkMode = true; Dnd = false; AutoRotate = true; AutoBrightness = false; Wifi = true; Bluetooth = true;
                 Brightness = 175; MusicMax = 25; MusicVolume = 14; RingMax = 7; RingVolume = 5;
                 MediaPlaying = true; MediaTitle = "Demo Track"; MediaArtist = "Demo Artist";
                 Say(Loc.T("Ready."));
@@ -77,6 +86,7 @@ public sealed partial class QuickControlsViewModel : ObservableObject
                 DarkMode = sys.DarkMode;
                 Dnd = sys.Dnd;
                 AutoRotate = sys.AutoRotate;
+                AutoBrightness = sys.AutoBrightness;
                 Wifi = sys.Wifi;
                 Bluetooth = sys.Bluetooth;
                 Brightness = sys.Brightness;
@@ -110,16 +120,72 @@ public sealed partial class QuickControlsViewModel : ObservableObject
     partial void OnDarkModeChanged(bool value) => _ = ApplyAsync("darkMode", value);
     partial void OnDndChanged(bool value) => _ = ApplyAsync("dnd", value);
     partial void OnAutoRotateChanged(bool value) => _ = ApplyAsync("autoRotate", value);
+    partial void OnAutoBrightnessChanged(bool value) { if (!_suppressAutoBrightnessSync) _ = ApplyAsync("autoBrightness", value); }
     partial void OnWifiChanged(bool value) => _ = ApplyAsync("wifi", value);
     partial void OnBluetoothChanged(bool value) => _ = ApplyAsync("bluetooth", value);
 
-    [RelayCommand] Task ApplyBrightness() => ApplyAsync("brightness", (int)Math.Round(Brightness));
-    [RelayCommand] Task ApplyMusicVolume() => ApplyAsync("volume", (int)Math.Round(MusicVolume), "music");
-    [RelayCommand] Task ApplyRingVolume() => ApplyAsync("volume", (int)Math.Round(RingVolume), "ring");
+    void ScheduleDebounced(ref CancellationTokenSource? slot, Func<Task> work, int delayMs = 220)
+    {
+        slot?.Cancel();
+        slot?.Dispose();
+        var cts = slot = new CancellationTokenSource();
+        _ = Task.Run(async () =>
+        {
+            try { await Task.Delay(delayMs, cts.Token); } catch (OperationCanceledException) { return; }
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                if (!cts.IsCancellationRequested) _ = work();
+            });
+        });
+    }
+
+    partial void OnBrightnessChanged(double value)
+    {
+        OnPropertyChanged(nameof(BrightnessText));
+        if (_loading) return;
+        if (AutoBrightness)
+        {
+            _suppressAutoBrightnessSync = true;
+            AutoBrightness = false;
+            _suppressAutoBrightnessSync = false;
+        }
+        var level = (int)Math.Round(value);
+        ScheduleDebounced(ref _brightnessDebounce, () => ApplyAsync("brightness", level));
+    }
+
+    partial void OnMusicMaxChanged(double value) => OnPropertyChanged(nameof(MusicVolumeText));
+
+    partial void OnMusicVolumeChanged(double value)
+    {
+        OnPropertyChanged(nameof(MusicVolumeText));
+        if (_loading) return;
+        var level = (int)Math.Round(value);
+        ScheduleDebounced(ref _musicDebounce, () => ApplyAsync("volume", level, "music"));
+    }
+
+    partial void OnRingMaxChanged(double value) => OnPropertyChanged(nameof(RingVolumeText));
+
+    partial void OnRingVolumeChanged(double value)
+    {
+        OnPropertyChanged(nameof(RingVolumeText));
+        if (_loading) return;
+        var level = (int)Math.Round(value);
+        ScheduleDebounced(ref _ringDebounce, () => ApplyAsync("volume", level, "ring"));
+    }
 
     [RelayCommand] Task MediaPrevious() => MediaAsync("previous");
     [RelayCommand] Task MediaPlayPause() => MediaAsync("play_pause");
     [RelayCommand] Task MediaNext() => MediaAsync("next");
+
+    public void Dispose()
+    {
+        foreach (var cts in new[] { _brightnessDebounce, _musicDebounce, _ringDebounce })
+        {
+            try { cts?.Cancel(); } catch { }
+            cts?.Dispose();
+        }
+        _brightnessDebounce = _musicDebounce = _ringDebounce = null;
+    }
 
     async Task MediaAsync(string action)
     {

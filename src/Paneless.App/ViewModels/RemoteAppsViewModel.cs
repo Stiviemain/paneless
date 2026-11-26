@@ -79,7 +79,7 @@ public sealed partial class RemoteAppItem : ObservableObject
         if (_loading || App.Shape == value.Value) return;
         App.Shape = value.Value;
         ForgetPlace();
-        _page.NotifyShapeChanged(App, immediate: true);
+        _page.NotifyLiveGeometryChanged(App, applyConfiguredShape: true, immediate: true);
     }
 
     partial void OnScaleChanged(ScaleChoice value)
@@ -87,10 +87,11 @@ public sealed partial class RemoteAppItem : ObservableObject
         if (_loading || value == null || App.ScalePercent == value.Value) return;
         App.ScalePercent = value.Value;
         _page.Save();
+        _page.NotifyLiveGeometryChanged(App, applyConfiguredShape: false, immediate: false);
     }
 
-    partial void OnCustomWidthChanged(decimal? value) { if (!_loading && value is { } v && (int)v != App.CustomWidth) { App.CustomWidth = (int)v; ForgetPlace(); _page.NotifyShapeChanged(App, immediate: false); } }
-    partial void OnCustomHeightChanged(decimal? value) { if (!_loading && value is { } v && (int)v != App.CustomHeight) { App.CustomHeight = (int)v; ForgetPlace(); _page.NotifyShapeChanged(App, immediate: false); } }
+    partial void OnCustomWidthChanged(decimal? value) { if (!_loading && value is { } v && (int)v != App.CustomWidth) { App.CustomWidth = (int)v; ForgetPlace(); _page.NotifyLiveGeometryChanged(App, applyConfiguredShape: true, immediate: false); } }
+    partial void OnCustomHeightChanged(decimal? value) { if (!_loading && value is { } v && (int)v != App.CustomHeight) { App.CustomHeight = (int)v; ForgetPlace(); _page.NotifyLiveGeometryChanged(App, applyConfiguredShape: true, immediate: false); } }
     partial void OnShowToolbarChanged(bool value) { if (!_loading) { App.ShowToolbar = value; _page.Save(); } }
     partial void OnPcKeyboardOnlyChanged(bool value) { if (!_loading) { App.PcKeyboardOnly = value; _page.Save(); } }
     partial void OnOnTopChanged(bool value) { if (!_loading) { App.OnTop = value; _page.Save(); } }
@@ -175,22 +176,36 @@ public sealed partial class RemoteAppsViewModel : ObservableObject
     public Func<string, string, Task<bool>>? ConfirmAsync { get; set; }
     /// <summary>Set by the window: exports one or more remote apps for external connection managers.</summary>
     public Func<IReadOnlyList<RemoteApp>, Task<string?>>? ExportConnectionsAsync { get; set; }
-    /// <summary>Set by the window: resizes an already-open remote app window to match its updated shape.</summary>
-    public Action<RemoteApp>? ResizeLiveWindow { get; set; }
+    /// <summary>Set by the window: reopens an already-open remote app window cleanly in place when its shape or UI scale changes.</summary>
+    public Func<RemoteApp, bool, Task>? ReopenLiveWindowAsync { get; set; }
 
     CancellationTokenSource? _shapeDebounce;
+    bool _pendingApplyConfiguredShape;
 
-    internal void NotifyShapeChanged(RemoteApp app, bool immediate)
+    internal void NotifyLiveGeometryChanged(RemoteApp app, bool applyConfiguredShape, bool immediate)
     {
         _shapeDebounce?.Cancel();
         _shapeDebounce?.Dispose();
         _shapeDebounce = null;
-        if (immediate) { ResizeLiveWindow?.Invoke(app); return; }
+        _pendingApplyConfiguredShape |= applyConfiguredShape;
+        if (immediate)
+        {
+            var applyShape = _pendingApplyConfiguredShape;
+            _pendingApplyConfiguredShape = false;
+            if (ReopenLiveWindowAsync != null) _ = ReopenLiveWindowAsync(app, applyShape);
+            return;
+        }
         var cts = _shapeDebounce = new CancellationTokenSource();
         _ = Task.Run(async () =>
         {
             try { await Task.Delay(350, cts.Token); } catch (OperationCanceledException) { return; }
-            Avalonia.Threading.Dispatcher.UIThread.Post(() => { if (!cts.IsCancellationRequested) ResizeLiveWindow?.Invoke(app); });
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                if (cts.IsCancellationRequested) return;
+                var applyShape = _pendingApplyConfiguredShape;
+                _pendingApplyConfiguredShape = false;
+                if (ReopenLiveWindowAsync != null) _ = ReopenLiveWindowAsync(app, applyShape);
+            });
         });
     }
 
@@ -202,7 +217,14 @@ public sealed partial class RemoteAppsViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(OpenCommand), nameof(RemoveCommand), nameof(ShortcutCommand), nameof(ForgetPlaceCommand), nameof(ReloadIconCommand), nameof(ExportSelectedCommand))]
     public partial RemoteAppItem? Selected { get; set; }
     public bool HasSelected => Selected != null;
-    partial void OnSelectedChanged(RemoteAppItem? value) => OnPropertyChanged(nameof(HasSelected));
+    public string SelectedShortcutLabel => Selected?.ShortcutButton ?? Loc.T("Create shortcut");
+    public bool SelectedHasPlace => Selected?.HasPlace == true;
+    partial void OnSelectedChanged(RemoteAppItem? value)
+    {
+        OnPropertyChanged(nameof(HasSelected));
+        OnPropertyChanged(nameof(SelectedShortcutLabel));
+        OnPropertyChanged(nameof(SelectedHasPlace));
+    }
 
     [ObservableProperty] public partial bool OnDesktop { get; set; } = true;
     [ObservableProperty] public partial bool InStartMenu { get; set; } = true;
@@ -225,6 +247,8 @@ public sealed partial class RemoteAppsViewModel : ObservableObject
             item.DeviceBrush = item.IsOpen ? Theme.Accent : brush;
             item.Changed();   // a window that just closed has a place to remember now
         }
+        OnPropertyChanged(nameof(SelectedShortcutLabel));
+        OnPropertyChanged(nameof(SelectedHasPlace));
     }
 
     bool CanAct() => Selected != null && !_opening;
@@ -272,6 +296,7 @@ public sealed partial class RemoteAppsViewModel : ObservableObject
     {
         Selected!.App.Window = null;
         Selected.Changed();
+        OnPropertyChanged(nameof(SelectedHasPlace));
         Save();
         Say(Loc.F("{0} opens in its usual size and place next time.", Selected.App.Name), StatusKind.Ok);
     }
@@ -345,6 +370,7 @@ public sealed partial class RemoteAppsViewModel : ObservableObject
             }
             Save();
             item.Changed();
+            OnPropertyChanged(nameof(SelectedShortcutLabel));
             Say(OnDesktop && InStartMenu ? Loc.F("Shortcuts for {0} are on the desktop and in the Start menu (folder “Paneless Remote apps”).", app.Name)
                 : OnDesktop ? Loc.F("A shortcut for {0} is on the desktop.", app.Name)
                 : Loc.F("A shortcut for {0} is in the Start menu (folder “Paneless Remote apps”).", app.Name), StatusKind.Ok);
